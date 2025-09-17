@@ -3,16 +3,18 @@ import { observer } from 'mobx-react-lite'
 import { useTodoStore } from '../stores/TodoStoreContext'
 
 interface PinnedDropZoneProps {
+  listId: string
   index: number
+  isListEmpty?: boolean
 }
 
-const PinnedDropZoneComponent = ({ index }: PinnedDropZoneProps) => {
+const PinnedDropZoneComponent = ({ listId, index, isListEmpty = false }: PinnedDropZoneProps) => {
   const store = useTodoStore()
   const [isOver, setIsOver] = useState(false)
 
   const draggedId = store.draggedId
   const canAccept = draggedId !== null && store.isPinned(draggedId)
-  const showPlaceholder = canAccept
+  const shouldDisplay = canAccept || isListEmpty
 
   const handleDragOver: React.DragEventHandler<HTMLDivElement> = (event) => {
     if (!canAccept) return
@@ -33,12 +35,19 @@ const PinnedDropZoneComponent = ({ index }: PinnedDropZoneProps) => {
     if (!canAccept || draggedId === null) return
     event.preventDefault()
     setIsOver(false)
-    store.movePinnedTodo(draggedId, index)
+    store.movePinnedTodo(draggedId, listId, index)
     store.clearDragged()
   }
 
-  const heightClass = showPlaceholder ? 'h-2' : 'h-0'
-  const marginClass = showPlaceholder ? 'my-1' : 'my-0'
+  const heightClass = shouldDisplay ? 'h-10' : 'h-0'
+  const marginClass = shouldDisplay ? 'my-2' : 'my-0'
+  const opacityClass = shouldDisplay ? 'opacity-100' : 'opacity-0'
+  const baseStyles = isListEmpty
+    ? 'border-slate-200/80 bg-white/90'
+    : canAccept
+      ? 'border-amber-300 bg-amber-200/40'
+      : 'border-transparent bg-transparent'
+  const activeStyles = isOver && canAccept ? 'border-amber-400 bg-amber-200/70' : ''
 
   return (
     <div className="py-0">
@@ -47,9 +56,9 @@ const PinnedDropZoneComponent = ({ index }: PinnedDropZoneProps) => {
           'rounded border border-dashed transition-all duration-150 ease-out',
           heightClass,
           marginClass,
-          showPlaceholder ? 'opacity-100' : 'opacity-0',
-          canAccept ? 'border-amber-300 bg-amber-200/40' : 'border-transparent bg-transparent',
-          isOver && canAccept ? 'border-amber-400 bg-amber-200/70' : '',
+          opacityClass,
+          baseStyles,
+          activeStyles,
         ].join(' ')}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}

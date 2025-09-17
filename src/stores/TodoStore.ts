@@ -5,7 +5,15 @@ export interface TodoNode {
   title: string
   completed: boolean
   pinned: boolean
+  pinnedListId: string | null
   children: TodoNode[]
+}
+
+export interface PinnedList {
+  id: string
+  title: string
+  itemIds: string[]
+  locked?: boolean
 }
 
 interface TodoLookup {
@@ -20,10 +28,11 @@ export const MAX_DEPTH = 2
 export class TodoStore {
   todos: TodoNode[] = []
   draggedId: string | null = null
-  pinnedOrder: string[] = []
+  pinnedLists: PinnedList[] = []
 
   constructor() {
     makeAutoObservable(this, {}, { autoBind: true })
+    this.pinnedLists = this.createInitialPinnedLists()
     this.todos = this.createInitialTodos()
   }
 
@@ -36,6 +45,7 @@ export class TodoStore {
       title: trimmed,
       completed: false,
       pinned: false,
+      pinnedListId: null,
       children: [],
     }
 
@@ -111,10 +121,13 @@ export class TodoStore {
     this.draggedId = null
   }
 
-  get pinnedTodos(): TodoNode[] {
-    return this.pinnedOrder
-      .map((id) => this.findTodo(id)?.node)
-      .filter((node): node is TodoNode => Boolean(node?.pinned))
+  get pinnedListsView() {
+    return this.pinnedLists.map((list) => ({
+      ...list,
+      todos: list.itemIds
+        .map((id) => this.findTodo(id)?.node)
+        .filter((node): node is TodoNode => Boolean(node?.pinned && node.pinnedListId === list.id)),
+    }))
   }
 
   togglePinned(id: string) {
@@ -129,29 +142,81 @@ export class TodoStore {
     this.pinNode(info.node)
   }
 
-  movePinnedTodo(id: string, targetIndex: number) {
-    const currentIndex = this.pinnedOrder.indexOf(id)
+  movePinnedTodo(id: string, targetListId: string, targetIndex: number) {
+    const info = this.findTodo(id)
+    if (!info?.node.pinned) return
+
+    const sourceList =
+      this.findPinnedListByTodoId(id) ??
+      (info.node.pinnedListId ? this.pinnedLists.find((list) => list.id === info.node.pinnedListId) : undefined)
+    const targetList = this.pinnedLists.find((list) => list.id === targetListId)
+    if (!sourceList || !targetList) return
+
+    const currentIndex = sourceList.itemIds.indexOf(id)
     if (currentIndex === -1) return
 
     let index = targetIndex
-    const maxIndex = this.pinnedOrder.length
-    if (index < 0) index = 0
-    if (index > maxIndex) index = maxIndex
-
-    const [removed] = this.pinnedOrder.splice(currentIndex, 1)
-    if (!removed) return
-
-    if (index > currentIndex) {
+    if (sourceList === targetList && index > currentIndex) {
       index -= 1
     }
 
-    const boundedIndex = Math.min(Math.max(index, 0), this.pinnedOrder.length)
-    this.pinnedOrder.splice(boundedIndex, 0, removed)
+    const [removed] = sourceList.itemIds.splice(currentIndex, 1)
+    if (!removed) return
+
+    if (index < 0) index = 0
+    if (index > targetList.itemIds.length) index = targetList.itemIds.length
+
+    targetList.itemIds.splice(index, 0, removed)
+    info.node.pinnedListId = targetList.id
   }
 
   isPinned(id: string): boolean {
     const info = this.findTodo(id)
     return info?.node.pinned ?? false
+  }
+
+  addPinnedList(title: string) {
+    const trimmed = title.trim()
+    if (!trimmed) return
+
+    const list: PinnedList = {
+      id: this.createId(),
+      title: trimmed,
+      itemIds: [],
+    }
+
+    this.pinnedLists.push(list)
+  }
+
+  renamePinnedList(id: string, title: string) {
+    const trimmed = title.trim()
+    if (!trimmed) return
+
+    const list = this.pinnedLists.find((item) => item.id === id)
+    if (!list) return
+
+    list.title = trimmed
+  }
+
+  removePinnedList(id: string) {
+    const index = this.pinnedLists.findIndex((item) => item.id === id)
+    if (index <= 0) return
+
+    const [removed] = this.pinnedLists.splice(index, 1)
+    if (!removed) return
+
+    const firstList = this.ensurePrimaryPinnedList()
+    const itemsToReassign = [...removed.itemIds]
+    const itemsToAdd = itemsToReassign.filter((itemId) => !firstList.itemIds.includes(itemId))
+
+    firstList.itemIds.push(...itemsToAdd)
+
+    itemsToReassign.forEach((itemId) => {
+      const info = this.findTodo(itemId)
+      if (info?.node.pinned) {
+        info.node.pinnedListId = firstList.id
+      }
+    })
   }
 
   canDrop(id: string, parentId: string | null): boolean {
@@ -170,6 +235,36 @@ export class TodoStore {
     if (this.containsNode(itemInfo.node, parentId)) return false
 
     return parentInfo.depth + 1 + subtreeDepth <= MAX_DEPTH
+  }
+
+  private createInitialPinnedLists(): PinnedList[] {
+    return [
+      {
+        id: this.createId(),
+        title: 'Основной список',
+        itemIds: [],
+        locked: true,
+      },
+    ]
+  }
+
+  private ensurePrimaryPinnedList(): PinnedList {
+    if (this.pinnedLists.length === 0) {
+      const list: PinnedList = {
+        id: this.createId(),
+        title: 'Основной список',
+        itemIds: [],
+        locked: true,
+      }
+      this.pinnedLists.push(list)
+      return list
+    }
+
+    return this.pinnedLists[0]
+  }
+
+  private findPinnedListByTodoId(id: string): PinnedList | undefined {
+    return this.pinnedLists.find((list) => list.itemIds.includes(id))
   }
 
   private createInitialTodos(): TodoNode[] {
@@ -233,19 +328,28 @@ export class TodoStore {
 
   private pinNode(node: TodoNode) {
     if (node.pinned) return
+
+    const primaryList = this.ensurePrimaryPinnedList()
     node.pinned = true
-    if (!this.pinnedOrder.includes(node.id)) {
-      this.pinnedOrder.push(node.id)
+    node.pinnedListId = primaryList.id
+
+    if (!primaryList.itemIds.includes(node.id)) {
+      primaryList.itemIds.push(node.id)
     }
   }
 
   private unpinNode(node: TodoNode) {
     if (!node.pinned) return
+
     node.pinned = false
-    const index = this.pinnedOrder.indexOf(node.id)
-    if (index !== -1) {
-      this.pinnedOrder.splice(index, 1)
-    }
+    node.pinnedListId = null
+
+    this.pinnedLists.forEach((list) => {
+      const index = list.itemIds.indexOf(node.id)
+      if (index !== -1) {
+        list.itemIds.splice(index, 1)
+      }
+    })
   }
 
   private removePinnedRecursive(node: TodoNode) {
@@ -257,13 +361,23 @@ export class TodoStore {
     title: string,
     options: { completed?: boolean; children?: TodoNode[]; pinned?: boolean } = {},
   ): TodoNode {
-    return {
+    const pinned = options.pinned ?? false
+    const primaryList = pinned ? this.ensurePrimaryPinnedList() : null
+
+    const todo: TodoNode = {
       id: this.createId(),
       title,
       completed: options.completed ?? false,
-      pinned: options.pinned ?? false,
+      pinned,
+      pinnedListId: pinned ? primaryList?.id ?? null : null,
       children: options.children ?? [],
     }
+
+    if (pinned && primaryList && !primaryList.itemIds.includes(todo.id)) {
+      primaryList.itemIds.push(todo.id)
+    }
+
+    return todo
   }
 
   private createId() {
