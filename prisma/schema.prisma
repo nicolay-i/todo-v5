@@ -1,0 +1,46 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+model Todo {
+  id        String   @id @default(cuid())
+  title     String
+  completed Boolean  @default(false)
+  pinned    Boolean  @default(false)
+  position  Int
+  parentId  String?
+  parent    Todo?    @relation("TodoChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children  Todo[]   @relation("TodoChildren")
+  pinnedIn  PinnedTodo[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PinnedList {
+  id        String       @id @default(cuid())
+  title     String
+  position  Int
+  isPrimary Boolean      @default(false)
+  todos     PinnedTodo[]
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+}
+
+model PinnedTodo {
+  id           Int        @id @default(autoincrement())
+  pinnedListId String
+  todoId       String
+  position     Int
+
+  pinnedList PinnedList @relation(fields: [pinnedListId], references: [id], onDelete: Cascade)
+  todo       Todo       @relation(fields: [todoId], references: [id], onDelete: Cascade)
+
+  @@unique([pinnedListId, todoId])
+  @@index([pinnedListId, position])
+}

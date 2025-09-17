@@ -2,24 +2,20 @@
 
 import { useState } from 'react'
 import { observer } from 'mobx-react-lite'
-import { MAX_DEPTH } from '@/lib/constants'
 import { useTodoStore } from '@/stores/TodoStoreContext'
 
-interface DropZoneProps {
-  parentId: string | null
-  depth: number
+interface PinnedDropZoneProps {
+  listId: string
   index: number
 }
 
-const DropZoneComponent = ({ parentId, depth, index }: DropZoneProps) => {
+const PinnedDropZoneComponent = ({ listId, index }: PinnedDropZoneProps) => {
   const store = useTodoStore()
   const [isOver, setIsOver] = useState(false)
 
-  if (depth > MAX_DEPTH) return null
-
   const draggedId = store.draggedId
-  const canAccept = draggedId !== null && store.canDrop(draggedId, parentId)
-  const showPlaceholder = draggedId !== null && depth <= MAX_DEPTH
+  const canAccept = draggedId !== null && store.isPinned(draggedId)
+  const showPlaceholder = canAccept
 
   const handleDragOver: React.DragEventHandler<HTMLDivElement> = (event) => {
     if (!canAccept) return
@@ -40,7 +36,8 @@ const DropZoneComponent = ({ parentId, depth, index }: DropZoneProps) => {
     if (!canAccept || draggedId === null) return
     event.preventDefault()
     setIsOver(false)
-    void store.moveTodo(draggedId, parentId, index)
+    void store.movePinnedTodo(draggedId, listId, index)
+    store.clearDragged()
   }
 
   const heightClass = showPlaceholder ? 'h-2' : 'h-0'
@@ -54,8 +51,8 @@ const DropZoneComponent = ({ parentId, depth, index }: DropZoneProps) => {
           heightClass,
           marginClass,
           showPlaceholder ? 'opacity-100' : 'opacity-0',
-          canAccept ? 'border-slate-300 bg-slate-200/60' : 'border-transparent bg-transparent',
-          isOver && canAccept ? 'border-slate-400 bg-slate-300' : '',
+          canAccept ? 'border-amber-300 bg-amber-200/40' : 'border-transparent bg-transparent',
+          isOver && canAccept ? 'border-amber-400 bg-amber-200/70' : '',
         ].join(' ')}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -66,4 +63,4 @@ const DropZoneComponent = ({ parentId, depth, index }: DropZoneProps) => {
   )
 }
 
-export const DropZone = observer(DropZoneComponent)
+export const PinnedDropZone = observer(PinnedDropZoneComponent)
