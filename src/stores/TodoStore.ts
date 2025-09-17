@@ -19,10 +19,30 @@ export const MAX_DEPTH = 2
 export class TodoStore {
   todos: TodoNode[] = []
   draggedId: string | null = null
+  pinnedIds: string[] = []
+  draggedPinnedId: string | null = null
 
   constructor() {
     makeAutoObservable(this, {}, { autoBind: true })
     this.todos = this.createInitialTodos()
+  }
+
+  get pinnedTodos(): TodoNode[] {
+    const result: TodoNode[] = []
+    const validIds: string[] = []
+
+    for (const id of this.pinnedIds) {
+      const info = this.findTodo(id)
+      if (!info) continue
+      result.push(info.node)
+      validIds.push(id)
+    }
+
+    if (validIds.length !== this.pinnedIds.length) {
+      this.pinnedIds = validIds
+    }
+
+    return result
   }
 
   addTodo(parentId: string | null, title: string) {
@@ -66,6 +86,8 @@ export class TodoStore {
     const info = this.findTodo(id)
     if (!info) return
 
+    this.removePinnedReferences(info.node)
+
     const list = info.parent ? info.parent.children : this.todos
     list.splice(info.index, 1)
   }
@@ -76,6 +98,14 @@ export class TodoStore {
 
   clearDragged() {
     this.draggedId = null
+  }
+
+  setPinnedDragged(id: string | null) {
+    this.draggedPinnedId = id
+  }
+
+  clearPinnedDragged() {
+    this.draggedPinnedId = null
   }
 
   moveTodo(id: string, targetParentId: string | null, targetIndex: number) {
@@ -122,6 +152,53 @@ export class TodoStore {
     if (this.containsNode(itemInfo.node, parentId)) return false
 
     return parentInfo.depth + 1 + subtreeDepth <= MAX_DEPTH
+  }
+
+  togglePinned(id: string) {
+    if (this.isPinned(id)) {
+      this.unpinTodo(id)
+      return
+    }
+
+    this.pinTodo(id)
+  }
+
+  isPinned(id: string) {
+    return this.pinnedIds.includes(id)
+  }
+
+  pinTodo(id: string) {
+    if (this.isPinned(id)) return
+    const info = this.findTodo(id)
+    if (!info) return
+    this.pinnedIds.push(id)
+  }
+
+  unpinTodo(id: string) {
+    if (!this.isPinned(id)) return
+    this.pinnedIds = this.pinnedIds.filter((pinnedId) => pinnedId !== id)
+  }
+
+  movePinnedTodo(id: string, targetIndex: number) {
+    const currentIndex = this.pinnedIds.indexOf(id)
+    if (currentIndex === -1) return
+
+    let index = targetIndex
+    if (index < 0) index = 0
+    if (index > this.pinnedIds.length) index = this.pinnedIds.length
+
+    if (index > currentIndex) {
+      index -= 1
+    }
+
+    const [item] = this.pinnedIds.splice(currentIndex, 1)
+    if (!item) return
+
+    if (index < 0) index = 0
+    if (index > this.pinnedIds.length) index = this.pinnedIds.length
+
+    this.pinnedIds.splice(index, 0, item)
+    this.draggedPinnedId = null
   }
 
   private createInitialTodos(): TodoNode[] {
@@ -181,6 +258,13 @@ export class TodoStore {
   private containsNode(node: TodoNode, id: string): boolean {
     if (node.id === id) return true
     return node.children.some((child) => this.containsNode(child, id))
+  }
+
+  private removePinnedReferences(node: TodoNode) {
+    this.unpinTodo(node.id)
+    for (const child of node.children) {
+      this.removePinnedReferences(child)
+    }
   }
 
   private makeTodo(title: string, options: { completed?: boolean; children?: TodoNode[] } = {}): TodoNode {
