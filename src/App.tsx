@@ -4,12 +4,13 @@ import { FiPlus } from 'react-icons/fi'
 import { TodoItem } from './components/TodoItem'
 import { DropZone } from './components/DropZone'
 import { PinnedList } from './components/PinnedList'
+import { MindMapView } from './components/MindMapView'
 import { useTodoStore } from './stores/TodoStoreContext'
 
 const AppComponent = () => {
   const store = useTodoStore()
   const [newTitle, setNewTitle] = useState('')
-  const [activeTab, setActiveTab] = useState<'pinned' | 'all'>('pinned')
+  const [activeTab, setActiveTab] = useState<'pinned' | 'all' | 'mindmap'>('pinned')
   const [isAddingPinnedList, setIsAddingPinnedList] = useState(false)
   const [newPinnedListTitle, setNewPinnedListTitle] = useState('')
 
@@ -40,18 +41,32 @@ const AppComponent = () => {
   )
   const isPinnedListTitleValid = newPinnedListTitle.trim().length > 0
 
+  const wrapperClassName = [
+    'mx-auto flex min-h-screen w-full flex-col px-4 py-10 sm:px-6 lg:px-8',
+    activeTab === 'mindmap' ? '' : 'max-w-4xl',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  const sectionClassName = [
+    'flex-1 rounded-3xl bg-white/60 p-5 shadow-inner ring-1 ring-white/40',
+    activeTab === 'mindmap' ? 'lg:px-10 lg:py-8' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
   return (
     <div className="min-h-screen bg-canvas-light text-slate-900">
-      <div className="mx-auto flex min-h-screen max-w-4xl flex-col px-4 py-10 sm:px-6 lg:px-8">
+      <div className={wrapperClassName}>
         {/* <header className="mb-8">
           <p className="text-sm font-medium uppercase tracking-wide text-slate-400">Задачи</p>
           <h1 className="mt-2 text-3xl font-semibold text-slate-800">Дерево задач</h1>
           <p className="mt-3 max-w-2xl text-sm text-slate-500">
-            Добавляйте задачи, группируйте их по уровням и перетаскивайте элементы, чтобы быстро управлять приоритетами. Максимальная глубина — три уровня.
+            Добавляйте задачи, группируйте их по уровням и перетаскивайте элементы, чтобы быстро управлять приоритетами. Максимальная глубина — семь уровней.
           </p>
         </header> */}
 
-        <section className="flex-1 rounded-3xl bg-white/60 p-5 shadow-inner ring-1 ring-white/40">
+        <section className={sectionClassName}>
           <div className="mb-6 flex justify-start">
             <div className="flex rounded-2xl bg-white/70 p-1 text-sm font-medium text-slate-500 shadow-sm ring-1 ring-slate-200/70">
               <button
@@ -78,10 +93,24 @@ const AppComponent = () => {
               >
                 Список задач
               </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('mindmap')}
+                className={[
+                  'rounded-xl px-4 py-2 transition focus-visible:outline-none',
+                  activeTab === 'mindmap'
+                    ? 'bg-slate-900 text-white shadow-sm'
+                    : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700',
+                ].join(' ')}
+              >
+                Mind map
+              </button>
             </div>
           </div>
 
-          {activeTab === 'pinned' ? (
+          {activeTab === 'mindmap' ? (
+            <MindMapView />
+          ) : activeTab === 'pinned' ? (
             <>
               <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h2 className="text-base font-semibold text-slate-600">Списки закрепленных задач</h2>
