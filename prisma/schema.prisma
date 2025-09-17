@@ -1,0 +1,45 @@
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "wasm"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Todo {
+  id        String   @id @default(cuid())
+  title     String
+  completed Boolean  @default(false)
+  pinned    Boolean  @default(false)
+  parentId  String?
+  position  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  parent      Todo?         @relation("TodoChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children    Todo[]        @relation("TodoChildren")
+  pinnedEntry PinnedEntry?
+}
+
+model PinnedList {
+  id        String        @id @default(cuid())
+  title     String
+  position  Int
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  entries   PinnedEntry[]
+}
+
+model PinnedEntry {
+  id        String     @id @default(cuid())
+  position  Int
+  todoId    String     @unique
+  listId    String
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  todo Todo       @relation(fields: [todoId], references: [id], onDelete: Cascade)
+  list PinnedList @relation(fields: [listId], references: [id], onDelete: Cascade)
+}

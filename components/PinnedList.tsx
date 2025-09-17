@@ -1,10 +1,12 @@
+'use client'
+
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { observer } from 'mobx-react-lite'
 import { FiCheck, FiEdit2, FiTrash2, FiX } from 'react-icons/fi'
 import { TodoItem } from './TodoItem'
 import { PinnedDropZone } from './PinnedDropZone'
-import { useTodoStore } from '../stores/TodoStoreContext'
-import type { PinnedListView } from '../stores/TodoStore'
+import { useTodoStore } from '@/stores/TodoStoreContext'
+import type { PinnedListView } from '@/types/state'
 
 interface PinnedListProps {
   list: PinnedListView
@@ -65,11 +67,11 @@ const PinnedListComponent = ({ list }: PinnedListProps) => {
               <button
                 type="submit"
                 disabled={!isRenameValid}
-                className={`${
+                className={
                   isRenameValid
                     ? actionConfirmButtonStyles
                     : `${actionConfirmButtonStyles} cursor-not-allowed opacity-60`
-                }`}
+                }
                 aria-label="Сохранить название списка"
               >
                 <FiCheck />
@@ -103,7 +105,9 @@ const PinnedListComponent = ({ list }: PinnedListProps) => {
                 type="button"
                 onClick={() => store.deletePinnedList(list.id)}
                 className={`${headerButtonStyles} ${
-                  isPrimary ? 'cursor-not-allowed opacity-40 hover:bg-transparent hover:text-slate-400' : 'text-rose-400 hover:text-rose-600'
+                  isPrimary
+                    ? 'cursor-not-allowed opacity-40 hover:bg-transparent hover:text-slate-400'
+                    : 'text-rose-400 hover:text-rose-600'
                 }`}
                 aria-label={isPrimary ? 'Первый список нельзя удалить' : 'Удалить список'}
                 disabled={isPrimary}
@@ -117,12 +121,12 @@ const PinnedListComponent = ({ list }: PinnedListProps) => {
 
       <div className="mt-4 space-y-3">
         <PinnedDropZone listId={list.id} index={0} />
-        {todos.map((todo, index) => (
-          <Fragment key={todo.id}>
-            <TodoItem todo={todo} depth={0} allowChildren={false} />
-            <PinnedDropZone listId={list.id} index={index + 1} />
-          </Fragment>
-        ))}
+          {todos.map((todo, index) => (
+            <Fragment key={todo.id}>
+              <TodoItem todo={{ ...todo, children: [] }} depth={0} allowChildren={false} />
+              <PinnedDropZone listId={list.id} index={index + 1} />
+            </Fragment>
+          ))}
       </div>
 
       {todos.length === 0 && (
