@@ -32,9 +32,9 @@ const PinnedListComponent = ({ list }: PinnedListProps) => {
 
   const emptyStateMessage = useMemo(() => {
     if (isPrimary) {
-      return 'Закрепите важные задачи на вкладке «Список задач», чтобы быстро возвращаться к ним.'
+      return 'Слот для задач сейчас пустой'
     }
-    return 'Перетащите закрепленные задачи, чтобы начать заполнять этот список.'
+    return 'Слот для задач сейчас пустой'
   }, [isPrimary])
 
   const handleRenameSubmit: React.FormEventHandler<HTMLFormElement> = async (event) => {
@@ -61,7 +61,7 @@ const PinnedListComponent = ({ list }: PinnedListProps) => {
                   setIsEditingTitle(false)
                 }
               }}
-              placeholder="Название списка"
+              placeholder="Название слота"
             />
             <div className="flex items-center gap-1">
               <button
@@ -72,7 +72,7 @@ const PinnedListComponent = ({ list }: PinnedListProps) => {
                     ? actionConfirmButtonStyles
                     : `${actionConfirmButtonStyles} cursor-not-allowed opacity-60`
                 }`}
-                aria-label="Сохранить название списка"
+                aria-label="Сохранить название слота"
               >
                 <FiCheck />
               </button>
@@ -97,7 +97,7 @@ const PinnedListComponent = ({ list }: PinnedListProps) => {
                 type="button"
                 onClick={() => setIsEditingTitle(true)}
                 className={headerButtonStyles}
-                aria-label="Переименовать список"
+                aria-label="Переименовать слот"
               >
                 <FiEdit2 />
               </button>
@@ -109,7 +109,7 @@ const PinnedListComponent = ({ list }: PinnedListProps) => {
                 className={`${headerButtonStyles} ${
                   isPrimary ? 'cursor-not-allowed opacity-40 hover:bg-transparent hover:text-slate-400' : 'text-rose-400 hover:text-rose-600'
                 }`}
-                aria-label={isPrimary ? 'Первый список нельзя удалить' : 'Удалить список'}
+                aria-label={isPrimary ? 'Первый слот нельзя удалить' : 'Удалить слот'}
                 disabled={isPrimary}
               >
                 <FiTrash2 />
