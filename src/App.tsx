@@ -1,13 +1,25 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { observer } from 'mobx-react-lite'
 import { FiPlus } from 'react-icons/fi'
 import { TodoItem } from './components/TodoItem'
 import { DropZone } from './components/DropZone'
+import { PinnedDropZone } from './components/PinnedDropZone'
 import { useTodoStore } from './stores/TodoStoreContext'
 
 const AppComponent = () => {
   const store = useTodoStore()
   const [newTitle, setNewTitle] = useState('')
+  const [activeTab, setActiveTab] = useState<'pinned' | 'todos'>('pinned')
+
+  const tabs = useMemo(
+    () => [
+      { id: 'pinned' as const, label: 'Закреплённые' },
+      { id: 'todos' as const, label: 'Список задач' },
+    ],
+    [],
+  )
+
+  const pinnedTodos = store.pinnedTodos
 
   const handleSubmit: React.FormEventHandler<HTMLFormElement> = (event) => {
     event.preventDefault()
@@ -46,21 +58,62 @@ const AppComponent = () => {
           </button>
         </form>
 
-        <section className="flex-1 rounded-3xl bg-white/60 p-5 shadow-inner ring-1 ring-white/40">
-          <div className="space-y-3">
-            <DropZone parentId={null} depth={0} index={0} />
-            {store.todos.map((todo, index) => (
-              <Fragment key={todo.id}>
-                <TodoItem todo={todo} depth={0} />
-                <DropZone parentId={null} depth={0} index={index + 1} />
-              </Fragment>
-            ))}
-          </div>
+        <div className="mb-6 inline-flex gap-2 rounded-2xl bg-white/70 p-1 shadow-inner ring-1 ring-white/50">
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.id
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={[
+                  'flex-1 rounded-xl px-4 py-2 text-sm font-medium transition-colors duration-150 sm:flex-none',
+                  isActive
+                    ? 'bg-slate-900 text-white shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700',
+                ].join(' ')}
+              >
+                {tab.label}
+              </button>
+            )
+          })}
+        </div>
 
-          {store.todos.length === 0 && (
-            <div className="mt-6 rounded-2xl border border-dashed border-slate-300/80 bg-white/70 px-6 py-10 text-center text-sm text-slate-500">
-              Начните с новой задачи — вы всегда сможете добавить вложенные подзадачи и перетащить элементы между уровнями.
-            </div>
+        <section className="flex-1 rounded-3xl bg-white/60 p-5 shadow-inner ring-1 ring-white/40">
+          {activeTab === 'pinned' ? (
+            pinnedTodos.length > 0 ? (
+              <div className="space-y-3">
+                <PinnedDropZone index={0} />
+                {pinnedTodos.map((todo, index) => (
+                  <Fragment key={todo.id}>
+                    <TodoItem todo={todo} depth={0} mode="pinned" />
+                    <PinnedDropZone index={index + 1} />
+                  </Fragment>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-slate-300/80 bg-white/70 px-6 py-10 text-center text-sm text-slate-500">
+                Закрепите задачу на вкладке «Список задач», чтобы она появилась здесь.
+              </div>
+            )
+          ) : (
+            <>
+              <div className="space-y-3">
+                <DropZone parentId={null} depth={0} index={0} />
+                {store.todos.map((todo, index) => (
+                  <Fragment key={todo.id}>
+                    <TodoItem todo={todo} depth={0} />
+                    <DropZone parentId={null} depth={0} index={index + 1} />
+                  </Fragment>
+                ))}
+              </div>
+
+              {store.todos.length === 0 && (
+                <div className="mt-6 rounded-2xl border border-dashed border-slate-300/80 bg-white/70 px-6 py-10 text-center text-sm text-slate-500">
+                  Начните с новой задачи — вы всегда сможете добавить вложенные подзадачи и перетащить элементы между уровнями.
+                </div>
+              )}
+            </>
           )}
         </section>
       </div>
