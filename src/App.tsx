@@ -4,12 +4,14 @@ import { FiPlus } from 'react-icons/fi'
 import { TodoItem } from './components/TodoItem'
 import { DropZone } from './components/DropZone'
 import { PinnedDropZone } from './components/PinnedDropZone'
+import { MindMapView } from './components/MindMapView'
 import { useTodoStore } from './stores/TodoStoreContext'
 
 const AppComponent = () => {
   const store = useTodoStore()
   const [newTitle, setNewTitle] = useState('')
-  const [activeTab, setActiveTab] = useState<'pinned' | 'all'>('pinned')
+  const [activeTab, setActiveTab] = useState<'pinned' | 'all' | 'mindmap'>('pinned')
+  const [hideCompletedMindMap, setHideCompletedMindMap] = useState(false)
 
   const handleSubmit: React.FormEventHandler<HTMLFormElement> = (event) => {
     event.preventDefault()
@@ -26,7 +28,7 @@ const AppComponent = () => {
           <p className="text-sm font-medium uppercase tracking-wide text-slate-400">Задачи</p>
           <h1 className="mt-2 text-3xl font-semibold text-slate-800">Дерево задач</h1>
           <p className="mt-3 max-w-2xl text-sm text-slate-500">
-            Добавляйте задачи, группируйте их по уровням и перетаскивайте элементы, чтобы быстро управлять приоритетами. Максимальная глубина — три уровня.
+            Добавляйте задачи, группируйте их по уровням и перетаскивайте элементы, чтобы быстро управлять приоритетами. Максимальная глубина — семь уровней.
           </p>
         </header> */}
 
@@ -57,6 +59,18 @@ const AppComponent = () => {
               >
                 Список задач
               </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('mindmap')}
+                className={[
+                  'rounded-xl px-4 py-2 transition focus-visible:outline-none',
+                  activeTab === 'mindmap'
+                    ? 'bg-slate-900 text-white shadow-sm'
+                    : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700',
+                ].join(' ')}
+              >
+                Mind map
+              </button>
             </div>
           </div>
 
@@ -78,7 +92,7 @@ const AppComponent = () => {
                 </div>
               )}
             </>
-          ) : (
+          ) : activeTab === 'all' ? (
             <>
               <form
                 onSubmit={handleSubmit}
@@ -115,6 +129,28 @@ const AppComponent = () => {
                 </div>
               )}
             </>
+          ) : (
+            <div className="space-y-6">
+              <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-white/70 p-4 ring-1 ring-slate-200">
+                <div>
+                  <h2 className="text-base font-semibold text-slate-700">Mind map</h2>
+                  <p className="mt-1 max-w-2xl text-sm text-slate-500">
+                    Перетаскивайте элементы, чтобы перестраивать иерархию. Используйте чекбоксы для отметки прогресса и скрывайте выполненные ветки.
+                  </p>
+                </div>
+                <label className="flex items-center gap-2 text-sm font-medium text-slate-600">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
+                    checked={hideCompletedMindMap}
+                    onChange={(event) => setHideCompletedMindMap(event.target.checked)}
+                  />
+                  Скрыть выполненные
+                </label>
+              </div>
+
+              <MindMapView hideCompleted={hideCompletedMindMap} />
+            </div>
           )}
         </section>
       </div>
