@@ -5,6 +5,7 @@ export interface TodoNode {
   title: string
   completed: boolean
   children: TodoNode[]
+  pinned: boolean
 }
 
 interface TodoLookup {
@@ -19,6 +20,7 @@ export const MAX_DEPTH = 2
 export class TodoStore {
   todos: TodoNode[] = []
   draggedId: string | null = null
+  pinnedOrder: string[] = []
 
   constructor() {
     makeAutoObservable(this, {}, { autoBind: true })
@@ -34,6 +36,7 @@ export class TodoStore {
       title: trimmed,
       completed: false,
       children: [],
+      pinned: false,
     }
 
     if (!parentId) {
@@ -65,6 +68,8 @@ export class TodoStore {
   deleteTodo(id: string) {
     const info = this.findTodo(id)
     if (!info) return
+
+    this.removePinnedState(info.node)
 
     const list = info.parent ? info.parent.children : this.todos
     list.splice(info.index, 1)
@@ -106,6 +111,28 @@ export class TodoStore {
     this.draggedId = null
   }
 
+  movePinned(id: string, targetIndex: number) {
+    const currentIndex = this.pinnedOrder.indexOf(id)
+    if (currentIndex === -1) return
+
+    let index = targetIndex
+    if (index < 0) index = 0
+    if (index > this.pinnedOrder.length) index = this.pinnedOrder.length
+
+    if (index > currentIndex) {
+      index -= 1
+    }
+
+    const [item] = this.pinnedOrder.splice(currentIndex, 1)
+    if (!item) return
+
+    if (index < 0) index = 0
+    if (index > this.pinnedOrder.length) index = this.pinnedOrder.length
+
+    this.pinnedOrder.splice(index, 0, item)
+    this.draggedId = null
+  }
+
   canDrop(id: string, parentId: string | null): boolean {
     const itemInfo = this.findTodo(id)
     if (!itemInfo) return false
@@ -122,6 +149,29 @@ export class TodoStore {
     if (this.containsNode(itemInfo.node, parentId)) return false
 
     return parentInfo.depth + 1 + subtreeDepth <= MAX_DEPTH
+  }
+
+  togglePinned(id: string) {
+    const info = this.findTodo(id)
+    if (!info) return
+
+    if (info.node.pinned) {
+      this.unpinTodo(info.node.id, info.node)
+      return
+    }
+
+    this.pinTodo(info.node.id, info.node)
+  }
+
+  isPinned(id: string): boolean {
+    return this.pinnedOrder.includes(id)
+  }
+
+  get pinnedTodos(): TodoNode[] {
+    return this.pinnedOrder
+      .map((id) => this.findTodo(id))
+      .filter((info): info is TodoLookup => info !== null)
+      .map((info) => info.node)
   }
 
   private createInitialTodos(): TodoNode[] {
@@ -189,6 +239,7 @@ export class TodoStore {
       title,
       completed: options.completed ?? false,
       children: options.children ?? [],
+      pinned: false,
     }
   }
 
@@ -198,5 +249,40 @@ export class TodoStore {
     }
 
     return Math.random().toString(36).slice(2, 11)
+  }
+
+  private pinTodo(id: string, node: TodoNode) {
+    if (!node.pinned) {
+      node.pinned = true
+    }
+
+    if (!this.pinnedOrder.includes(id)) {
+      this.pinnedOrder.push(id)
+    }
+  }
+
+  private unpinTodo(id: string, node: TodoNode) {
+    if (node.pinned) {
+      node.pinned = false
+    }
+
+    const index = this.pinnedOrder.indexOf(id)
+    if (index !== -1) {
+      this.pinnedOrder.splice(index, 1)
+    }
+
+    if (this.draggedId === id) {
+      this.draggedId = null
+    }
+  }
+
+  private removePinnedState(node: TodoNode) {
+    if (node.pinned) {
+      this.unpinTodo(node.id, node)
+    }
+
+    for (const child of node.children) {
+      this.removePinnedState(child)
+    }
   }
 }

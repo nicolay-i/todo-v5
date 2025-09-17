@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { observer } from 'mobx-react-lite'
 import {
+  FiBookmark,
   FiCheck,
   FiCheckCircle,
   FiCircle,
@@ -16,19 +17,20 @@ import { useTodoStore } from '../stores/TodoStoreContext'
 interface TodoItemProps {
   todo: TodoNode
   depth: number
+  allowChildren?: boolean
 }
 
 const actionButtonStyles =
   'rounded-lg p-1.5 text-slate-400 transition-colors duration-150 hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none'
 
-const TodoItemComponent = ({ todo, depth }: TodoItemProps) => {
+const TodoItemComponent = ({ todo, depth, allowChildren = true }: TodoItemProps) => {
   const store = useTodoStore()
   const [isEditing, setIsEditing] = useState(false)
   const [isAddingChild, setIsAddingChild] = useState(false)
   const [titleDraft, setTitleDraft] = useState(todo.title)
   const [childTitle, setChildTitle] = useState('')
 
-  const canAddChild = depth < MAX_DEPTH
+  const canAddChild = allowChildren && depth < MAX_DEPTH
   const isDragging = store.draggedId === todo.id
 
   useEffect(() => {
@@ -141,6 +143,20 @@ const TodoItemComponent = ({ todo, depth }: TodoItemProps) => {
           <div className="flex items-center gap-1">
             {!isEditing && (
               <>
+                <button
+                  type="button"
+                  onClick={() => store.togglePinned(todo.id)}
+                  className={[
+                    actionButtonStyles,
+                    todo.pinned
+                      ? 'bg-amber-100 text-amber-500 hover:bg-amber-100 hover:text-amber-600'
+                      : '',
+                  ].join(' ')}
+                  aria-label={todo.pinned ? 'Открепить задачу' : 'Закрепить задачу'}
+                  aria-pressed={todo.pinned}
+                >
+                  <FiBookmark />
+                </button>
                 {canAddChild && (
                   <button
                     type="button"
