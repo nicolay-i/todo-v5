@@ -4,12 +4,13 @@ import { FiPlus } from 'react-icons/fi'
 import { TodoItem } from './components/TodoItem'
 import { DropZone } from './components/DropZone'
 import { PinnedList } from './components/PinnedList'
+import { MindMapView } from './components/MindMapView'
 import { useTodoStore } from './stores/TodoStoreContext'
 
 const AppComponent = () => {
   const store = useTodoStore()
   const [newTitle, setNewTitle] = useState('')
-  const [activeTab, setActiveTab] = useState<'pinned' | 'all'>('pinned')
+  const [activeTab, setActiveTab] = useState<'pinned' | 'all' | 'mindmap'>('pinned')
   const [isAddingPinnedList, setIsAddingPinnedList] = useState(false)
   const [newPinnedListTitle, setNewPinnedListTitle] = useState('')
 
@@ -40,9 +41,14 @@ const AppComponent = () => {
   )
   const isPinnedListTitleValid = newPinnedListTitle.trim().length > 0
 
+  const containerClasses = [
+    'mx-auto flex min-h-screen flex-col px-4 py-10 sm:px-6 lg:px-8',
+    activeTab === 'mindmap' ? 'w-full max-w-none' : 'max-w-4xl',
+  ].join(' ')
+
   return (
     <div className="min-h-screen bg-canvas-light text-slate-900">
-      <div className="mx-auto flex min-h-screen max-w-4xl flex-col px-4 py-10 sm:px-6 lg:px-8">
+      <div className={containerClasses}>
         {/* <header className="mb-8">
           <p className="text-sm font-medium uppercase tracking-wide text-slate-400">Задачи</p>
           <h1 className="mt-2 text-3xl font-semibold text-slate-800">Дерево задач</h1>
@@ -77,6 +83,18 @@ const AppComponent = () => {
                 ].join(' ')}
               >
                 Список задач
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('mindmap')}
+                className={[
+                  'rounded-xl px-4 py-2 transition focus-visible:outline-none',
+                  activeTab === 'mindmap'
+                    ? 'bg-slate-900 text-white shadow-sm'
+                    : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700',
+                ].join(' ')}
+              >
+                Mind map
               </button>
             </div>
           </div>
@@ -141,7 +159,7 @@ const AppComponent = () => {
                 </div>
               )}
             </>
-          ) : (
+          ) : activeTab === 'all' ? (
             <>
               <form
                 onSubmit={handleSubmit}
@@ -178,6 +196,8 @@ const AppComponent = () => {
                 </div>
               )}
             </>
+          ) : (
+            <MindMapView />
           )}
         </section>
       </div>
