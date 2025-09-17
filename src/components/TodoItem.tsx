@@ -6,6 +6,7 @@ import {
   FiCircle,
   FiEdit2,
   FiPlus,
+  FiStar,
   FiTrash2,
   FiX,
 } from 'react-icons/fi'
@@ -30,6 +31,7 @@ const TodoItemComponent = ({ todo, depth }: TodoItemProps) => {
 
   const canAddChild = depth < MAX_DEPTH
   const isDragging = store.draggedId === todo.id
+  const isPinned = store.isPinned(todo.id)
 
   useEffect(() => {
     setTitleDraft(todo.title)
@@ -141,6 +143,20 @@ const TodoItemComponent = ({ todo, depth }: TodoItemProps) => {
           <div className="flex items-center gap-1">
             {!isEditing && (
               <>
+                <button
+                  type="button"
+                  onClick={() => store.togglePinned(todo.id)}
+                  className={[
+                    actionButtonStyles,
+                    isPinned
+                      ? 'text-amber-500 hover:text-amber-600'
+                      : 'text-slate-400 hover:text-slate-600',
+                  ].join(' ')}
+                  aria-label={isPinned ? 'Открепить задачу' : 'Закрепить задачу'}
+                  aria-pressed={isPinned}
+                >
+                  <FiStar />
+                </button>
                 {canAddChild && (
                   <button
                     type="button"
