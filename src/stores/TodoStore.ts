@@ -8,14 +8,14 @@ export interface TodoNode {
   children: TodoNode[]
 }
 
-interface TodoLookup {
+export interface TodoLookup {
   node: TodoNode
   parent: TodoNode | null
   depth: number
   index: number
 }
 
-export const MAX_DEPTH = 2
+export const MAX_DEPTH = 6
 
 export class TodoStore {
   todos: TodoNode[] = []
@@ -170,6 +170,10 @@ export class TodoStore {
     if (this.containsNode(itemInfo.node, parentId)) return false
 
     return parentInfo.depth + 1 + subtreeDepth <= MAX_DEPTH
+  }
+
+  getTodoInfo(id: string): TodoLookup | null {
+    return this.findTodo(id)
   }
 
   private createInitialTodos(): TodoNode[] {
