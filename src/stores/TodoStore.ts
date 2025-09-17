@@ -1,18 +1,6 @@
-import { makeAutoObservable } from 'mobx'
-
-export interface TodoNode {
-  id: string
-  title: string
-  completed: boolean
-  pinned: boolean
-  children: TodoNode[]
-}
-
-export interface PinnedListState {
-  id: string
-  title: string
-  order: string[]
-}
+import { makeAutoObservable, runInAction } from 'mobx'
+import { MAX_DEPTH } from '@/lib/constants'
+import type { TodoNode, TodoState, PinnedListState } from '@/lib/types'
 
 export interface PinnedListView extends PinnedListState {
   todos: TodoNode[]
@@ -25,102 +13,15 @@ interface TodoLookup {
   index: number
 }
 
-export const MAX_DEPTH = 2
-
 export class TodoStore {
   todos: TodoNode[] = []
-  draggedId: string | null = null
   pinnedLists: PinnedListState[] = []
+  draggedId: string | null = null
 
-  constructor() {
+  constructor(initialState: TodoState) {
     makeAutoObservable(this, {}, { autoBind: true })
-    this.pinnedLists.push(this.createPinnedList('Главное'))
-    this.todos = this.createInitialTodos()
-    this.syncPinnedTodos(this.todos)
-  }
-
-  addTodo(parentId: string | null, title: string) {
-    const trimmed = title.trim()
-    if (!trimmed) return
-
-    const todo: TodoNode = {
-      id: this.createId(),
-      title: trimmed,
-      completed: false,
-      pinned: false,
-      children: [],
-    }
-
-    if (!parentId) {
-      this.todos.push(todo)
-      return
-    }
-
-    const parentInfo = this.findTodo(parentId)
-    if (!parentInfo) return
-    if (parentInfo.depth >= MAX_DEPTH) return
-
-    parentInfo.node.children.push(todo)
-  }
-
-  updateTitle(id: string, title: string) {
-    const info = this.findTodo(id)
-    if (!info) return
-    const trimmed = title.trim()
-    if (!trimmed) return
-    info.node.title = trimmed
-  }
-
-  toggleTodo(id: string) {
-    const info = this.findTodo(id)
-    if (!info) return
-    info.node.completed = !info.node.completed
-  }
-
-  deleteTodo(id: string) {
-    const info = this.findTodo(id)
-    if (!info) return
-
-    this.removePinnedRecursive(info.node)
-
-    const list = info.parent ? info.parent.children : this.todos
-    list.splice(info.index, 1)
-  }
-
-  setDragged(id: string | null) {
-    this.draggedId = id
-  }
-
-  clearDragged() {
-    this.draggedId = null
-  }
-
-  moveTodo(id: string, targetParentId: string | null, targetIndex: number) {
-    if (!this.canDrop(id, targetParentId)) return
-
-    const itemInfo = this.findTodo(id)
-    if (!itemInfo) return
-
-    const sourceList = itemInfo.parent ? itemInfo.parent.children : this.todos
-    const parentInfo = targetParentId ? this.findTodo(targetParentId) : null
-
-    if (targetParentId && !parentInfo) return
-
-    const targetList = parentInfo ? parentInfo.node.children : this.todos
-
-    let index = targetIndex
-    if (sourceList === targetList && index > itemInfo.index) {
-      index -= 1
-    }
-
-    const [node] = sourceList.splice(itemInfo.index, 1)
-    if (!node) return
-
-    if (index < 0) index = 0
-    if (index > targetList.length) index = targetList.length
-
-    targetList.splice(index, 0, node)
-    this.draggedId = null
+    this.todos = initialState.todos
+    this.pinnedLists = initialState.pinnedLists
   }
 
   get pinnedListsWithTodos(): PinnedListView[] {
@@ -132,79 +33,102 @@ export class TodoStore {
     }))
   }
 
-  togglePinned(id: string) {
-    const info = this.findTodo(id)
-    if (!info) return
-
-    if (info.node.pinned) {
-      this.unpinNode(info.node)
-      return
+  async refresh() {
+    try {
+      const response = await fetch('/api/state', { cache: 'no-store' })
+      if (!response.ok) {
+        throw new Error('Failed to load state')
+      }
+      const data = (await response.json()) as TodoState
+      runInAction(() => {
+        this.todos = data.todos
+        this.pinnedLists = data.pinnedLists
+      })
+    } catch (error) {
+      console.error('Failed to refresh state', error)
     }
-
-    this.pinNode(info.node)
   }
 
-  movePinnedTodo(id: string, targetListId: string, targetIndex: number) {
-    const sourceList = this.pinnedLists.find((list) => list.order.includes(id))
-    const targetList = this.pinnedLists.find((list) => list.id === targetListId)
-    if (!sourceList || !targetList) return
+  async addTodo(parentId: string | null, title: string) {
+    if (!title.trim()) return
+    await this.mutate('/api/todos', {
+      method: 'POST',
+      body: JSON.stringify({ parentId, title }),
+    })
+  }
 
-    const currentIndex = sourceList.order.indexOf(id)
-    if (currentIndex === -1) return
+  async updateTitle(id: string, title: string) {
+    if (!title.trim()) return
+    await this.mutate(`/api/todos/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ action: 'rename', title }),
+    })
+  }
 
-    const [removed] = sourceList.order.splice(currentIndex, 1)
-    if (!removed) return
+  async toggleTodo(id: string) {
+    await this.mutate(`/api/todos/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ action: 'toggleCompleted' }),
+    })
+  }
 
-    let index = targetIndex
-    if (targetList === sourceList && index > currentIndex) {
-      index -= 1
-    }
+  async deleteTodo(id: string) {
+    await this.mutate(`/api/todos/${id}`, { method: 'DELETE' })
+  }
 
-    if (index < 0) index = 0
-    if (index > targetList.order.length) index = targetList.order.length
+  setDragged(id: string | null) {
+    this.draggedId = id
+  }
 
-    targetList.order.splice(index, 0, removed)
+  clearDragged() {
+    this.draggedId = null
+  }
+
+  async moveTodo(id: string, targetParentId: string | null, targetIndex: number) {
+    if (!this.canDrop(id, targetParentId)) return
+    await this.mutate(`/api/todos/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ action: 'move', targetParentId, targetIndex }),
+    })
+  }
+
+  async togglePinned(id: string) {
+    await this.mutate(`/api/todos/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ action: 'togglePinned' }),
+    })
+  }
+
+  async movePinnedTodo(id: string, targetListId: string, targetIndex: number) {
+    await this.mutate('/api/pinned-lists/move', {
+      method: 'POST',
+      body: JSON.stringify({ todoId: id, targetListId, targetIndex }),
+    })
+  }
+
+  async addPinnedList(title: string) {
+    if (!title.trim()) return
+    await this.mutate('/api/pinned-lists', {
+      method: 'POST',
+      body: JSON.stringify({ title }),
+    })
+  }
+
+  async renamePinnedList(id: string, title: string) {
+    if (!title.trim()) return
+    await this.mutate(`/api/pinned-lists/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ title }),
+    })
+  }
+
+  async deletePinnedList(id: string) {
+    await this.mutate(`/api/pinned-lists/${id}`, { method: 'DELETE' })
   }
 
   isPinned(id: string): boolean {
     const info = this.findTodo(id)
     return info?.node.pinned ?? false
-  }
-
-  addPinnedList(title: string) {
-    const trimmed = title.trim()
-    if (!trimmed) return
-
-    this.pinnedLists.push(this.createPinnedList(trimmed))
-  }
-
-  renamePinnedList(id: string, title: string) {
-    const trimmed = title.trim()
-    if (!trimmed) return
-
-    const list = this.pinnedLists.find((item) => item.id === id)
-    if (!list) return
-
-    list.title = trimmed
-  }
-
-  deletePinnedList(id: string) {
-    if (this.isPrimaryPinnedList(id)) return
-
-    const index = this.pinnedLists.findIndex((list) => list.id === id)
-    if (index === -1) return
-
-    const primary = this.primaryPinnedList
-    const [removed] = this.pinnedLists.splice(index, 1)
-    if (!removed) return
-
-    removed.order.forEach((todoId) => {
-      const todo = this.findTodo(todoId)?.node
-      if (!todo?.pinned) return
-      if (!primary.order.includes(todoId)) {
-        primary.order.push(todoId)
-      }
-    })
   }
 
   isPrimaryPinnedList(id: string): boolean {
@@ -229,25 +153,29 @@ export class TodoStore {
     return parentInfo.depth + 1 + subtreeDepth <= MAX_DEPTH
   }
 
-  private createInitialTodos(): TodoNode[] {
-    const qaChecklist = this.makeTodo('Проверка перед релизом', {
-      children: [
-        this.makeTodo('Прогнать авто-тесты', { completed: true }),
-        this.makeTodo('Проверить ручные сценарии'),
-        this.makeTodo('Согласовать список изменений'),
-      ],
-    })
+  private async mutate(url: string, init: RequestInit) {
+    try {
+      const response = await fetch(url, {
+        ...init,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(init.headers ?? {}),
+        },
+      })
 
-    const designIteration = this.makeTodo('Прототип интерфейса', {
-      children: [
-        this.makeTodo('Скетч основных экранов'),
-        this.makeTodo('Собрать обратную связь', {
-          children: [this.makeTodo('Созвон с командой продукта')],
-        }),
-      ],
-    })
+      if (!response.ok) {
+        throw new Error(`Request failed: ${response.status}`)
+      }
 
-    return [qaChecklist, designIteration]
+      const data = (await response.json()) as TodoState
+      runInAction(() => {
+        this.todos = data.todos
+        this.pinnedLists = data.pinnedLists
+      })
+    } catch (error) {
+      console.error('Failed to update state', error)
+      await this.refresh()
+    }
   }
 
   private findTodo(
@@ -286,87 +214,5 @@ export class TodoStore {
   private containsNode(node: TodoNode, id: string): boolean {
     if (node.id === id) return true
     return node.children.some((child) => this.containsNode(child, id))
-  }
-
-  private pinNode(node: TodoNode) {
-    if (node.pinned) return
-    node.pinned = true
-    const primary = this.primaryPinnedList
-    if (!primary.order.includes(node.id)) {
-      primary.order.push(node.id)
-    }
-  }
-
-  private unpinNode(node: TodoNode) {
-    if (!node.pinned) return
-    node.pinned = false
-    this.removeFromPinnedLists(node.id)
-  }
-
-  private removePinnedRecursive(node: TodoNode) {
-    this.unpinNode(node)
-    node.children.forEach((child) => this.removePinnedRecursive(child))
-  }
-
-  private syncPinnedTodos(nodes: TodoNode[]) {
-    nodes.forEach((node) => {
-      if (node.pinned) {
-        const primary = this.primaryPinnedList
-        if (!primary.order.includes(node.id)) {
-          primary.order.push(node.id)
-        }
-      }
-      if (node.children.length > 0) {
-        this.syncPinnedTodos(node.children)
-      }
-    })
-  }
-
-  private get primaryPinnedList(): PinnedListState {
-    if (this.pinnedLists.length === 0) {
-      const list = this.createPinnedList('Главное')
-      this.pinnedLists.push(list)
-      return list
-    }
-
-    return this.pinnedLists[0]
-  }
-
-  private removeFromPinnedLists(id: string) {
-    this.pinnedLists.forEach((list) => {
-      const index = list.order.indexOf(id)
-      if (index !== -1) {
-        list.order.splice(index, 1)
-      }
-    })
-  }
-
-  private makeTodo(
-    title: string,
-    options: { completed?: boolean; children?: TodoNode[]; pinned?: boolean } = {},
-  ): TodoNode {
-    return {
-      id: this.createId(),
-      title,
-      completed: options.completed ?? false,
-      pinned: options.pinned ?? false,
-      children: options.children ?? [],
-    }
-  }
-
-  private createPinnedList(title: string): PinnedListState {
-    return {
-      id: this.createId(),
-      title,
-      order: [],
-    }
-  }
-
-  private createId() {
-    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-      return crypto.randomUUID()
-    }
-
-    return Math.random().toString(36).slice(2, 11)
   }
 }

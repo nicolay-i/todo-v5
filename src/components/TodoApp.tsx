@@ -1,29 +1,39 @@
+'use client'
+
 import { Fragment, useMemo, useState } from 'react'
 import { observer } from 'mobx-react-lite'
 import { FiPlus } from 'react-icons/fi'
-import { TodoItem } from './components/TodoItem'
-import { DropZone } from './components/DropZone'
-import { PinnedList } from './components/PinnedList'
-import { useTodoStore } from './stores/TodoStoreContext'
+import type { TodoState } from '@/lib/types'
+import { TodoStore } from '@/stores/TodoStore'
+import { TodoStoreProvider, useTodoStore } from '@/stores/TodoStoreContext'
+import { DropZone } from './DropZone'
+import { PinnedList } from './PinnedList'
+import { TodoItem } from './TodoItem'
 
-const AppComponent = () => {
+interface TodoAppProps {
+  initialState: TodoState
+}
+
+const TodoAppContent = () => {
   const store = useTodoStore()
   const [newTitle, setNewTitle] = useState('')
   const [activeTab, setActiveTab] = useState<'pinned' | 'all'>('pinned')
   const [isAddingPinnedList, setIsAddingPinnedList] = useState(false)
   const [newPinnedListTitle, setNewPinnedListTitle] = useState('')
 
-  const handleSubmit: React.FormEventHandler<HTMLFormElement> = (event) => {
+  const handleSubmit: React.FormEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault()
-    store.addTodo(null, newTitle)
+    const trimmed = newTitle.trim()
+    if (!trimmed) return
+    await store.addTodo(null, trimmed)
     setNewTitle('')
   }
 
-  const handlePinnedListSubmit: React.FormEventHandler<HTMLFormElement> = (event) => {
+  const handlePinnedListSubmit: React.FormEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault()
     const trimmed = newPinnedListTitle.trim()
     if (!trimmed) return
-    store.addPinnedList(trimmed)
+    await store.addPinnedList(trimmed)
     setNewPinnedListTitle('')
     setIsAddingPinnedList(false)
   }
@@ -43,14 +53,6 @@ const AppComponent = () => {
   return (
     <div className="min-h-screen bg-canvas-light text-slate-900">
       <div className="mx-auto flex min-h-screen max-w-4xl flex-col px-4 py-10 sm:px-6 lg:px-8">
-        {/* <header className="mb-8">
-          <p className="text-sm font-medium uppercase tracking-wide text-slate-400">Задачи</p>
-          <h1 className="mt-2 text-3xl font-semibold text-slate-800">Дерево задач</h1>
-          <p className="mt-3 max-w-2xl text-sm text-slate-500">
-            Добавляйте задачи, группируйте их по уровням и перетаскивайте элементы, чтобы быстро управлять приоритетами. Максимальная глубина — три уровня.
-          </p>
-        </header> */}
-
         <section className="flex-1 rounded-3xl bg-white/60 p-5 shadow-inner ring-1 ring-white/40">
           <div className="mb-6 flex justify-start">
             <div className="flex rounded-2xl bg-white/70 p-1 text-sm font-medium text-slate-500 shadow-sm ring-1 ring-slate-200/70">
@@ -185,4 +187,14 @@ const AppComponent = () => {
   )
 }
 
-export const App = observer(AppComponent)
+const ObservedContent = observer(TodoAppContent)
+
+export const TodoApp = ({ initialState }: TodoAppProps) => {
+  const [store] = useState(() => new TodoStore(initialState))
+
+  return (
+    <TodoStoreProvider store={store}>
+      <ObservedContent />
+    </TodoStoreProvider>
+  )
+}
