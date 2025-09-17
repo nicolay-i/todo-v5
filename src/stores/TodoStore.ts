@@ -1,4 +1,4 @@
-import { makeAutoObservable, runInAction } from 'mobx'
+import { makeAutoObservable } from 'mobx'
 import { MAX_DEPTH } from '@/lib/constants'
 import type { TodoNode, TodoState, PinnedListState } from '@/lib/types'
 
@@ -40,10 +40,7 @@ export class TodoStore {
         throw new Error('Failed to load state')
       }
       const data = (await response.json()) as TodoState
-      runInAction(() => {
-        this.todos = data.todos
-        this.pinnedLists = data.pinnedLists
-      })
+      this.setState(data)
     } catch (error) {
       console.error('Failed to refresh state', error)
     }
@@ -82,6 +79,11 @@ export class TodoStore {
 
   clearDragged() {
     this.draggedId = null
+  }
+
+  setState(state: TodoState) {
+    this.todos = state.todos
+    this.pinnedLists = state.pinnedLists
   }
 
   async moveTodo(id: string, targetParentId: string | null, targetIndex: number) {
@@ -168,10 +170,7 @@ export class TodoStore {
       }
 
       const data = (await response.json()) as TodoState
-      runInAction(() => {
-        this.todos = data.todos
-        this.pinnedLists = data.pinnedLists
-      })
+      this.setState(data)
     } catch (error) {
       console.error('Failed to update state', error)
       await this.refresh()

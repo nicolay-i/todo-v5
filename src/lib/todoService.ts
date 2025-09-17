@@ -1,9 +1,27 @@
+import { randomUUID } from 'node:crypto'
 import type { Todo } from '@prisma/client'
 import { MAX_DEPTH } from './constants'
 import { prisma } from './prisma'
 import type { PinnedListState, TodoNode, TodoState } from './types'
 
 let schemaInitialized = false
+
+interface NormalizedTodoRecord {
+  id: string
+  title: string
+  completed: boolean
+  pinned: boolean
+  parentId: string | null
+  position: number
+}
+
+interface NormalizedPinnedList {
+  id: string
+  title: string
+  position: number
+  isPrimary: boolean
+  order: string[]
+}
 
 async function ensureDatabase() {
   // No-op: schema is managed by Prisma migrations for Postgres
@@ -212,6 +230,172 @@ export async function getTodoState(): Promise<TodoState> {
   const pinnedLists = await composePinnedLists()
 
   return { todos: tree, pinnedLists }
+}
+
+function normalizeTodos(
+  nodes: unknown,
+  parentId: string | null,
+  depth: number,
+  result: NormalizedTodoRecord[],
+  idSet: Set<string>,
+) {
+  if (depth > MAX_DEPTH) {
+    throw new Error('Превышена максимальная глубина вложенности задач')
+  }
+
+  if (!Array.isArray(nodes)) {
+    return
+  }
+
+  nodes.forEach((item, index) => {
+    if (typeof item !== 'object' || item === null) {
+      return
+    }
+
+    const raw = item as Partial<TodoNode>
+    const idCandidate = typeof raw.id === 'string' && raw.id.trim().length > 0 ? raw.id.trim() : randomUUID()
+    const id = idSet.has(idCandidate) ? randomUUID() : idCandidate
+    idSet.add(id)
+
+    const title = typeof raw.title === 'string' && raw.title.trim().length > 0 ? raw.title.trim() : 'Без названия'
+    const completed = typeof raw.completed === 'boolean' ? raw.completed : false
+    const pinned = typeof raw.pinned === 'boolean' ? raw.pinned : false
+
+    result.push({
+      id,
+      title,
+      completed,
+      pinned,
+      parentId,
+      position: index,
+    })
+
+    normalizeTodos((raw.children ?? []) as unknown, id, depth + 1, result, idSet)
+  })
+}
+
+function normalizePinnedLists(
+  lists: unknown,
+  todoIds: Set<string>,
+): NormalizedPinnedList[] {
+  if (!Array.isArray(lists)) {
+    return [
+      {
+        id: randomUUID(),
+        title: 'Главное',
+        position: 0,
+        isPrimary: true,
+        order: [],
+      },
+    ]
+  }
+
+  const normalized: NormalizedPinnedList[] = []
+
+  lists.forEach((item, index) => {
+    if (typeof item !== 'object' || item === null) {
+      return
+    }
+
+    const raw = item as Partial<PinnedListState>
+    const idCandidate = typeof raw.id === 'string' && raw.id.trim().length > 0 ? raw.id.trim() : randomUUID()
+    const id = normalized.some((list) => list.id === idCandidate) ? randomUUID() : idCandidate
+    const title = typeof raw.title === 'string' && raw.title.trim().length > 0 ? raw.title.trim() : 'Главное'
+    const order = Array.isArray(raw.order)
+      ? raw.order
+          .map((value) => (typeof value === 'string' ? value : String(value)))
+          .filter((todoId) => todoIds.has(todoId))
+      : []
+
+    normalized.push({
+      id,
+      title,
+      position: index,
+      isPrimary: Boolean(raw.isPrimary),
+      order,
+    })
+  })
+
+  if (normalized.length === 0) {
+    return [
+      {
+        id: randomUUID(),
+        title: 'Главное',
+        position: 0,
+        isPrimary: true,
+        order: [],
+      },
+    ]
+  }
+
+  const firstPrimaryIndex = normalized.findIndex((item) => item.isPrimary)
+  normalized.forEach((item, index) => {
+    item.position = index
+    item.isPrimary = index === (firstPrimaryIndex === -1 ? 0 : firstPrimaryIndex)
+  })
+
+  return normalized
+}
+
+export async function replaceTodoState(state: unknown): Promise<TodoState> {
+  const todos: NormalizedTodoRecord[] = []
+  const idSet = new Set<string>()
+  const parsed = (state as Partial<TodoState>) ?? {}
+  normalizeTodos(parsed.todos ?? [], null, 0, todos, idSet)
+
+  const todoIds = new Set(todos.map((item) => item.id))
+  const pinnedLists = normalizePinnedLists(parsed.pinnedLists ?? [], todoIds)
+
+  const pinnedTodoIds = new Set<string>()
+  pinnedLists.forEach((list) => {
+    list.order.forEach((todoId) => pinnedTodoIds.add(todoId))
+  })
+
+  todos.forEach((todo) => {
+    todo.pinned = todo.pinned || pinnedTodoIds.has(todo.id)
+  })
+
+  await prisma.$transaction(async (tx) => {
+    await tx.pinnedTodo.deleteMany()
+    await tx.pinnedList.deleteMany()
+    await tx.todo.deleteMany()
+
+    for (const todo of todos) {
+      await tx.todo.create({
+        data: {
+          id: todo.id,
+          title: todo.title,
+          completed: todo.completed,
+          pinned: todo.pinned,
+          parentId: todo.parentId,
+          position: todo.position,
+        },
+      })
+    }
+
+    for (const list of pinnedLists) {
+      await tx.pinnedList.create({
+        data: {
+          id: list.id,
+          title: list.title,
+          position: list.position,
+          isPrimary: list.isPrimary,
+        },
+      })
+
+      if (list.order.length > 0) {
+        await tx.pinnedTodo.createMany({
+          data: list.order.map((todoId, index) => ({
+            pinnedListId: list.id,
+            todoId,
+            position: index,
+          })),
+        })
+      }
+    }
+  })
+
+  return getTodoState()
 }
 
 async function getTodoDepth(id: string): Promise<number> {
