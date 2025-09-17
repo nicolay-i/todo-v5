@@ -3,8 +3,8 @@ import { observer } from 'mobx-react-lite'
 import { FiPlus } from 'react-icons/fi'
 import { TodoItem } from './components/TodoItem'
 import { DropZone } from './components/DropZone'
-import { PinnedDropZone } from './components/PinnedDropZone'
 import { useTodoStore } from './stores/TodoStoreContext'
+import { PinnedList } from './components/PinnedList'
 
 const AppComponent = () => {
   const store = useTodoStore()
@@ -17,7 +17,8 @@ const AppComponent = () => {
     setNewTitle('')
   }
 
-  const pinnedTodos = store.pinnedTodos
+  const pinnedLists = store.pinnedListData
+  const hasPinnedTodos = pinnedLists.some((list) => list.todos.length > 0)
 
   return (
     <div className="min-h-screen bg-canvas-light text-slate-900">
@@ -62,19 +63,25 @@ const AppComponent = () => {
 
           {activeTab === 'pinned' ? (
             <>
-              {pinnedTodos.length > 0 ? (
-                <div className="space-y-3">
-                  <PinnedDropZone index={0} />
-                  {pinnedTodos.map((todo, index) => (
-                    <Fragment key={todo.id}>
-                      <TodoItem todo={todo} depth={0} allowChildren={false} />
-                      <PinnedDropZone index={index + 1} />
-                    </Fragment>
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-dashed border-amber-200 bg-white/80 px-6 py-10 text-center text-sm text-slate-500">
-                  Закрепите важные задачи на вкладке «Список задач», чтобы быстро возвращаться к ним.
+              <div className="mb-4 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => store.addPinnedList()}
+                  className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
+                >
+                  <FiPlus /> Новый список
+                </button>
+              </div>
+
+              <div className="flex flex-1 gap-4 overflow-x-auto pb-2">
+                {pinnedLists.map((list) => (
+                  <PinnedList key={list.id} {...list} />
+                ))}
+              </div>
+
+              {!hasPinnedTodos && (
+                <div className="mt-6 rounded-2xl border border-dashed border-amber-200 bg-white/80 px-6 py-10 text-center text-sm text-slate-500">
+                  Закрепите важные задачи на вкладке «Список задач», затем распределяйте их по спискам и перетаскивайте между ними.
                 </div>
               )}
             </>

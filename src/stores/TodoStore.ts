@@ -8,6 +8,12 @@ export interface TodoNode {
   children: TodoNode[]
 }
 
+export interface PinnedList {
+  id: string
+  title: string
+  todoIds: string[]
+}
+
 interface TodoLookup {
   node: TodoNode
   parent: TodoNode | null
@@ -20,11 +26,18 @@ export const MAX_DEPTH = 2
 export class TodoStore {
   todos: TodoNode[] = []
   draggedId: string | null = null
-  pinnedOrder: string[] = []
+  pinnedLists: PinnedList[] = []
 
   constructor() {
     makeAutoObservable(this, {}, { autoBind: true })
     this.todos = this.createInitialTodos()
+    this.pinnedLists = [
+      {
+        id: this.createId(),
+        title: 'Основное',
+        todoIds: [],
+      },
+    ]
   }
 
   addTodo(parentId: string | null, title: string) {
@@ -111,10 +124,19 @@ export class TodoStore {
     this.draggedId = null
   }
 
-  get pinnedTodos(): TodoNode[] {
-    return this.pinnedOrder
-      .map((id) => this.findTodo(id)?.node)
-      .filter((node): node is TodoNode => Boolean(node?.pinned))
+  get pinnedListData(): { id: string; title: string; todos: TodoNode[]; isFirst: boolean }[] {
+    return this.pinnedLists.map((list, index) => {
+      const todos = list.todoIds
+        .map((id) => this.findTodo(id)?.node)
+        .filter((node): node is TodoNode => Boolean(node?.pinned))
+
+      return {
+        id: list.id,
+        title: list.title,
+        todos,
+        isFirst: index === 0,
+      }
+    })
   }
 
   togglePinned(id: string) {
@@ -129,24 +151,63 @@ export class TodoStore {
     this.pinNode(info.node)
   }
 
-  movePinnedTodo(id: string, targetIndex: number) {
-    const currentIndex = this.pinnedOrder.indexOf(id)
+  movePinnedTodo(id: string, targetListId: string, targetIndex: number) {
+    const sourceList = this.pinnedLists.find((list) => list.todoIds.includes(id))
+    const targetList = this.pinnedLists.find((list) => list.id === targetListId)
+    if (!sourceList || !targetList) return
+
+    const currentIndex = sourceList.todoIds.indexOf(id)
     if (currentIndex === -1) return
 
     let index = targetIndex
-    const maxIndex = this.pinnedOrder.length
-    if (index < 0) index = 0
-    if (index > maxIndex) index = maxIndex
-
-    const [removed] = this.pinnedOrder.splice(currentIndex, 1)
+    const [removed] = sourceList.todoIds.splice(currentIndex, 1)
     if (!removed) return
 
-    if (index > currentIndex) {
+    if (sourceList === targetList && index > currentIndex) {
       index -= 1
     }
 
-    const boundedIndex = Math.min(Math.max(index, 0), this.pinnedOrder.length)
-    this.pinnedOrder.splice(boundedIndex, 0, removed)
+    if (index < 0) index = 0
+    if (index > targetList.todoIds.length) {
+      index = targetList.todoIds.length
+    }
+
+    targetList.todoIds.splice(index, 0, removed)
+  }
+
+  addPinnedList(title?: string) {
+    const trimmed = title?.trim()
+    const newTitle = trimmed && trimmed.length > 0 ? trimmed : `Список ${this.pinnedLists.length + 1}`
+
+    this.pinnedLists.push({
+      id: this.createId(),
+      title: newTitle,
+      todoIds: [],
+    })
+  }
+
+  renamePinnedList(id: string, title: string) {
+    const trimmed = title.trim()
+    if (!trimmed) return
+    const list = this.pinnedLists.find((item) => item.id === id)
+    if (!list) return
+    list.title = trimmed
+  }
+
+  removePinnedList(id: string) {
+    const index = this.pinnedLists.findIndex((list) => list.id === id)
+    if (index <= 0) return
+    const firstList = this.pinnedLists[0]
+    if (!firstList) return
+
+    const [removed] = this.pinnedLists.splice(index, 1)
+    if (!removed) return
+
+    removed.todoIds.forEach((todoId) => {
+      if (!firstList.todoIds.includes(todoId)) {
+        firstList.todoIds.push(todoId)
+      }
+    })
   }
 
   isPinned(id: string): boolean {
@@ -234,18 +295,22 @@ export class TodoStore {
   private pinNode(node: TodoNode) {
     if (node.pinned) return
     node.pinned = true
-    if (!this.pinnedOrder.includes(node.id)) {
-      this.pinnedOrder.push(node.id)
+    const firstList = this.pinnedLists[0]
+    if (!firstList) return
+    if (!firstList.todoIds.includes(node.id)) {
+      firstList.todoIds.push(node.id)
     }
   }
 
   private unpinNode(node: TodoNode) {
     if (!node.pinned) return
     node.pinned = false
-    const index = this.pinnedOrder.indexOf(node.id)
-    if (index !== -1) {
-      this.pinnedOrder.splice(index, 1)
-    }
+    this.pinnedLists.forEach((list) => {
+      const index = list.todoIds.indexOf(node.id)
+      if (index !== -1) {
+        list.todoIds.splice(index, 1)
+      }
+    })
   }
 
   private removePinnedRecursive(node: TodoNode) {

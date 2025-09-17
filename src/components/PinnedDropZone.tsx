@@ -3,10 +3,11 @@ import { observer } from 'mobx-react-lite'
 import { useTodoStore } from '../stores/TodoStoreContext'
 
 interface PinnedDropZoneProps {
+  listId: string
   index: number
 }
 
-const PinnedDropZoneComponent = ({ index }: PinnedDropZoneProps) => {
+const PinnedDropZoneComponent = ({ listId, index }: PinnedDropZoneProps) => {
   const store = useTodoStore()
   const [isOver, setIsOver] = useState(false)
 
@@ -33,21 +34,16 @@ const PinnedDropZoneComponent = ({ index }: PinnedDropZoneProps) => {
     if (!canAccept || draggedId === null) return
     event.preventDefault()
     setIsOver(false)
-    store.movePinnedTodo(draggedId, index)
+    store.movePinnedTodo(draggedId, listId, index)
     store.clearDragged()
   }
-
-  const heightClass = showPlaceholder ? 'h-2' : 'h-0'
-  const marginClass = showPlaceholder ? 'my-1' : 'my-0'
 
   return (
     <div className="py-0">
       <div
         className={[
           'rounded border border-dashed transition-all duration-150 ease-out',
-          heightClass,
-          marginClass,
-          showPlaceholder ? 'opacity-100' : 'opacity-0',
+          showPlaceholder ? 'my-2 h-2 opacity-100' : 'my-0 h-0 opacity-0',
           canAccept ? 'border-amber-300 bg-amber-200/40' : 'border-transparent bg-transparent',
           isOver && canAccept ? 'border-amber-400 bg-amber-200/70' : '',
         ].join(' ')}
