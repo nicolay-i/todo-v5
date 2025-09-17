@@ -1,3 +1,5 @@
+'use client'
+
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { observer } from 'mobx-react-lite'
 import {
@@ -10,9 +12,10 @@ import {
   FiTrash2,
   FiX,
 } from 'react-icons/fi'
+import { MAX_DEPTH } from '@/lib/constants'
+import type { TodoNode } from '@/lib/types'
+import { useTodoStore } from '@/stores/TodoStoreContext'
 import { DropZone } from './DropZone'
-import { MAX_DEPTH, type TodoNode } from '../stores/TodoStore'
-import { useTodoStore } from '../stores/TodoStoreContext'
 
 interface TodoItemProps {
   todo: TodoNode
@@ -38,28 +41,28 @@ const TodoItemComponent = ({ todo, depth, allowChildren = true }: TodoItemProps)
   }, [todo.title])
 
   const handleToggle = () => {
-    store.toggleTodo(todo.id)
+    void store.toggleTodo(todo.id)
   }
 
-  const handleEditSubmit: React.FormEventHandler<HTMLFormElement> = (event) => {
+  const handleEditSubmit: React.FormEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault()
-    store.updateTitle(todo.id, titleDraft)
+    await store.updateTitle(todo.id, titleDraft)
     setIsEditing(false)
   }
 
-  const handleAddChild: React.FormEventHandler<HTMLFormElement> = (event) => {
+  const handleAddChild: React.FormEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault()
-    store.addTodo(todo.id, childTitle)
+    await store.addTodo(todo.id, childTitle)
     setChildTitle('')
     setIsAddingChild(false)
   }
 
   const handleDelete = () => {
-    store.deleteTodo(todo.id)
+    void store.deleteTodo(todo.id)
   }
 
   const handleTogglePinned = () => {
-    store.togglePinned(todo.id)
+    void store.togglePinned(todo.id)
   }
 
   const handleDragStart: React.DragEventHandler<HTMLDivElement> = (event) => {

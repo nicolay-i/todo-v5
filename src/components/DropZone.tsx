@@ -1,7 +1,9 @@
+'use client'
+
 import { useState } from 'react'
 import { observer } from 'mobx-react-lite'
-import { MAX_DEPTH } from '../stores/TodoStore'
-import { useTodoStore } from '../stores/TodoStoreContext'
+import { MAX_DEPTH } from '@/lib/constants'
+import { useTodoStore } from '@/stores/TodoStoreContext'
 
 interface DropZoneProps {
   parentId: string | null
@@ -38,7 +40,7 @@ const DropZoneComponent = ({ parentId, depth, index }: DropZoneProps) => {
     if (!canAccept || draggedId === null) return
     event.preventDefault()
     setIsOver(false)
-    store.moveTodo(draggedId, parentId, index)
+    void store.moveTodo(draggedId, parentId, index)
   }
 
   const heightClass = showPlaceholder ? 'h-2' : 'h-0'
