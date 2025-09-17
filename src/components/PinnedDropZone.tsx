@@ -3,10 +3,11 @@ import { observer } from 'mobx-react-lite'
 import { useTodoStore } from '../stores/TodoStoreContext'
 
 interface PinnedDropZoneProps {
+  listId: string
   index: number
 }
 
-const PinnedDropZoneComponent = ({ index }: PinnedDropZoneProps) => {
+const PinnedDropZoneComponent = ({ listId, index }: PinnedDropZoneProps) => {
   const store = useTodoStore()
   const [isOver, setIsOver] = useState(false)
 
@@ -33,7 +34,7 @@ const PinnedDropZoneComponent = ({ index }: PinnedDropZoneProps) => {
     if (!canAccept || draggedId === null) return
     event.preventDefault()
     setIsOver(false)
-    store.movePinnedTodo(draggedId, index)
+    store.movePinnedTodo(draggedId, listId, index)
     store.clearDragged()
   }
 
