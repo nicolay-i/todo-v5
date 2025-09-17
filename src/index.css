@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  body {
+    @apply min-h-screen bg-canvas font-sans text-slate-900 antialiased;
+  }
+
+  button {
+    @apply outline-none;
+  }
+}
