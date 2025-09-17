@@ -4,12 +4,13 @@ import { FiPlus } from 'react-icons/fi'
 import { TodoItem } from './components/TodoItem'
 import { DropZone } from './components/DropZone'
 import { PinnedDropZone } from './components/PinnedDropZone'
+import { MindMapView } from './components/MindMapView'
 import { useTodoStore } from './stores/TodoStoreContext'
 
 const AppComponent = () => {
   const store = useTodoStore()
   const [newTitle, setNewTitle] = useState('')
-  const [activeTab, setActiveTab] = useState<'pinned' | 'all'>('pinned')
+  const [activeTab, setActiveTab] = useState<'pinned' | 'all' | 'mindmap'>('pinned')
 
   const handleSubmit: React.FormEventHandler<HTMLFormElement> = (event) => {
     event.preventDefault()
@@ -26,7 +27,7 @@ const AppComponent = () => {
           <p className="text-sm font-medium uppercase tracking-wide text-slate-400">Задачи</p>
           <h1 className="mt-2 text-3xl font-semibold text-slate-800">Дерево задач</h1>
           <p className="mt-3 max-w-2xl text-sm text-slate-500">
-            Добавляйте задачи, группируйте их по уровням и перетаскивайте элементы, чтобы быстро управлять приоритетами. Максимальная глубина — три уровня.
+            Добавляйте задачи, группируйте их по уровням и перетаскивайте элементы, чтобы быстро управлять приоритетами. Максимальная глубина — семь уровней.
           </p>
         </header>
 
@@ -77,10 +78,22 @@ const AppComponent = () => {
               >
                 Список задач
               </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('mindmap')}
+                className={[
+                  'rounded-xl px-4 py-2 transition focus-visible:outline-none',
+                  activeTab === 'mindmap'
+                    ? 'bg-slate-900 text-white shadow-sm'
+                    : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700',
+                ].join(' ')}
+              >
+                Mind map
+              </button>
             </div>
           </div>
 
-          {activeTab === 'pinned' ? (
+          {activeTab === 'pinned' && (
             <>
               {pinnedTodos.length > 0 ? (
                 <div className="space-y-3">
@@ -98,7 +111,9 @@ const AppComponent = () => {
                 </div>
               )}
             </>
-          ) : (
+          )}
+
+          {activeTab === 'all' && (
             <>
               <div className="space-y-3">
                 <DropZone parentId={null} depth={0} index={0} />
@@ -117,6 +132,8 @@ const AppComponent = () => {
               )}
             </>
           )}
+
+          {activeTab === 'mindmap' && <MindMapView />}
         </section>
       </div>
     </div>
