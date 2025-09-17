@@ -3,13 +3,15 @@ import { observer } from 'mobx-react-lite'
 import { FiPlus } from 'react-icons/fi'
 import { TodoItem } from './components/TodoItem'
 import { DropZone } from './components/DropZone'
-import { PinnedDropZone } from './components/PinnedDropZone'
+import { PinnedListColumn } from './components/PinnedListColumn'
 import { useTodoStore } from './stores/TodoStoreContext'
 
 const AppComponent = () => {
   const store = useTodoStore()
   const [newTitle, setNewTitle] = useState('')
   const [activeTab, setActiveTab] = useState<'pinned' | 'all'>('pinned')
+  const [isCreatingList, setIsCreatingList] = useState(false)
+  const [newListTitle, setNewListTitle] = useState('')
 
   const handleSubmit: React.FormEventHandler<HTMLFormElement> = (event) => {
     event.preventDefault()
@@ -17,7 +19,7 @@ const AppComponent = () => {
     setNewTitle('')
   }
 
-  const pinnedTodos = store.pinnedTodos
+  const pinnedLists = store.pinnedListsView
 
   return (
     <div className="min-h-screen bg-canvas-light text-slate-900">
@@ -62,21 +64,71 @@ const AppComponent = () => {
 
           {activeTab === 'pinned' ? (
             <>
-              {pinnedTodos.length > 0 ? (
-                <div className="space-y-3">
-                  <PinnedDropZone index={0} />
-                  {pinnedTodos.map((todo, index) => (
-                    <Fragment key={todo.id}>
-                      <TodoItem todo={todo} depth={0} allowChildren={false} />
-                      <PinnedDropZone index={index + 1} />
-                    </Fragment>
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-dashed border-amber-200 bg-white/80 px-6 py-10 text-center text-sm text-slate-500">
-                  Закрепите важные задачи на вкладке «Список задач», чтобы быстро возвращаться к ним.
-                </div>
-              )}
+              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-slate-500">
+                  Создавайте отдельные списки для закреплённых задач и перетаскивайте элементы между ними.
+                </p>
+                {isCreatingList ? (
+                  <form
+                    onSubmit={(event) => {
+                      event.preventDefault()
+                      const trimmed = newListTitle.trim()
+                      const fallbackTitle = `Список ${pinnedLists.length + 1}`
+                      store.addPinnedList(trimmed || fallbackTitle)
+                      setNewListTitle('')
+                      setIsCreatingList(false)
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    <input
+                      className="w-40 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-inner focus:border-slate-400 focus:outline-none"
+                      value={newListTitle}
+                      onChange={(event) => setNewListTitle(event.target.value)}
+                      placeholder="Название списка"
+                      autoFocus
+                      onKeyDown={(event) => {
+                        if (event.key === 'Escape') {
+                          setNewListTitle('')
+                          setIsCreatingList(false)
+                        }
+                      }}
+                    />
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="submit"
+                        className="rounded-lg bg-emerald-500 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-emerald-500/90"
+                      >
+                        Сохранить
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNewListTitle('')
+                          setIsCreatingList(false)
+                        }}
+                        className="rounded-lg px-3 py-2 text-sm font-medium text-slate-500 transition hover:bg-slate-100"
+                      >
+                        Отмена
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsCreatingList(true)}
+                    className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
+                  >
+                    <FiPlus />
+                    Новый список
+                  </button>
+                )}
+              </div>
+
+              <div className="flex gap-4 overflow-x-auto pb-2">
+                {pinnedLists.map((list) => (
+                  <PinnedListColumn key={list.id} list={list} />
+                ))}
+              </div>
             </>
           ) : (
             <>
