@@ -3,7 +3,7 @@ import { observer } from 'mobx-react-lite'
 import { FiPlus } from 'react-icons/fi'
 import { TodoItem } from './components/TodoItem'
 import { DropZone } from './components/DropZone'
-import { PinnedDropZone } from './components/PinnedDropZone'
+import { PinnedLists } from './components/PinnedLists'
 import { useTodoStore } from './stores/TodoStoreContext'
 
 const AppComponent = () => {
@@ -16,8 +16,6 @@ const AppComponent = () => {
     store.addTodo(null, newTitle)
     setNewTitle('')
   }
-
-  const pinnedTodos = store.pinnedTodos
 
   return (
     <div className="min-h-screen bg-canvas-light text-slate-900">
@@ -61,23 +59,7 @@ const AppComponent = () => {
           </div>
 
           {activeTab === 'pinned' ? (
-            <>
-              {pinnedTodos.length > 0 ? (
-                <div className="space-y-3">
-                  <PinnedDropZone index={0} />
-                  {pinnedTodos.map((todo, index) => (
-                    <Fragment key={todo.id}>
-                      <TodoItem todo={todo} depth={0} allowChildren={false} />
-                      <PinnedDropZone index={index + 1} />
-                    </Fragment>
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-dashed border-amber-200 bg-white/80 px-6 py-10 text-center text-sm text-slate-500">
-                  Закрепите важные задачи на вкладке «Список задач», чтобы быстро возвращаться к ним.
-                </div>
-              )}
-            </>
+            <PinnedLists />
           ) : (
             <>
               <form
