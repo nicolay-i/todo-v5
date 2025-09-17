@@ -25,7 +25,7 @@ interface TodoLookup {
   index: number
 }
 
-export const MAX_DEPTH = 2
+export const MAX_DEPTH = 6
 
 export class TodoStore {
   todos: TodoNode[] = []
@@ -121,6 +121,12 @@ export class TodoStore {
 
     targetList.splice(index, 0, node)
     this.draggedId = null
+  }
+
+  moveTodoToParent(id: string, targetParentId: string | null) {
+    const parentInfo = targetParentId ? this.findTodo(targetParentId) : null
+    const targetListLength = parentInfo ? parentInfo.node.children.length : this.todos.length
+    this.moveTodo(id, targetParentId, targetListLength)
   }
 
   get pinnedListsWithTodos(): PinnedListView[] {
