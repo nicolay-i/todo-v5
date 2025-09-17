@@ -4,6 +4,7 @@ export interface TodoNode {
   id: string
   title: string
   completed: boolean
+  pinned: boolean
   children: TodoNode[]
 }
 
@@ -19,6 +20,7 @@ export const MAX_DEPTH = 2
 export class TodoStore {
   todos: TodoNode[] = []
   draggedId: string | null = null
+  pinnedOrder: string[] = []
 
   constructor() {
     makeAutoObservable(this, {}, { autoBind: true })
@@ -33,6 +35,7 @@ export class TodoStore {
       id: this.createId(),
       title: trimmed,
       completed: false,
+      pinned: false,
       children: [],
     }
 
@@ -65,6 +68,8 @@ export class TodoStore {
   deleteTodo(id: string) {
     const info = this.findTodo(id)
     if (!info) return
+
+    this.removePinnedRecursive(info.node)
 
     const list = info.parent ? info.parent.children : this.todos
     list.splice(info.index, 1)
@@ -104,6 +109,49 @@ export class TodoStore {
 
     targetList.splice(index, 0, node)
     this.draggedId = null
+  }
+
+  get pinnedTodos(): TodoNode[] {
+    return this.pinnedOrder
+      .map((id) => this.findTodo(id)?.node)
+      .filter((node): node is TodoNode => Boolean(node?.pinned))
+  }
+
+  togglePinned(id: string) {
+    const info = this.findTodo(id)
+    if (!info) return
+
+    if (info.node.pinned) {
+      this.unpinNode(info.node)
+      return
+    }
+
+    this.pinNode(info.node)
+  }
+
+  movePinnedTodo(id: string, targetIndex: number) {
+    const currentIndex = this.pinnedOrder.indexOf(id)
+    if (currentIndex === -1) return
+
+    let index = targetIndex
+    const maxIndex = this.pinnedOrder.length
+    if (index < 0) index = 0
+    if (index > maxIndex) index = maxIndex
+
+    const [removed] = this.pinnedOrder.splice(currentIndex, 1)
+    if (!removed) return
+
+    if (index > currentIndex) {
+      index -= 1
+    }
+
+    const boundedIndex = Math.min(Math.max(index, 0), this.pinnedOrder.length)
+    this.pinnedOrder.splice(boundedIndex, 0, removed)
+  }
+
+  isPinned(id: string): boolean {
+    const info = this.findTodo(id)
+    return info?.node.pinned ?? false
   }
 
   canDrop(id: string, parentId: string | null): boolean {
@@ -183,11 +231,37 @@ export class TodoStore {
     return node.children.some((child) => this.containsNode(child, id))
   }
 
-  private makeTodo(title: string, options: { completed?: boolean; children?: TodoNode[] } = {}): TodoNode {
+  private pinNode(node: TodoNode) {
+    if (node.pinned) return
+    node.pinned = true
+    if (!this.pinnedOrder.includes(node.id)) {
+      this.pinnedOrder.push(node.id)
+    }
+  }
+
+  private unpinNode(node: TodoNode) {
+    if (!node.pinned) return
+    node.pinned = false
+    const index = this.pinnedOrder.indexOf(node.id)
+    if (index !== -1) {
+      this.pinnedOrder.splice(index, 1)
+    }
+  }
+
+  private removePinnedRecursive(node: TodoNode) {
+    this.unpinNode(node)
+    node.children.forEach((child) => this.removePinnedRecursive(child))
+  }
+
+  private makeTodo(
+    title: string,
+    options: { completed?: boolean; children?: TodoNode[]; pinned?: boolean } = {},
+  ): TodoNode {
     return {
       id: this.createId(),
       title,
       completed: options.completed ?? false,
+      pinned: options.pinned ?? false,
       children: options.children ?? [],
     }
   }
