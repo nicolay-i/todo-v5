@@ -15,7 +15,7 @@ interface TodoLookup {
   index: number
 }
 
-export const MAX_DEPTH = 2
+export const MAX_DEPTH = 6
 
 export class TodoStore {
   todos: TodoNode[] = []
