@@ -76,7 +76,7 @@ const TodoItemComponent = ({ todo, depth }: TodoItemProps) => {
   )
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-1">
       <div
         className={[
           'group rounded-xl bg-white/95 ring-1 ring-slate-200 transition-all duration-200 hover:shadow-md',

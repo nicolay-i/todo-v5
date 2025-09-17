@@ -47,7 +47,7 @@ const AppComponent = () => {
         </form>
 
         <section className="flex-1 rounded-3xl bg-white/60 p-5 shadow-inner ring-1 ring-white/40">
-          <div className="space-y-3">
+          <div className="space-y-1">
             <DropZone parentId={null} depth={0} index={0} />
             {store.todos.map((todo, index) => (
               <Fragment key={todo.id}>
