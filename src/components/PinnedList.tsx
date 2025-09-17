@@ -1,10 +1,12 @@
+'use client'
+
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { observer } from 'mobx-react-lite'
 import { FiCheck, FiEdit2, FiTrash2, FiX } from 'react-icons/fi'
 import { TodoItem } from './TodoItem'
 import { PinnedDropZone } from './PinnedDropZone'
-import { useTodoStore } from '../stores/TodoStoreContext'
-import type { PinnedListView } from '../stores/TodoStore'
+import { useTodoStore } from '@/stores/TodoStoreContext'
+import type { PinnedListView } from '@/stores/TodoStore'
 
 interface PinnedListProps {
   list: PinnedListView
