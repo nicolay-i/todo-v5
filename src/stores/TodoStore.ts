@@ -25,7 +25,7 @@ interface TodoLookup {
   index: number
 }
 
-export const MAX_DEPTH = 2
+export const MAX_DEPTH = 6
 
 export class TodoStore {
   todos: TodoNode[] = []
@@ -39,9 +39,9 @@ export class TodoStore {
     this.syncPinnedTodos(this.todos)
   }
 
-  addTodo(parentId: string | null, title: string) {
+  addTodo(parentId: string | null, title: string): string | null {
     const trimmed = title.trim()
-    if (!trimmed) return
+    if (!trimmed) return null
 
     const todo: TodoNode = {
       id: this.createId(),
@@ -53,14 +53,15 @@ export class TodoStore {
 
     if (!parentId) {
       this.todos.push(todo)
-      return
+      return todo.id
     }
 
     const parentInfo = this.findTodo(parentId)
-    if (!parentInfo) return
-    if (parentInfo.depth >= MAX_DEPTH) return
+    if (!parentInfo) return null
+    if (parentInfo.depth >= MAX_DEPTH) return null
 
     parentInfo.node.children.push(todo)
+    return todo.id
   }
 
   updateTitle(id: string, title: string) {
@@ -205,6 +206,25 @@ export class TodoStore {
         primary.order.push(todoId)
       }
     })
+  }
+
+  getTodo(id: string): TodoNode | null {
+    return this.findTodo(id)?.node ?? null
+  }
+
+  getParentId(id: string): string | null {
+    const info = this.findTodo(id)
+    if (!info) return null
+    return info.parent?.id ?? null
+  }
+
+  getChildren(parentId: string | null): TodoNode[] {
+    if (!parentId) {
+      return this.todos
+    }
+
+    const info = this.findTodo(parentId)
+    return info ? info.node.children : []
   }
 
   isPrimaryPinnedList(id: string): boolean {
