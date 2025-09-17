@@ -6,6 +6,7 @@ import {
   FiCircle,
   FiEdit2,
   FiPlus,
+  FiStar,
   FiTrash2,
   FiX,
 } from 'react-icons/fi'
@@ -16,19 +17,20 @@ import { useTodoStore } from '../stores/TodoStoreContext'
 interface TodoItemProps {
   todo: TodoNode
   depth: number
+  allowChildren?: boolean
 }
 
 const actionButtonStyles =
   'rounded-lg p-1.5 text-slate-400 transition-colors duration-150 hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none'
 
-const TodoItemComponent = ({ todo, depth }: TodoItemProps) => {
+const TodoItemComponent = ({ todo, depth, allowChildren = true }: TodoItemProps) => {
   const store = useTodoStore()
   const [isEditing, setIsEditing] = useState(false)
   const [isAddingChild, setIsAddingChild] = useState(false)
   const [titleDraft, setTitleDraft] = useState(todo.title)
   const [childTitle, setChildTitle] = useState('')
 
-  const canAddChild = depth < MAX_DEPTH
+  const canAddChild = allowChildren && depth < MAX_DEPTH
   const isDragging = store.draggedId === todo.id
 
   useEffect(() => {
@@ -54,6 +56,10 @@ const TodoItemComponent = ({ todo, depth }: TodoItemProps) => {
 
   const handleDelete = () => {
     store.deleteTodo(todo.id)
+  }
+
+  const handleTogglePinned = () => {
+    store.togglePinned(todo.id)
   }
 
   const handleDragStart: React.DragEventHandler<HTMLDivElement> = (event) => {
@@ -141,6 +147,18 @@ const TodoItemComponent = ({ todo, depth }: TodoItemProps) => {
           <div className="flex items-center gap-1">
             {!isEditing && (
               <>
+                <button
+                  type="button"
+                  onClick={handleTogglePinned}
+                  className={[
+                    actionButtonStyles,
+                    todo.pinned ? 'text-amber-500 hover:text-amber-500' : '',
+                  ].join(' ')}
+                  aria-label={todo.pinned ? 'Открепить задачу' : 'Закрепить задачу'}
+                  aria-pressed={todo.pinned}
+                >
+                  <FiStar className={todo.pinned ? 'text-amber-500' : undefined} />
+                </button>
                 {canAddChild && (
                   <button
                     type="button"
