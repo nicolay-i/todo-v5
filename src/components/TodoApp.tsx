@@ -1,6 +1,7 @@
 'use client'
 
-import { Fragment, useMemo, useState } from 'react'
+import type { ChangeEventHandler, FormEventHandler } from 'react'
+import { Fragment, useMemo, useRef, useState } from 'react'
 import { observer } from 'mobx-react-lite'
 import { FiPlus } from 'react-icons/fi'
 import type { TodoState } from '@/lib/types'
@@ -17,11 +18,11 @@ interface TodoAppProps {
 const TodoAppContent = () => {
   const store = useTodoStore()
   const [newTitle, setNewTitle] = useState('')
-  const [activeTab, setActiveTab] = useState<'pinned' | 'all'>('pinned')
+  const [activeTab, setActiveTab] = useState<'pinned' | 'all' | 'settings'>('pinned')
   const [isAddingPinnedList, setIsAddingPinnedList] = useState(false)
   const [newPinnedListTitle, setNewPinnedListTitle] = useState('')
 
-  const handleSubmit: React.FormEventHandler<HTMLFormElement> = async (event) => {
+  const handleSubmit: FormEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault()
     const trimmed = newTitle.trim()
     if (!trimmed) return
@@ -29,7 +30,7 @@ const TodoAppContent = () => {
     setNewTitle('')
   }
 
-  const handlePinnedListSubmit: React.FormEventHandler<HTMLFormElement> = async (event) => {
+  const handlePinnedListSubmit: FormEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault()
     const trimmed = newPinnedListTitle.trim()
     if (!trimmed) return
@@ -50,36 +51,36 @@ const TodoAppContent = () => {
   )
   const isPinnedListTitleValid = newPinnedListTitle.trim().length > 0
 
+  const tabs: { key: 'pinned' | 'all' | 'settings'; label: string }[] = useMemo(
+    () => [
+      { key: 'pinned', label: 'Слоты' },
+      { key: 'all', label: 'Список задач' },
+      { key: 'settings', label: 'Настройки' },
+    ],
+    [],
+  )
+
   return (
     <div className="min-h-screen bg-canvas-light text-slate-900">
       <div className="mx-auto flex min-h-screen max-w-4xl flex-col px-4 py-10 sm:px-6 lg:px-8">
         <section className="flex-1 rounded-3xl bg-white/60 p-5 shadow-inner ring-1 ring-white/40">
           <div className="mb-6 flex justify-start">
             <div className="flex rounded-2xl bg-white/70 p-1 text-sm font-medium text-slate-500 shadow-sm ring-1 ring-slate-200/70">
-              <button
-                type="button"
-                onClick={() => setActiveTab('pinned')}
-                className={[
-                  'rounded-xl px-4 py-2 transition focus-visible:outline-none',
-                  activeTab === 'pinned'
-                    ? 'bg-slate-900 text-white shadow-sm'
-                    : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700',
-                ].join(' ')}
-              >
-                Закрепленные
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('all')}
-                className={[
-                  'rounded-xl px-4 py-2 transition focus-visible:outline-none',
-                  activeTab === 'all'
-                    ? 'bg-slate-900 text-white shadow-sm'
-                    : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700',
-                ].join(' ')}
-              >
-                Слоты задач
-              </button>
+              {tabs.map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setActiveTab(tab.key)}
+                  className={[
+                    'rounded-xl px-4 py-2 transition focus-visible:outline-none',
+                    activeTab === tab.key
+                      ? 'bg-slate-900 text-white shadow-sm'
+                      : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700',
+                  ].join(' ')}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -143,7 +144,7 @@ const TodoAppContent = () => {
                 </div>
               )}
             </>
-          ) : (
+          ) : activeTab === 'all' ? (
             <>
               <form
                 onSubmit={handleSubmit}
@@ -180,6 +181,8 @@ const TodoAppContent = () => {
                 </div>
               )}
             </>
+          ) : (
+            <SettingsTab />
           )}
         </section>
       </div>
@@ -196,5 +199,136 @@ export const TodoApp = ({ initialState }: TodoAppProps) => {
     <TodoStoreProvider store={store}>
       <ObservedContent />
     </TodoStoreProvider>
+  )
+}
+
+const SettingsTab = () => {
+  const store = useTodoStore()
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [isExporting, setIsExporting] = useState(false)
+  const [isImporting, setIsImporting] = useState(false)
+  const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+
+  const handleExport = async () => {
+    setStatus(null)
+    setIsExporting(true)
+    try {
+      const response = await fetch('/api/state', { cache: 'no-store' })
+      if (!response.ok) {
+        throw new Error('Failed to export state')
+      }
+      const data = await response.json()
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      const timestamp = new Date().toISOString().split('T')[0]
+      link.download = `todo-data-${timestamp}.json`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+      setStatus({ type: 'success', message: 'Данные успешно экспортированы.' })
+    } catch (error) {
+      console.error('Failed to export state', error)
+      setStatus({ type: 'error', message: 'Не удалось экспортировать данные.' })
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  const handleFileChange: ChangeEventHandler<HTMLInputElement> = async (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    setStatus(null)
+    setIsImporting(true)
+
+    try {
+      const text = await file.text()
+      const parsed = JSON.parse(text)
+      const response = await fetch('/api/state', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(parsed),
+      })
+
+      if (!response.ok) {
+        throw new Error('Import failed')
+      }
+
+      const state = (await response.json()) as TodoState
+      store.setState(state)
+      setStatus({ type: 'success', message: 'Данные успешно импортированы.' })
+    } catch (error) {
+      console.error('Failed to import state', error)
+      setStatus({ type: 'error', message: 'Не удалось импортировать данные. Проверьте файл и попробуйте снова.' })
+    } finally {
+      setIsImporting(false)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      {status && (
+        <div
+          className={[
+            'rounded-2xl border px-4 py-3 text-sm shadow-inner',
+            status.type === 'success'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : 'border-rose-200 bg-rose-50 text-rose-700',
+          ].join(' ')}
+        >
+          {status.message}
+        </div>
+      )}
+
+      <div className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
+        <h3 className="text-base font-semibold text-slate-700">Экспорт данных</h3>
+        <p className="mt-2 text-sm text-slate-500">
+          Скачайте текущий список задач и закрепленных списков в формате JSON.
+        </p>
+        <button
+          type="button"
+          onClick={handleExport}
+          disabled={isExporting}
+          className={`mt-4 inline-flex items-center rounded-xl px-4 py-2 text-sm font-medium text-white shadow-sm transition ${
+            isExporting ? 'cursor-not-allowed bg-slate-400' : 'bg-slate-900 hover:bg-slate-800'
+          }`}
+        >
+          {isExporting ? 'Подготовка...' : 'Скачать JSON'}
+        </button>
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
+        <h3 className="text-base font-semibold text-slate-700">Импорт данных</h3>
+        <p className="mt-2 text-sm text-slate-500">
+          Выберите файл JSON, созданный в этом приложении, чтобы заменить текущие данные.
+        </p>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/json,.json"
+          onChange={handleFileChange}
+          className="hidden"
+        />
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isImporting}
+          className={`mt-4 inline-flex items-center rounded-xl px-4 py-2 text-sm font-medium text-white shadow-sm transition ${
+            isImporting ? 'cursor-not-allowed bg-slate-400' : 'bg-slate-900 hover:bg-slate-800'
+          }`}
+        >
+          {isImporting ? 'Импорт...' : 'Выбрать файл'}
+        </button>
+        <p className="mt-3 text-xs text-slate-400">
+          Импорт заменит существующие задачи и списки. Перед продолжением сохраните резервную копию.
+        </p>
+      </div>
+    </div>
   )
 }
