@@ -1,0 +1,52 @@
+// Prisma schema for todo tree application
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Task {
+  id        String   @id @default(cuid())
+  title     String
+  completed Boolean  @default(false)
+  pinned    Boolean  @default(false)
+  order     Int
+  parentId  String?
+
+  parent   Task?   @relation("TaskChildren", fields: [parentId], references: [id])
+  children Task[]  @relation("TaskChildren")
+  pinnedItems PinnedListItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PinnedList {
+  id        String @id @default(cuid())
+  title     String
+  position  Int
+
+  items     PinnedListItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PinnedListItem {
+  id       String @id @default(cuid())
+  listId   String
+  taskId   String
+  position Int
+
+  list PinnedList @relation(fields: [listId], references: [id])
+  task Task       @relation(fields: [taskId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([listId, taskId])
+}
