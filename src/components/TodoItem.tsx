@@ -19,7 +19,7 @@ interface TodoItemProps {
 }
 
 const actionButtonStyles =
-  'rounded-full p-1.5 text-slate-400 transition-colors duration-150 hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none'
+  'rounded-lg p-1.5 text-slate-400 transition-colors duration-150 hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none'
 
 const TodoItemComponent = ({ todo, depth }: TodoItemProps) => {
   const store = useTodoStore()
@@ -86,7 +86,7 @@ const TodoItemComponent = ({ todo, depth }: TodoItemProps) => {
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex items-start gap-3 px-4 py-3">
+        <div className="flex items-center gap-3 px-4 py-3">
           <button
             type="button"
             onClick={handleToggle}
@@ -104,6 +104,12 @@ const TodoItemComponent = ({ todo, depth }: TodoItemProps) => {
                   autoFocus
                   value={titleDraft}
                   onChange={(event) => setTitleDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape') {
+                      setTitleDraft(todo.title)
+                      setIsEditing(false)
+                    }
+                  }}
                   placeholder="Название задачи"
                 />
                 <div className="flex items-center gap-1 self-end sm:self-auto">
@@ -133,34 +139,38 @@ const TodoItemComponent = ({ todo, depth }: TodoItemProps) => {
           </div>
 
           <div className="flex items-center gap-1">
-            {canAddChild && (
-              <button
-                type="button"
-                onClick={() => {
-                  setIsAddingChild((value) => !value)
-                }}
-                className={actionButtonStyles}
-                aria-label={isAddingChild ? 'Скрыть форму добавления подзадачи' : 'Добавить подзадачу'}
-              >
-                <FiPlus />
-              </button>
+            {!isEditing && (
+              <>
+                {canAddChild && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAddingChild((value) => !value)
+                    }}
+                    className={actionButtonStyles}
+                    aria-label={isAddingChild ? 'Скрыть форму добавления подзадачи' : 'Добавить подзадачу'}
+                  >
+                    <FiPlus />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setIsEditing(true)}
+                  className={actionButtonStyles}
+                  aria-label="Редактировать задачу"
+                >
+                  <FiEdit2 />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  className={`${actionButtonStyles} text-rose-400 hover:text-rose-600`}
+                  aria-label="Удалить задачу"
+                >
+                  <FiTrash2 />
+                </button>
+              </>
             )}
-            <button
-              type="button"
-              onClick={() => setIsEditing(true)}
-              className={actionButtonStyles}
-              aria-label="Редактировать задачу"
-            >
-              <FiEdit2 />
-            </button>
-            <button
-              type="button"
-              onClick={handleDelete}
-              className={`${actionButtonStyles} text-rose-400 hover:text-rose-600`}
-              aria-label="Удалить задачу"
-            >
-              <FiTrash2 />
-            </button>
           </div>
         </div>
 
