@@ -3,6 +3,28 @@ import { MAX_DEPTH } from './constants'
 import { prisma } from './prisma'
 import type { PinnedListState, TodoNode, TodoState } from './types'
 
+interface SerializableTodoNode {
+  id: string
+  title: string
+  completed: boolean
+  pinned: boolean
+  position: number
+  children?: SerializableTodoNode[]
+}
+
+interface SerializablePinnedList {
+  id: string
+  title: string
+  position: number
+  isPrimary: boolean
+  order: string[]
+}
+
+interface SerializableTodoState {
+  todos: SerializableTodoNode[]
+  pinnedLists: SerializablePinnedList[]
+}
+
 let schemaInitialized = false
 
 async function ensureDatabase() {
@@ -622,6 +644,212 @@ export async function deletePinnedList(id: string): Promise<TodoState> {
 
     await tx.pinnedTodo.deleteMany({ where: { pinnedListId: id } })
     await tx.pinnedList.delete({ where: { id } })
+  })
+
+  return getTodoState()
+}
+
+function collectTodos(
+  nodes: SerializableTodoNode[],
+  parentId: string | null,
+  depth: number,
+  accumulator: {
+    id: string
+    title: string
+    completed: boolean
+    pinned: boolean
+    position: number
+    parentId: string | null
+  }[],
+  seenIds: Set<string>,
+) {
+  if (depth > MAX_DEPTH) {
+    throw new Error('Превышена максимальная вложенность задач')
+  }
+
+  nodes.forEach((node, index) => {
+    if (!node || typeof node !== 'object') {
+      throw new Error(`Некорректный элемент задачи на уровне ${depth}`)
+    }
+
+    const { id, title, completed, pinned, position } = node
+    if (typeof id !== 'string' || id.trim() === '') {
+      throw new Error(`Задача №${index + 1} на уровне ${depth + 1} не содержит корректного идентификатора`)
+    }
+    if (seenIds.has(id)) {
+      throw new Error(`Обнаружен повторяющийся идентификатор задачи: ${id}`)
+    }
+    seenIds.add(id)
+
+    if (typeof title !== 'string' || title.trim() === '') {
+      throw new Error(`Задача «${id}» имеет пустой заголовок`)
+    }
+
+    if (!Number.isInteger(position)) {
+      throw new Error(`Задача «${title}» содержит некорректную позицию`)
+    }
+
+    accumulator.push({
+      id,
+      title: title.trim(),
+      completed: Boolean(completed),
+      pinned: Boolean(pinned),
+      position,
+      parentId,
+    })
+
+    const children = Array.isArray(node.children) ? node.children : []
+    collectTodos(children, id, depth + 1, accumulator, seenIds)
+  })
+}
+
+function normalizePinnedLists(
+  lists: SerializablePinnedList[],
+  todoIds: Set<string>,
+): SerializablePinnedList[] {
+  if (lists.length === 0) {
+    throw new Error('Необходимо указать хотя бы один список закрепленных задач')
+  }
+
+  const seenListIds = new Set<string>()
+  const sanitized = lists.map((list, index) => {
+    if (!list || typeof list !== 'object') {
+      throw new Error(`Некорректный список закрепленных задач №${index + 1}`)
+    }
+
+    const { id, title, position, isPrimary } = list
+    if (typeof id !== 'string' || id.trim() === '') {
+      throw new Error(`Список закрепленных задач №${index + 1} не содержит корректного идентификатора`)
+    }
+    if (seenListIds.has(id)) {
+      throw new Error(`Обнаружен повторяющийся идентификатор списка закрепленных задач: ${id}`)
+    }
+    seenListIds.add(id)
+
+    if (typeof title !== 'string' || title.trim() === '') {
+      throw new Error(`Список закрепленных задач «${id}» имеет пустое название`)
+    }
+
+    if (!Number.isInteger(position)) {
+      throw new Error(`Список закрепленных задач «${title}» содержит некорректную позицию`)
+    }
+
+    const uniqueOrder: string[] = []
+    const seenTodoIds = new Set<string>()
+    const order = Array.isArray(list.order) ? list.order : []
+    order.forEach((todoId) => {
+      if (typeof todoId !== 'string') {
+        return
+      }
+      if (!todoIds.has(todoId)) {
+        return
+      }
+      if (seenTodoIds.has(todoId)) {
+        return
+      }
+      seenTodoIds.add(todoId)
+      uniqueOrder.push(todoId)
+    })
+
+    return {
+      id,
+      title: title.trim(),
+      position,
+      isPrimary: Boolean(isPrimary),
+      order: uniqueOrder,
+    }
+  })
+
+  const primaryLists = sanitized.filter((list) => list.isPrimary)
+  if (primaryLists.length !== 1) {
+    throw new Error('В данных должен быть ровно один основной список закрепленных задач')
+  }
+
+  const [primary] = primaryLists
+  const others = sanitized.filter((list) => list.id !== primary.id)
+  others.sort((a, b) => a.position - b.position)
+
+  return [primary, ...others].map((list, index) => ({
+    ...list,
+    position: index,
+  }))
+}
+
+function sanitizeState(rawState: unknown) {
+  if (!rawState || typeof rawState !== 'object') {
+    throw new Error('Некорректный формат файла импорта')
+  }
+
+  const { todos, pinnedLists } = rawState as Partial<SerializableTodoState>
+  if (!Array.isArray(todos) || !Array.isArray(pinnedLists)) {
+    throw new Error('Файл импорта должен содержать списки задач и закреплений')
+  }
+
+  const todoAccumulator: {
+    id: string
+    title: string
+    completed: boolean
+    pinned: boolean
+    position: number
+    parentId: string | null
+  }[] = []
+  const todoIds = new Set<string>()
+
+  collectTodos(todos, null, 0, todoAccumulator, todoIds)
+
+  const normalizedLists = normalizePinnedLists(pinnedLists, todoIds)
+
+  return { todos: todoAccumulator, pinnedLists: normalizedLists }
+}
+
+export async function exportTodoState(): Promise<TodoState> {
+  return getTodoState()
+}
+
+export async function importTodoState(rawState: unknown): Promise<TodoState> {
+  await ensureSeedData()
+
+  const { todos, pinnedLists } = sanitizeState(rawState)
+
+  await prisma.$transaction(async (tx) => {
+    await tx.pinnedTodo.deleteMany()
+    await tx.pinnedList.deleteMany()
+    await tx.todo.deleteMany()
+
+    if (todos.length > 0) {
+      await tx.todo.createMany({
+        data: todos.map((todo) => ({
+          id: todo.id,
+          title: todo.title,
+          completed: todo.completed,
+          pinned: todo.pinned,
+          position: todo.position,
+          parentId: todo.parentId,
+        })),
+      })
+    }
+
+    await tx.pinnedList.createMany({
+      data: pinnedLists.map((list) => ({
+        id: list.id,
+        title: list.title,
+        position: list.position,
+        isPrimary: list.isPrimary,
+      })),
+    })
+
+    for (const list of pinnedLists) {
+      if (list.order.length === 0) {
+        continue
+      }
+      await tx.pinnedTodo.createMany({
+        data: list.order.map((todoId, index) => ({
+          pinnedListId: list.id,
+          todoId,
+          position: index,
+        })),
+      })
+    }
   })
 
   return getTodoState()
