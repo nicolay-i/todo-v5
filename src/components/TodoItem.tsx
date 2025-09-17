@@ -1,3 +1,5 @@
+'use client'
+
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { observer } from 'mobx-react-lite'
 import {
@@ -11,8 +13,8 @@ import {
   FiX,
 } from 'react-icons/fi'
 import { DropZone } from './DropZone'
-import { MAX_DEPTH, type TodoNode } from '../stores/TodoStore'
-import { useTodoStore } from '../stores/TodoStoreContext'
+import { MAX_DEPTH, type TodoNode } from '@/stores/TodoStore'
+import { useTodoStore } from '@/stores/TodoStoreContext'
 
 interface TodoItemProps {
   todo: TodoNode

@@ -1,6 +1,8 @@
+'use client'
+
 import { useState } from 'react'
 import { observer } from 'mobx-react-lite'
-import { useTodoStore } from '../stores/TodoStoreContext'
+import { useTodoStore } from '@/stores/TodoStoreContext'
 
 interface PinnedDropZoneProps {
   listId: string
