@@ -6,60 +6,9 @@ import type { PinnedListState, TodoNode, TodoState } from './types'
 let schemaInitialized = false
 
 async function ensureDatabase() {
-  if (schemaInitialized) {
-    return
-  }
-
-  try {
-    await prisma.$executeRawUnsafe('PRAGMA foreign_keys = ON')
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "Todo" (
-        "id" TEXT PRIMARY KEY,
-        "title" TEXT NOT NULL,
-        "completed" INTEGER NOT NULL DEFAULT 0,
-        "pinned" INTEGER NOT NULL DEFAULT 0,
-        "position" INTEGER NOT NULL,
-        "parentId" TEXT,
-        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        CONSTRAINT "Todo_parentId_fkey" FOREIGN KEY ("parentId") REFERENCES "Todo"("id") ON DELETE CASCADE ON UPDATE CASCADE
-      )
-    `)
-
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "PinnedList" (
-        "id" TEXT PRIMARY KEY,
-        "title" TEXT NOT NULL,
-        "position" INTEGER NOT NULL,
-        "isPrimary" INTEGER NOT NULL DEFAULT 0,
-        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-      )
-    `)
-
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "PinnedTodo" (
-        "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-        "pinnedListId" TEXT NOT NULL,
-        "todoId" TEXT NOT NULL,
-        "position" INTEGER NOT NULL,
-        CONSTRAINT "PinnedTodo_pinnedListId_fkey" FOREIGN KEY ("pinnedListId") REFERENCES "PinnedList"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-        CONSTRAINT "PinnedTodo_todoId_fkey" FOREIGN KEY ("todoId") REFERENCES "Todo"("id") ON DELETE CASCADE ON UPDATE CASCADE
-      )
-    `)
-
-    await prisma.$executeRawUnsafe(
-      'CREATE UNIQUE INDEX IF NOT EXISTS "PinnedTodo_pinnedListId_todoId_key" ON "PinnedTodo"("pinnedListId", "todoId")',
-    )
-    await prisma.$executeRawUnsafe(
-      'CREATE INDEX IF NOT EXISTS "PinnedTodo_pinnedListId_position_idx" ON "PinnedTodo"("pinnedListId", "position")',
-    )
-
-    schemaInitialized = true
-  } catch (error) {
-    schemaInitialized = false
-    throw error
-  }
+  // No-op: schema is managed by Prisma migrations for Postgres
+  if (schemaInitialized) return
+  schemaInitialized = true
 }
 
 async function ensureSeedData() {
