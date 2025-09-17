@@ -1,12 +1,10 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  content: ['./app/**/*.{ts,tsx}', './components/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {
-        canvas: {
-          light: '#f5f7fb',
-        },
+        'canvas-light': '#f6f7fb',
       },
     },
   },
