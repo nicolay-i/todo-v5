@@ -22,33 +22,13 @@ const AppComponent = () => {
   return (
     <div className="min-h-screen bg-canvas-light text-slate-900">
       <div className="mx-auto flex min-h-screen max-w-4xl flex-col px-4 py-10 sm:px-6 lg:px-8">
-        <header className="mb-8">
+        {/* <header className="mb-8">
           <p className="text-sm font-medium uppercase tracking-wide text-slate-400">Задачи</p>
           <h1 className="mt-2 text-3xl font-semibold text-slate-800">Дерево задач</h1>
           <p className="mt-3 max-w-2xl text-sm text-slate-500">
             Добавляйте задачи, группируйте их по уровням и перетаскивайте элементы, чтобы быстро управлять приоритетами. Максимальная глубина — три уровня.
           </p>
-        </header>
-
-        <form
-          onSubmit={handleSubmit}
-          className="mb-8 flex flex-col gap-3 rounded-2xl bg-white/80 p-4 shadow-sm ring-1 ring-slate-200 sm:flex-row sm:items-center"
-        >
-          <input
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-inner focus:border-slate-400 focus:outline-none"
-            placeholder="Новая задача"
-            value={newTitle}
-            onChange={(event) => setNewTitle(event.target.value)}
-          />
-          <button
-            type="submit"
-            className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 sm:w-auto"
-            aria-label="Добавить задачу"
-          >
-            <FiPlus />
-            Добавить
-          </button>
-        </form>
+        </header> */}
 
         <section className="flex-1 rounded-3xl bg-white/60 p-5 shadow-inner ring-1 ring-white/40">
           <div className="mb-6 flex justify-start">
@@ -100,6 +80,25 @@ const AppComponent = () => {
             </>
           ) : (
             <>
+              <form
+                onSubmit={handleSubmit}
+                className="mb-8 flex flex-col gap-3 rounded-2xl bg-white/80 p-4 shadow-sm ring-1 ring-slate-200 sm:flex-row sm:items-center"
+              >
+                <input
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-inner focus:border-slate-400 focus:outline-none"
+                  placeholder="Новая задача"
+                  value={newTitle}
+                  onChange={(event) => setNewTitle(event.target.value)}
+                />
+                <button
+                  type="submit"
+                  className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 sm:w-auto"
+                  aria-label="Добавить задачу"
+                >
+                  <FiPlus />
+                  Добавить
+                </button>
+              </form>
               <div className="space-y-3">
                 <DropZone parentId={null} depth={0} index={0} />
                 {store.todos.map((todo, index) => (
