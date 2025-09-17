@@ -8,6 +8,7 @@ import {
   FiPlus,
   FiTrash2,
   FiX,
+  FiBookmark,
 } from 'react-icons/fi'
 import { DropZone } from './DropZone'
 import { MAX_DEPTH, type TodoNode } from '../stores/TodoStore'
@@ -16,20 +17,23 @@ import { useTodoStore } from '../stores/TodoStoreContext'
 interface TodoItemProps {
   todo: TodoNode
   depth: number
+  mode?: 'tree' | 'pinned'
 }
 
 const actionButtonStyles =
   'rounded-lg p-1.5 text-slate-400 transition-colors duration-150 hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none'
 
-const TodoItemComponent = ({ todo, depth }: TodoItemProps) => {
+const TodoItemComponent = ({ todo, depth, mode = 'tree' }: TodoItemProps) => {
   const store = useTodoStore()
   const [isEditing, setIsEditing] = useState(false)
   const [isAddingChild, setIsAddingChild] = useState(false)
   const [titleDraft, setTitleDraft] = useState(todo.title)
   const [childTitle, setChildTitle] = useState('')
 
-  const canAddChild = depth < MAX_DEPTH
-  const isDragging = store.draggedId === todo.id
+  const isPinnedMode = mode === 'pinned'
+  const canAddChild = !isPinnedMode && depth < MAX_DEPTH
+  const isDragging = isPinnedMode ? store.draggedPinnedId === todo.id : store.draggedId === todo.id
+  const isPinned = store.isPinned(todo.id)
 
   useEffect(() => {
     setTitleDraft(todo.title)
@@ -57,13 +61,21 @@ const TodoItemComponent = ({ todo, depth }: TodoItemProps) => {
   }
 
   const handleDragStart: React.DragEventHandler<HTMLDivElement> = (event) => {
-    store.setDragged(todo.id)
+    if (isPinnedMode) {
+      store.setDraggedPinned(todo.id)
+    } else {
+      store.setDragged(todo.id)
+    }
     event.dataTransfer.setData('text/plain', todo.id)
     event.dataTransfer.effectAllowed = 'move'
   }
 
   const handleDragEnd: React.DragEventHandler<HTMLDivElement> = () => {
-    store.clearDragged()
+    if (isPinnedMode) {
+      store.clearDraggedPinned()
+    } else {
+      store.clearDragged()
+    }
   }
 
   const titleStyles = useMemo(
@@ -141,6 +153,19 @@ const TodoItemComponent = ({ todo, depth }: TodoItemProps) => {
           <div className="flex items-center gap-1">
             {!isEditing && (
               <>
+                <button
+                  type="button"
+                  onClick={() => store.togglePin(todo.id)}
+                  className={[
+                    actionButtonStyles,
+                    isPinned
+                      ? 'text-amber-500 hover:text-amber-500/90'
+                      : 'text-slate-400 hover:text-slate-600',
+                  ].join(' ')}
+                  aria-label={isPinned ? 'Открепить задачу' : 'Закрепить задачу'}
+                >
+                  <FiBookmark />
+                </button>
                 {canAddChild && (
                   <button
                     type="button"
