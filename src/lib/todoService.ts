@@ -438,13 +438,22 @@ export async function addTodo(parentId: string | null, title: string): Promise<T
     }
   }
 
-  const position = await getNextTodoPosition(parentId)
-  await prisma.todo.create({
-    data: {
-      title: trimmed,
-      parentId,
-      position,
-    },
+  // Insert new todo at the top (position = 0) and shift siblings down
+  await prisma.$transaction(async (tx) => {
+    // Shift positions of existing siblings (including roots when parentId is null)
+    await tx.todo.updateMany({
+      where: { parentId },
+      data: { position: { increment: 1 } },
+    })
+
+    // Create the new todo at position 0
+    await tx.todo.create({
+      data: {
+        title: trimmed,
+        parentId,
+        position: 0,
+      },
+    })
   })
 
   return getTodoState()
