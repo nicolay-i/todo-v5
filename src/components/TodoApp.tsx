@@ -1,7 +1,7 @@
 'use client'
 
 import type { ChangeEventHandler, FormEventHandler } from 'react'
-import { Fragment, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { observer } from 'mobx-react-lite'
 import { FiPlus } from 'react-icons/fi'
 import type { TodoState } from '@/lib/types'
@@ -21,6 +21,7 @@ const TodoAppContent = () => {
   const [activeTab, setActiveTab] = useState<'pinned' | 'all' | 'settings'>('pinned')
   const [isAddingPinnedList, setIsAddingPinnedList] = useState(false)
   const [newPinnedListTitle, setNewPinnedListTitle] = useState('')
+  const pinnedListInputRef = useRef<HTMLInputElement>(null)
 
   const handleSubmit: FormEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault()
@@ -50,6 +51,12 @@ const TodoAppContent = () => {
     [pinnedLists],
   )
   const isPinnedListTitleValid = newPinnedListTitle.trim().length > 0
+
+  useEffect(() => {
+    if (isAddingPinnedList && pinnedListInputRef.current) {
+      pinnedListInputRef.current.focus()
+    }
+  }, [isAddingPinnedList])
 
   const tabs: { key: 'pinned' | 'all' | 'settings'; label: string }[] = useMemo(
     () => [
@@ -94,6 +101,7 @@ const TodoAppContent = () => {
                     className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white/80 p-3 shadow-sm sm:flex-row sm:items-center"
                   >
                     <input
+                      ref={pinnedListInputRef}
                       className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-inner focus:border-slate-400 focus:outline-none"
                       placeholder="Название нового слота"
                       value={newPinnedListTitle}

@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { observer } from 'mobx-react-lite'
 import {
   FiCheck,
@@ -35,6 +35,7 @@ const TodoItemComponent = ({ todo, depth, allowChildren = true }: TodoItemProps)
   const [titleDraft, setTitleDraft] = useState(todo.title)
   const [childTitle, setChildTitle] = useState('')
   const [isOverInside, setIsOverInside] = useState(false)
+  const childInputRef = useRef<HTMLInputElement>(null)
 
   const canAddChild = allowChildren && depth < MAX_DEPTH
   const isDragging = store.draggedId === todo.id
@@ -46,6 +47,12 @@ const TodoItemComponent = ({ todo, depth, allowChildren = true }: TodoItemProps)
   useEffect(() => {
     setTitleDraft(todo.title)
   }, [todo.title])
+
+  useEffect(() => {
+    if (isAddingChild && childInputRef.current) {
+      childInputRef.current.focus()
+    }
+  }, [isAddingChild])
 
   const handleToggle = () => {
     void store.toggleTodo(todo.id)
@@ -246,6 +253,7 @@ const TodoItemComponent = ({ todo, depth, allowChildren = true }: TodoItemProps)
   {canAddChild && isAddingChild && !isCollapsed && (
           <form onSubmit={handleAddChild} className="flex items-center gap-2 border-t border-slate-100 bg-slate-50 px-4 py-3">
             <input
+              ref={childInputRef}
               className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-inner focus:border-slate-400 focus:outline-none"
               value={childTitle}
               onChange={(event) => setChildTitle(event.target.value)}
