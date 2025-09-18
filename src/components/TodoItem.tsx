@@ -34,10 +34,14 @@ const TodoItemComponent = ({ todo, depth, allowChildren = true }: TodoItemProps)
   const [isAddingChild, setIsAddingChild] = useState(false)
   const [titleDraft, setTitleDraft] = useState(todo.title)
   const [childTitle, setChildTitle] = useState('')
+  const [isOverInside, setIsOverInside] = useState(false)
 
   const canAddChild = allowChildren && depth < MAX_DEPTH
   const isDragging = store.draggedId === todo.id
   const isCollapsed = store.isCollapsed(todo.id)
+  const draggedId = store.draggedId
+  const canDropInside =
+    allowChildren && depth < MAX_DEPTH && draggedId !== null && store.canDrop(draggedId, todo.id)
 
   useEffect(() => {
     setTitleDraft(todo.title)
@@ -83,6 +87,26 @@ const TodoItemComponent = ({ todo, depth, allowChildren = true }: TodoItemProps)
     store.clearDragged()
   }
 
+  // Allow dropping directly onto the card to append as a child (even when collapsed)
+  const handleCardDragOver: React.DragEventHandler<HTMLDivElement> = (event) => {
+    if (!canDropInside) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+    if (!isOverInside) setIsOverInside(true)
+  }
+
+  const handleCardDragLeave: React.DragEventHandler<HTMLDivElement> = () => {
+    if (isOverInside) setIsOverInside(false)
+  }
+
+  const handleCardDrop: React.DragEventHandler<HTMLDivElement> = (event) => {
+    if (!canDropInside || draggedId === null) return
+    event.preventDefault()
+    setIsOverInside(false)
+    // append to the end of children
+    void store.moveTodo(draggedId, todo.id, todo.children.length)
+  }
+
   const titleStyles = useMemo(
     () =>
       [
@@ -98,10 +122,14 @@ const TodoItemComponent = ({ todo, depth, allowChildren = true }: TodoItemProps)
         className={[
           'group rounded-xl bg-white/95 ring-1 ring-slate-200 transition-all duration-200 hover:shadow-md',
           isDragging ? 'opacity-60 ring-2 ring-slate-300' : '',
+          isOverInside && canDropInside ? 'ring-2 ring-emerald-400/80 bg-emerald-50/50' : '',
         ].join(' ')}
         draggable={!isEditing && !isAddingChild}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
+        onDragOver={handleCardDragOver}
+        onDragLeave={handleCardDragLeave}
+        onDrop={handleCardDrop}
       >
         <div className="flex items-center gap-3 px-4 py-3">
           {/* Toggle collapse button for nodes that can have children */}
