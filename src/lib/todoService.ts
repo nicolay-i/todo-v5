@@ -1,10 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import type { Todo } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 import { MAX_DEPTH } from './constants'
 import { prisma } from './prisma'
 import type { PinnedListState, TodoNode, TodoState } from './types'
 
 let schemaInitialized = false
+let seedInitialized = false
 
 interface NormalizedTodoRecord {
   id: string
@@ -31,105 +33,98 @@ async function ensureDatabase() {
 
 async function ensureSeedData() {
   await ensureDatabase()
+  if (seedInitialized) return
 
-  let primary = await prisma.pinnedList.findFirst({
-    orderBy: { position: 'asc' },
-  })
-
+  // Ensure primary pinned list exists once
+  let primary = await prisma.pinnedList.findFirst({ orderBy: { position: 'asc' } })
   if (!primary) {
     primary = await prisma.pinnedList.create({
-      data: {
-        title: 'Главное',
-        isPrimary: true,
-        position: 0,
-      },
+      data: { title: 'Главное', isPrimary: true, position: 0 },
     })
   } else if (!primary.isPrimary) {
-    primary = await prisma.pinnedList.update({
-      where: { id: primary.id },
-      data: { isPrimary: true },
-    })
+    await prisma.pinnedList.update({ where: { id: primary.id }, data: { isPrimary: true } })
   }
 
+  // Seed demo todos only if DB is empty
   const count = await prisma.todo.count()
-  if (count > 0) {
-    return
-  }
-
-  await prisma.$transaction(async (tx) => {
-    const qaChecklist = await tx.todo.create({
-      data: {
-        title: 'Проверка перед релизом',
-        completed: false,
-        pinned: false,
-        position: 0,
-      },
-    })
-
-    await tx.todo.createMany({
-      data: [
-        {
-          title: 'Прогнать авто-тесты',
-          completed: true,
+  if (count === 0) {
+    await prisma.$transaction(async (tx) => {
+      const qaChecklist = await tx.todo.create({
+        data: {
+          title: 'Проверка перед релизом',
+          completed: false,
           pinned: false,
-          parentId: qaChecklist.id,
           position: 0,
         },
-        {
-          title: 'Проверить ручные сценарии',
+      })
+
+      await tx.todo.createMany({
+        data: [
+          {
+            title: 'Прогнать авто-тесты',
+            completed: true,
+            pinned: false,
+            parentId: qaChecklist.id,
+            position: 0,
+          },
+          {
+            title: 'Проверить ручные сценарии',
+            completed: false,
+            pinned: false,
+            parentId: qaChecklist.id,
+            position: 1,
+          },
+          {
+            title: 'Согласовать список изменений',
+            completed: false,
+            pinned: false,
+            parentId: qaChecklist.id,
+            position: 2,
+          },
+        ],
+      })
+
+      const designIteration = await tx.todo.create({
+        data: {
+          title: 'Прототип интерфейса',
           completed: false,
           pinned: false,
-          parentId: qaChecklist.id,
           position: 1,
         },
-        {
-          title: 'Согласовать список изменений',
-          completed: false,
-          pinned: false,
-          parentId: qaChecklist.id,
-          position: 2,
-        },
-      ],
-    })
+      })
 
-    const designIteration = await tx.todo.create({
-      data: {
-        title: 'Прототип интерфейса',
-        completed: false,
-        pinned: false,
-        position: 1,
-      },
-    })
-
-    const feedback = await tx.todo.create({
-      data: {
-        title: 'Собрать обратную связь',
-        completed: false,
-        pinned: false,
-        parentId: designIteration.id,
-        position: 1,
-      },
-    })
-
-    await tx.todo.createMany({
-      data: [
-        {
-          title: 'Скетч основных экранов',
+      const feedback = await tx.todo.create({
+        data: {
+          title: 'Собрать обратную связь',
           completed: false,
           pinned: false,
           parentId: designIteration.id,
-          position: 0,
+          position: 1,
         },
-        {
-          title: 'Созвон с командой продукта',
-          completed: false,
-          pinned: false,
-          parentId: feedback.id,
-          position: 0,
-        },
-      ],
+      })
+
+      await tx.todo.createMany({
+        data: [
+          {
+            title: 'Скетч основных экранов',
+            completed: false,
+            pinned: false,
+            parentId: designIteration.id,
+            position: 0,
+          },
+          {
+            title: 'Созвон с командой продукта',
+            completed: false,
+            pinned: false,
+            parentId: feedback.id,
+            position: 0,
+          },
+        ],
+      })
     })
-  })
+  }
+
+  seedInitialized = true
 }
 
 async function getPrimaryList() {
@@ -400,37 +395,32 @@ export async function replaceTodoState(state: unknown): Promise<TodoState> {
 
 async function getTodoDepth(id: string): Promise<number> {
   await ensureSeedData()
-  let depth = 0
-  let current = await prisma.todo.findUnique({ where: { id }, select: { parentId: true } })
-  while (current?.parentId) {
-    depth += 1
-    current = await prisma.todo.findUnique({ where: { id: current.parentId }, select: { parentId: true } })
-  }
-  return depth
+  const rows = await prisma.$queryRaw<{ depth: number | null }[]>`
+    WITH RECURSIVE ancestors AS (
+      SELECT "parentId", 0::int AS depth FROM "Todo" WHERE "id" = ${id}
+      UNION ALL
+      SELECT t."parentId", ancestors.depth + 1
+      FROM "Todo" t
+      JOIN ancestors ON t."id" = ancestors."parentId"
+    )
+    SELECT COALESCE(MAX(depth), 0) AS depth FROM ancestors;
+  `
+  return rows[0]?.depth ?? 0
 }
 
 async function getSubtreeDepth(id: string): Promise<number> {
   await ensureSeedData()
-  const stack: string[] = [id]
-  let maxDepth = 0
-  const depthMap = new Map<string, number>([[id, 0]])
-
-  while (stack.length > 0) {
-    const currentId = stack.pop()!
-    const depth = depthMap.get(currentId) ?? 0
-    const children = await prisma.todo.findMany({
-      where: { parentId: currentId },
-      select: { id: true },
-    })
-    for (const child of children) {
-      const childDepth = depth + 1
-      maxDepth = Math.max(maxDepth, childDepth)
-      depthMap.set(child.id, childDepth)
-      stack.push(child.id)
-    }
-  }
-
-  return maxDepth
+  const rows = await prisma.$queryRaw<{ maxDepth: number | null }[]>`
+    WITH RECURSIVE tree AS (
+      SELECT "id", "parentId", 0::int AS depth FROM "Todo" WHERE "id" = ${id}
+      UNION ALL
+      SELECT t."id", t."parentId", tree.depth + 1
+      FROM "Todo" t
+      JOIN tree ON t."parentId" = tree."id"
+    )
+    SELECT COALESCE(MAX(depth), 0) AS "maxDepth" FROM tree;
+  `
+  return rows[0]?.maxDepth ?? 0
 }
 
 export async function addTodo(parentId: string | null, title: string): Promise<TodoState> {
@@ -524,18 +514,18 @@ export async function moveTodo(
       return getTodoState()
     }
 
-    // ensure not moving into descendant
-    const stack = [id]
-    while (stack.length > 0) {
-      const currentId = stack.pop()!
-      if (currentId === targetParentId) {
-        return getTodoState()
-      }
-      const children = await prisma.todo.findMany({
-        where: { parentId: currentId },
-        select: { id: true },
-      })
-      stack.push(...children.map((child) => child.id))
+    // ensure not moving into descendant (single query via recursive CTE)
+    const descendantRows = await prisma.$queryRaw<{ exists: boolean }[]>`
+      WITH RECURSIVE subtree AS (
+        SELECT "id" FROM "Todo" WHERE "id" = ${id}
+        UNION ALL
+        SELECT t."id" FROM "Todo" t
+        JOIN subtree ON t."parentId" = subtree."id"
+      )
+      SELECT EXISTS(SELECT 1 FROM subtree WHERE "id" = ${targetParentId}) AS exists;
+    `
+    if (descendantRows[0]?.exists) {
+      return getTodoState()
     }
   } else {
     const subtreeDepth = await getSubtreeDepth(id)
@@ -574,17 +564,16 @@ export async function moveTodo(
     const bounded = Math.min(Math.max(nextIndex, 0), order.length)
     order.splice(bounded, 0, id)
 
-    await prisma.$transaction(
-      order.map((todoId, index) =>
-        prisma.todo.update({
-          where: { id: todoId },
-          data: {
-            parentId: sourceParentId,
-            position: index,
-          },
-        }),
-      ),
+    // Single SQL UPDATE for all affected rows (same parent)
+    const rows = order.map((todoId, index) =>
+      Prisma.sql`(${todoId}, ${sourceParentId}, ${index})`,
     )
+
+    await prisma.$executeRaw`UPDATE "Todo" AS t
+      SET "parentId" = v.parent_id,
+          "position" = v.position
+      FROM (VALUES ${Prisma.join(rows)}) AS v(id, parent_id, position)
+      WHERE t."id" = v.id;`
 
     return getTodoState()
   }
@@ -594,26 +583,23 @@ export async function moveTodo(
   const bounded = Math.min(Math.max(nextIndex, 0), targetOrder.length)
   targetOrder.splice(bounded, 0, id)
 
-  await prisma.$transaction([
+  // Single SQL UPDATE for both source and target lists (cross-parent move)
+  const rows = [
     ...sourceOrder.map((todoId, index) =>
-      prisma.todo.update({
-        where: { id: todoId },
-        data: {
-          parentId: sourceParentId,
-          position: index,
-        },
-      }),
+      Prisma.sql`(${todoId}, ${sourceParentId}, ${index})`,
     ),
     ...targetOrder.map((todoId, index) =>
-      prisma.todo.update({
-        where: { id: todoId },
-        data: {
-          parentId: targetParentId,
-          position: index,
-        },
-      }),
+      Prisma.sql`(${todoId}, ${targetParentId}, ${index})`,
     ),
-  ])
+  ]
+
+  if (rows.length > 0) {
+    await prisma.$executeRaw`UPDATE "Todo" AS t
+      SET "parentId" = v.parent_id,
+          "position" = v.position
+      FROM (VALUES ${Prisma.join(rows)}) AS v(id, parent_id, position)
+      WHERE t."id" = v.id;`
+  }
 
   return getTodoState()
 }
