@@ -17,11 +17,16 @@ export class TodoStore {
   todos: TodoNode[] = []
   pinnedLists: PinnedListState[] = []
   draggedId: string | null = null
+  // Set со свернутыми узлами дерева (хранит id задач)
+  collapsedIds: Set<string> = new Set()
+
+  private static readonly COLLAPSE_STORAGE_KEY = 'todoCollapsedIds_v1'
 
   constructor(initialState: TodoState) {
     makeAutoObservable(this, {}, { autoBind: true })
     this.todos = initialState.todos
     this.pinnedLists = initialState.pinnedLists
+    this.loadCollapsed()
   }
 
   get pinnedListsWithTodos(): PinnedListView[] {
@@ -84,6 +89,54 @@ export class TodoStore {
   setState(state: TodoState) {
     this.todos = state.todos
     this.pinnedLists = state.pinnedLists
+  }
+
+  // ---- Collapse API ----
+  isCollapsed(id: string): boolean {
+    return this.collapsedIds.has(id)
+  }
+
+  setCollapsed(id: string, collapsed: boolean) {
+    if (collapsed) {
+      this.collapsedIds.add(id)
+    } else {
+      this.collapsedIds.delete(id)
+    }
+    this.saveCollapsed()
+  }
+
+  toggleCollapse(id: string) {
+    if (this.collapsedIds.has(id)) {
+      this.collapsedIds.delete(id)
+    } else {
+      this.collapsedIds.add(id)
+    }
+    this.saveCollapsed()
+  }
+
+  private loadCollapsed() {
+    if (typeof window === 'undefined') return
+    try {
+      const raw = window.localStorage.getItem(TodoStore.COLLAPSE_STORAGE_KEY)
+      if (!raw) return
+      const arr = JSON.parse(raw) as string[]
+      if (Array.isArray(arr)) {
+        this.collapsedIds = new Set(arr)
+      }
+    } catch (e) {
+      // ignore parsing/storage errors
+      console.warn('Failed to load collapsedIds from storage')
+    }
+  }
+
+  private saveCollapsed() {
+    if (typeof window === 'undefined') return
+    try {
+      const arr = Array.from(this.collapsedIds)
+      window.localStorage.setItem(TodoStore.COLLAPSE_STORAGE_KEY, JSON.stringify(arr))
+    } catch (e) {
+      // ignore storage errors
+    }
   }
 
   async moveTodo(id: string, targetParentId: string | null, targetIndex: number) {

@@ -6,6 +6,8 @@ import {
   FiCheck,
   FiCheckCircle,
   FiCircle,
+  FiChevronDown,
+  FiChevronRight,
   FiEdit2,
   FiPlus,
   FiStar,
@@ -35,6 +37,7 @@ const TodoItemComponent = ({ todo, depth, allowChildren = true }: TodoItemProps)
 
   const canAddChild = allowChildren && depth < MAX_DEPTH
   const isDragging = store.draggedId === todo.id
+  const isCollapsed = store.isCollapsed(todo.id)
 
   useEffect(() => {
     setTitleDraft(todo.title)
@@ -63,6 +66,11 @@ const TodoItemComponent = ({ todo, depth, allowChildren = true }: TodoItemProps)
 
   const handleTogglePinned = () => {
     void store.togglePinned(todo.id)
+  }
+
+  const handleToggleCollapsed = () => {
+    // Разрешаем сворачивать только если потенциально есть дети (или уже есть), иначе кнопка не показывается
+    store.toggleCollapse(todo.id)
   }
 
   const handleDragStart: React.DragEventHandler<HTMLDivElement> = (event) => {
@@ -96,10 +104,22 @@ const TodoItemComponent = ({ todo, depth, allowChildren = true }: TodoItemProps)
         onDragEnd={handleDragEnd}
       >
         <div className="flex items-center gap-3 px-4 py-3">
+          {/* Toggle collapse button for nodes that can have children */}
+          {allowChildren && (
+            <button
+              type="button"
+              onClick={handleToggleCollapsed}
+              className={`${actionButtonStyles} -ml-1.5 text-lg ${todo.children.length > 0 ? 'text-slate-500' : 'text-slate-300 cursor-default'}`}
+              aria-label={isCollapsed ? 'Развернуть' : 'Свернуть'}
+              disabled={todo.children.length === 0}
+            >
+              {isCollapsed ? <FiChevronRight /> : <FiChevronDown />}
+            </button>
+          )}
           <button
             type="button"
             onClick={handleToggle}
-            className={`${actionButtonStyles} -ml-1.5 text-xl text-slate-500`}
+            className={`${actionButtonStyles} text-xl text-slate-500`}
             aria-label={todo.completed ? 'Отметить как невыполненную' : 'Отметить как выполненную'}
           >
             {todo.completed ? <FiCheckCircle /> : <FiCircle />}
@@ -195,7 +215,7 @@ const TodoItemComponent = ({ todo, depth, allowChildren = true }: TodoItemProps)
           </div>
         </div>
 
-        {canAddChild && isAddingChild && (
+  {canAddChild && isAddingChild && !isCollapsed && (
           <form onSubmit={handleAddChild} className="flex items-center gap-2 border-t border-slate-100 bg-slate-50 px-4 py-3">
             <input
               className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-inner focus:border-slate-400 focus:outline-none"
@@ -227,7 +247,7 @@ const TodoItemComponent = ({ todo, depth, allowChildren = true }: TodoItemProps)
         )}
       </div>
 
-      {canAddChild && (
+      {canAddChild && !isCollapsed && (
         <div className="space-y-2 border-l border-slate-200/70 pl-6">
           <DropZone parentId={todo.id} depth={depth + 1} index={0} />
           {todo.children.map((child, childIndex) => (
