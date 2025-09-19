@@ -1,1 +1,1 @@
-export const MAX_DEPTH = 2
+export const MAX_DEPTH = 5

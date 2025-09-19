@@ -13,12 +13,14 @@ model Todo {
   id        String   @id @default(cuid())
   title     String
   completed Boolean  @default(false)
+  completedAt DateTime?
   pinned    Boolean  @default(false)
   position  Int
   parentId  String?
   parent    Todo?    @relation("TodoChildren", fields: [parentId], references: [id], onDelete: Cascade)
   children  Todo[]   @relation("TodoChildren")
   pinnedIn  PinnedTodo[]
+  tags      Tag[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -28,6 +30,7 @@ model PinnedList {
   title     String
   position  Int
   isPrimary Boolean      @default(false)
+  isActive  Boolean      @default(false)
   todos     PinnedTodo[]
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
@@ -44,4 +47,12 @@ model PinnedTodo {
 
   @@unique([pinnedListId, todoId])
   @@index([pinnedListId, position])
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  name      String
+  todos     Todo[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

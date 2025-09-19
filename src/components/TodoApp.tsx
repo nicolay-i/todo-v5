@@ -1,15 +1,17 @@
 'use client'
 
 import type { ChangeEventHandler, FormEventHandler } from 'react'
-import { Fragment, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { observer } from 'mobx-react-lite'
 import { FiPlus } from 'react-icons/fi'
 import type { TodoState } from '@/lib/types'
 import { TodoStore } from '@/stores/TodoStore'
+import type { VisibilityMode } from '@/stores/TodoStore'
 import { TodoStoreProvider, useTodoStore } from '@/stores/TodoStoreContext'
-import { DropZone } from './DropZone'
+// мини-плейсхолдеры для сортировки больше не используются
 import { PinnedList } from './PinnedList'
 import { TodoItem } from './TodoItem'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 interface TodoAppProps {
   initialState: TodoState
@@ -18,9 +20,19 @@ interface TodoAppProps {
 const TodoAppContent = () => {
   const store = useTodoStore()
   const [newTitle, setNewTitle] = useState('')
-  const [activeTab, setActiveTab] = useState<'pinned' | 'all' | 'settings'>('pinned')
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  // Инициализируем вкладку из URL (?tab=...)
+  const tabFromUrl = searchParams.get('tab')
+  const normalizedTab = (tabFromUrl === 'pinned' || tabFromUrl === 'all' || tabFromUrl === 'settings')
+    ? (tabFromUrl as 'pinned' | 'all' | 'settings')
+    : 'pinned'
+  const [activeTab, setActiveTab] = useState<'pinned' | 'all' | 'settings'>(normalizedTab)
   const [isAddingPinnedList, setIsAddingPinnedList] = useState(false)
   const [newPinnedListTitle, setNewPinnedListTitle] = useState('')
+  const pinnedListInputRef = useRef<HTMLInputElement>(null)
 
   const handleSubmit: FormEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault()
@@ -51,6 +63,12 @@ const TodoAppContent = () => {
   )
   const isPinnedListTitleValid = newPinnedListTitle.trim().length > 0
 
+  useEffect(() => {
+    if (isAddingPinnedList && pinnedListInputRef.current) {
+      pinnedListInputRef.current.focus()
+    }
+  }, [isAddingPinnedList])
+
   const tabs: { key: 'pinned' | 'all' | 'settings'; label: string }[] = useMemo(
     () => [
       { key: 'pinned', label: 'Слоты' },
@@ -60,17 +78,43 @@ const TodoAppContent = () => {
     [],
   )
 
+  // Синхронизация URL при смене вкладки пользователем
+  const applyTabToUrl = (tab: 'pinned' | 'all' | 'settings') => {
+    const params = new URLSearchParams(searchParams)
+    params.set('tab', tab)
+    const next = `${pathname}?${params.toString()}`
+    router.replace(next, { scroll: false })
+  }
+
+  const handleSwitchTab = (tab: 'pinned' | 'all' | 'settings') => {
+    if (tab === activeTab) return
+    setActiveTab(tab)
+    applyTabToUrl(tab)
+  }
+
+  // Обратная синхронизация: если URL поменялся (например, навигация назад/вперёд), обновим стейт
+  useEffect(() => {
+    const current = searchParams.get('tab')
+    const nextTab = (current === 'pinned' || current === 'all' || current === 'settings')
+      ? (current as 'pinned' | 'all' | 'settings')
+      : 'pinned'
+    if (nextTab !== activeTab) {
+      setActiveTab(nextTab)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
+
   return (
     <div className="min-h-screen bg-canvas-light text-slate-900">
       <div className="mx-auto flex min-h-screen max-w-4xl flex-col px-4 py-10 sm:px-6 lg:px-8">
         <section className="flex-1 rounded-3xl bg-white/60 p-5 shadow-inner ring-1 ring-white/40">
           <div className="mb-6 flex justify-start">
             <div className="flex rounded-2xl bg-white/70 p-1 text-sm font-medium text-slate-500 shadow-sm ring-1 ring-slate-200/70">
-              {tabs.map((tab) => (
+        {tabs.map((tab) => (
                 <button
                   key={tab.key}
                   type="button"
-                  onClick={() => setActiveTab(tab.key)}
+          onClick={() => handleSwitchTab(tab.key)}
                   className={[
                     'rounded-xl px-4 py-2 transition focus-visible:outline-none',
                     activeTab === tab.key
@@ -88,12 +132,19 @@ const TodoAppContent = () => {
             <>
               <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h2 className="text-base font-semibold text-slate-600">Слоты на день</h2>
+                <div className="flex items-center gap-2">
+                  <FilterSelect
+                    value={store.pinnedFilterMode}
+                    onChange={(v) => store.setPinnedFilterMode(v)}
+                  />
+                </div>
                 {isAddingPinnedList ? (
                   <form
                     onSubmit={handlePinnedListSubmit}
                     className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white/80 p-3 shadow-sm sm:flex-row sm:items-center"
                   >
                     <input
+                      ref={pinnedListInputRef}
                       className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-inner focus:border-slate-400 focus:outline-none"
                       placeholder="Название нового слота"
                       value={newPinnedListTitle}
@@ -165,15 +216,10 @@ const TodoAppContent = () => {
                   Добавить
                 </button>
               </form>
-              <div className="space-y-3">
-                <DropZone parentId={null} depth={0} index={0} />
-                {store.todos.map((todo, index) => (
-                  <Fragment key={todo.id}>
-                    <TodoItem todo={todo} depth={0} />
-                    <DropZone parentId={null} depth={0} index={index + 1} />
-                  </Fragment>
-                ))}
+              <div className="mb-3 flex items-center justify-end">
+                <FilterSelect value={store.listFilterMode} onChange={(v) => store.setListFilterMode(v)} />
               </div>
+              <ListContainer />
 
               {store.todos.length === 0 && (
                 <div className="mt-6 rounded-2xl border border-dashed border-slate-300/80 bg-white/70 px-6 py-10 text-center text-sm text-slate-500">
@@ -202,12 +248,73 @@ export const TodoApp = ({ initialState }: TodoAppProps) => {
   )
 }
 
+const filterOptions: { value: VisibilityMode; label: string }[] = [
+  { value: 'activeOnly', label: 'Только активные' },
+  { value: 'today', label: 'Активные сегодня' },
+  { value: 'oneDay', label: 'За день' },
+  { value: 'twoDays', label: 'За два дня' },
+  { value: 'week', label: 'За неделю' },
+]
+
+function FilterSelect({ value, onChange }: { value: VisibilityMode; onChange: (v: VisibilityMode) => void }) {
+  return (
+    <select
+      className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 shadow-inner focus:border-slate-400 focus:outline-none"
+      value={value}
+      onChange={(e) => onChange(e.target.value as VisibilityMode)}
+    >
+      {filterOptions.map((opt) => (
+        <option key={opt.value} value={opt.value}>
+          {opt.label}
+        </option>
+      ))}
+    </select>
+  )
+}
+
+// Контейнер списка верхнего уровня: без мини-плейсхолдеров.
+const ListContainer = observer(() => {
+  const store = useTodoStore()
+  const draggedId = store.draggedId
+  const canAcceptRoot = draggedId !== null && store.canDrop(draggedId, null)
+
+  const handleEmptyDragOver: React.DragEventHandler<HTMLDivElement> = (event) => {
+    if (!canAcceptRoot || store.todos.length > 0) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+  }
+
+  const handleEmptyDrop: React.DragEventHandler<HTMLDivElement> = (event) => {
+    if (!canAcceptRoot || draggedId === null || store.todos.length > 0) return
+    event.preventDefault()
+    void store.moveTodo(draggedId, null, 0)
+    store.clearDragged()
+  }
+
+  return (
+    <div
+      className="space-y-3"
+      onDragOver={handleEmptyDragOver}
+      onDrop={handleEmptyDrop}
+    >
+  {store.visibleTodos.map((todo, index) => (
+        <Fragment key={todo.id}>
+          <TodoItem todo={todo} depth={0} parentId={null} index={index} />
+        </Fragment>
+      ))}
+    </div>
+  )
+})
+
 const SettingsTab = () => {
   const store = useTodoStore()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isExporting, setIsExporting] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [newTag, setNewTag] = useState('')
+  const [editingTagId, setEditingTagId] = useState<string | null>(null)
+  const [editingTagName, setEditingTagName] = useState('')
 
   const handleExport = async () => {
     setStatus(null)
@@ -273,6 +380,98 @@ const SettingsTab = () => {
 
   return (
     <div className="space-y-6">
+      {/* Tags management */}
+      <div className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
+        <h3 className="text-base font-semibold text-slate-700">Теги</h3>
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault()
+            const trimmed = newTag.trim()
+            if (!trimmed) return
+            await store.addTag(trimmed)
+            setNewTag('')
+          }}
+          className="mt-3 flex gap-2"
+        >
+          <input
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-inner focus:border-slate-400 focus:outline-none"
+            placeholder="Новый тег"
+            value={newTag}
+            onChange={(e) => setNewTag(e.target.value)}
+          />
+          <button
+            type="submit"
+            className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
+          >
+            Добавить
+          </button>
+        </form>
+
+        <ul className="mt-4 space-y-2">
+          {store.tags.map((tag) => (
+            <li key={tag.id} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
+              {editingTagId === tag.id ? (
+                <>
+                  <input
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-inner focus:border-slate-400 focus:outline-none"
+                    value={editingTagName}
+                    onChange={(e) => setEditingTagName(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await store.renameTag(tag.id, editingTagName)
+                      setEditingTagId(null)
+                      setEditingTagName('')
+                    }}
+                    className="rounded-lg bg-emerald-500 p-2 text-white hover:bg-emerald-500/90"
+                    aria-label="Сохранить тег"
+                  >
+                    Сохранить
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingTagId(null)
+                      setEditingTagName('')
+                    }}
+                    className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+                    aria-label="Отменить редактирование"
+                  >
+                    Отмена
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="flex-1 text-sm text-slate-700">{tag.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingTagId(tag.id)
+                      setEditingTagName(tag.name)
+                    }}
+                    className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+                    aria-label="Редактировать тег"
+                  >
+                    Редактировать
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => store.deleteTag(tag.id)}
+                    className="rounded-lg p-2 text-rose-500 hover:bg-rose-50"
+                    aria-label="Удалить тег"
+                  >
+                    Удалить
+                  </button>
+                </>
+              )}
+            </li>
+          ))}
+          {store.tags.length === 0 && (
+            <li className="rounded-xl border border-dashed border-slate-200 bg-white/70 px-3 py-4 text-center text-sm text-slate-500">Тегов пока нет</li>
+          )}
+        </ul>
+      </div>
       {status && (
         <div
           className={[
