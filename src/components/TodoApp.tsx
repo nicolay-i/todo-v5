@@ -7,7 +7,7 @@ import { FiPlus } from 'react-icons/fi'
 import type { TodoState } from '@/lib/types'
 import { TodoStore } from '@/stores/TodoStore'
 import { TodoStoreProvider, useTodoStore } from '@/stores/TodoStoreContext'
-import { DropZone } from './DropZone'
+// мини-плейсхолдеры для сортировки больше не используются
 import { PinnedList } from './PinnedList'
 import { TodoItem } from './TodoItem'
 
@@ -173,15 +173,7 @@ const TodoAppContent = () => {
                   Добавить
                 </button>
               </form>
-              <div className="space-y-3">
-                <DropZone parentId={null} depth={0} index={0} />
-                {store.todos.map((todo, index) => (
-                  <Fragment key={todo.id}>
-                    <TodoItem todo={todo} depth={0} />
-                    <DropZone parentId={null} depth={0} index={index + 1} />
-                  </Fragment>
-                ))}
-              </div>
+              <ListContainer />
 
               {store.todos.length === 0 && (
                 <div className="mt-6 rounded-2xl border border-dashed border-slate-300/80 bg-white/70 px-6 py-10 text-center text-sm text-slate-500">
@@ -209,6 +201,40 @@ export const TodoApp = ({ initialState }: TodoAppProps) => {
     </TodoStoreProvider>
   )
 }
+
+// Контейнер списка верхнего уровня: без мини-плейсхолдеров.
+const ListContainer = observer(() => {
+  const store = useTodoStore()
+  const draggedId = store.draggedId
+  const canAcceptRoot = draggedId !== null && store.canDrop(draggedId, null)
+
+  const handleEmptyDragOver: React.DragEventHandler<HTMLDivElement> = (event) => {
+    if (!canAcceptRoot || store.todos.length > 0) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+  }
+
+  const handleEmptyDrop: React.DragEventHandler<HTMLDivElement> = (event) => {
+    if (!canAcceptRoot || draggedId === null || store.todos.length > 0) return
+    event.preventDefault()
+    void store.moveTodo(draggedId, null, 0)
+    store.clearDragged()
+  }
+
+  return (
+    <div
+      className="space-y-3"
+      onDragOver={handleEmptyDragOver}
+      onDrop={handleEmptyDrop}
+    >
+      {store.todos.map((todo, index) => (
+        <Fragment key={todo.id}>
+          <TodoItem todo={todo} depth={0} parentId={null} index={index} />
+        </Fragment>
+      ))}
+    </div>
+  )
+})
 
 const SettingsTab = () => {
   const store = useTodoStore()

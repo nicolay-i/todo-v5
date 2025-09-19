@@ -5,7 +5,7 @@ import { observer } from 'mobx-react-lite'
 import { FiCheck, FiEdit2, FiTrash2, FiX } from 'react-icons/fi'
 import type { PinnedListView } from '@/stores/TodoStore'
 import { useTodoStore } from '@/stores/TodoStoreContext'
-import { PinnedDropZone } from './PinnedDropZone'
+// мини-плейсхолдеры для сортировки больше не используются
 import { TodoItem } from './TodoItem'
 
 interface PinnedListProps {
@@ -119,15 +119,13 @@ const PinnedListComponent = ({ list }: PinnedListProps) => {
         )}
       </div>
 
-      <div className="mt-4 space-y-3">
-        <PinnedDropZone listId={list.id} index={0} />
+      <PinnedListContainer listId={list.id} todosCount={todos.length}>
         {todos.map((todo, index) => (
           <Fragment key={todo.id}>
-            <TodoItem todo={todo} depth={0} allowChildren={false} />
-            <PinnedDropZone listId={list.id} index={index + 1} />
+            <TodoItem todo={todo} depth={0} parentId={null} index={index} pinnedListId={list.id} allowChildren={false} />
           </Fragment>
         ))}
-      </div>
+      </PinnedListContainer>
 
       {todos.length === 0 && (
         <div className="mt-4 rounded-xl border border-dashed border-amber-200 bg-amber-50/60 px-4 py-6 text-center text-xs text-amber-600">
@@ -139,3 +137,34 @@ const PinnedListComponent = ({ list }: PinnedListProps) => {
 }
 
 export const PinnedList = observer(PinnedListComponent)
+
+interface PLCProps {
+  listId: string
+  todosCount: number
+  children: React.ReactNode
+}
+
+const PinnedListContainer = observer(({ listId, todosCount, children }: PLCProps) => {
+  const store = useTodoStore()
+  const draggedId = store.draggedId
+  const canAccept = draggedId !== null && store.isPinned(draggedId)
+
+  const handleEmptyOver: React.DragEventHandler<HTMLDivElement> = (event) => {
+    if (!canAccept || todosCount > 0) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+  }
+
+  const handleEmptyDrop: React.DragEventHandler<HTMLDivElement> = (event) => {
+    if (!canAccept || draggedId === null || todosCount > 0) return
+    event.preventDefault()
+    void store.movePinnedTodo(draggedId, listId, 0)
+    store.clearDragged()
+  }
+
+  return (
+    <div className="mt-4 space-y-3" onDragOver={handleEmptyOver} onDrop={handleEmptyDrop}>
+      {children}
+    </div>
+  )
+})

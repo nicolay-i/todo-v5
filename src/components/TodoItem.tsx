@@ -17,24 +17,30 @@ import {
 import { MAX_DEPTH } from '@/lib/constants'
 import type { TodoNode } from '@/lib/types'
 import { useTodoStore } from '@/stores/TodoStoreContext'
-import { DropZone } from './DropZone'
+// мини-плейсхолдеры для сортировки больше не используются
 
 interface TodoItemProps {
   todo: TodoNode
   depth: number
+  // для вычисления целевого индекса при сортировке среди сиблингов
+  parentId: string | null
+  index: number
+  // если передан pinnedListId, сортировка идет внутри закрепленного списка
+  pinnedListId?: string
   allowChildren?: boolean
 }
 
 const actionButtonStyles =
   'rounded-lg p-1.5 text-slate-400 transition-colors duration-150 hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none'
 
-const TodoItemComponent = ({ todo, depth, allowChildren = true }: TodoItemProps) => {
+const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowChildren = true }: TodoItemProps) => {
   const store = useTodoStore()
   const [isEditing, setIsEditing] = useState(false)
   const [isAddingChild, setIsAddingChild] = useState(false)
   const [titleDraft, setTitleDraft] = useState(todo.title)
   const [childTitle, setChildTitle] = useState('')
   const [isOverInside, setIsOverInside] = useState(false)
+  const [overPosition, setOverPosition] = useState<null | 'above' | 'below' | 'inside'>(null)
   const childInputRef = useRef<HTMLInputElement>(null)
 
   const canAddChild = allowChildren && depth < MAX_DEPTH
@@ -43,6 +49,9 @@ const TodoItemComponent = ({ todo, depth, allowChildren = true }: TodoItemProps)
   const draggedId = store.draggedId
   const canDropInside =
     allowChildren && depth < MAX_DEPTH && draggedId !== null && store.canDrop(draggedId, todo.id)
+  const canReorderInTree = draggedId !== null && store.canDrop(draggedId, parentId)
+  const isPinnedContext = Boolean(pinnedListId)
+  const canReorderInPinned = draggedId !== null && isPinnedContext && store.isPinned(draggedId!)
 
   useEffect(() => {
     setTitleDraft(todo.title)
@@ -94,24 +103,66 @@ const TodoItemComponent = ({ todo, depth, allowChildren = true }: TodoItemProps)
     store.clearDragged()
   }
 
-  // Allow dropping directly onto the card to append as a child (even when collapsed)
+  // Drop на карточку: верх/низ для сортировки, центр — перенос в потомки
   const handleCardDragOver: React.DragEventHandler<HTMLDivElement> = (event) => {
-    if (!canDropInside) return
+    const mayAccept = canDropInside || canReorderInTree || canReorderInPinned
+    if (!mayAccept) return
+    const rect = (event.currentTarget as HTMLDivElement).getBoundingClientRect()
+    const y = event.clientY - rect.top
+    const ratio = rect.height > 0 ? y / rect.height : 0.5
+
+    // решаем, в какую зону попали
+    let nextPos: 'above' | 'below' | 'inside'
+    if (canDropInside && ratio > 0.33 && ratio < 0.67) {
+      nextPos = 'inside'
+    } else {
+      nextPos = ratio < 0.5 ? 'above' : 'below'
+    }
+
+    // если доступна только одна из механик — корректируем nextPos
+    if (!canDropInside && nextPos === 'inside') {
+      nextPos = ratio < 0.5 ? 'above' : 'below'
+    }
+    if (!(canReorderInTree || canReorderInPinned) && (nextPos === 'above' || nextPos === 'below')) {
+      nextPos = 'inside'
+    }
+
     event.preventDefault()
     event.dataTransfer.dropEffect = 'move'
-    if (!isOverInside) setIsOverInside(true)
+    setOverPosition(nextPos)
+    setIsOverInside(nextPos === 'inside')
   }
 
   const handleCardDragLeave: React.DragEventHandler<HTMLDivElement> = () => {
     if (isOverInside) setIsOverInside(false)
+    if (overPosition) setOverPosition(null)
   }
 
   const handleCardDrop: React.DragEventHandler<HTMLDivElement> = (event) => {
-    if (!canDropInside || draggedId === null) return
-    event.preventDefault()
+    if (draggedId === null) return
+    const pos = overPosition
     setIsOverInside(false)
-    // append to the end of children
-    void store.moveTodo(draggedId, todo.id, todo.children.length)
+    setOverPosition(null)
+    event.preventDefault()
+
+    if (pos === 'inside' && canDropInside) {
+      // append to children
+      void store.moveTodo(draggedId, todo.id, todo.children.length)
+      return
+    }
+
+    // сортировка среди сиблингов (дерево)
+    if ((pos === 'above' || pos === 'below') && canReorderInTree && !isPinnedContext) {
+      const targetIndex = pos === 'above' ? index : index + 1
+      void store.moveTodo(draggedId, parentId, targetIndex)
+      return
+    }
+
+    // сортировка в закрепленном списке
+    if ((pos === 'above' || pos === 'below') && canReorderInPinned && pinnedListId) {
+      const targetIndex = pos === 'above' ? index : index + 1
+      void store.movePinnedTodo(draggedId, pinnedListId, targetIndex)
+    }
   }
 
   const titleStyles = useMemo(
@@ -130,6 +181,8 @@ const TodoItemComponent = ({ todo, depth, allowChildren = true }: TodoItemProps)
           'group rounded-xl bg-white/95 ring-1 ring-slate-200 transition-all duration-200 hover:shadow-md',
           isDragging ? 'opacity-60 ring-2 ring-slate-300' : '',
           isOverInside && canDropInside ? 'ring-2 ring-emerald-400/80 bg-emerald-50/50' : '',
+          overPosition === 'above' ? 'shadow-[inset_0_2px_0_0_rgba(16,185,129,0.7)]' : '',
+          overPosition === 'below' ? 'shadow-[inset_0_-2px_0_0_rgba(16,185,129,0.7)]' : '',
         ].join(' ')}
         draggable={!isEditing && !isAddingChild}
         onDragStart={handleDragStart}
@@ -285,11 +338,9 @@ const TodoItemComponent = ({ todo, depth, allowChildren = true }: TodoItemProps)
 
       {canAddChild && !isCollapsed && (
         <div className="space-y-2 border-l border-slate-200/70 pl-6">
-          <DropZone parentId={todo.id} depth={depth + 1} index={0} />
           {todo.children.map((child, childIndex) => (
             <Fragment key={child.id}>
-              <TodoItem todo={child} depth={depth + 1} />
-              <DropZone parentId={todo.id} depth={depth + 1} index={childIndex + 1} />
+              <TodoItem todo={child} depth={depth + 1} parentId={todo.id} index={childIndex} />
             </Fragment>
           ))}
         </div>
