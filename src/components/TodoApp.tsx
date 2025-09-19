@@ -11,6 +11,7 @@ import { TodoStoreProvider, useTodoStore } from '@/stores/TodoStoreContext'
 // мини-плейсхолдеры для сортировки больше не используются
 import { PinnedList } from './PinnedList'
 import { TodoItem } from './TodoItem'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 interface TodoAppProps {
   initialState: TodoState
@@ -19,7 +20,16 @@ interface TodoAppProps {
 const TodoAppContent = () => {
   const store = useTodoStore()
   const [newTitle, setNewTitle] = useState('')
-  const [activeTab, setActiveTab] = useState<'pinned' | 'all' | 'settings'>('pinned')
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  // Инициализируем вкладку из URL (?tab=...)
+  const tabFromUrl = searchParams.get('tab')
+  const normalizedTab = (tabFromUrl === 'pinned' || tabFromUrl === 'all' || tabFromUrl === 'settings')
+    ? (tabFromUrl as 'pinned' | 'all' | 'settings')
+    : 'pinned'
+  const [activeTab, setActiveTab] = useState<'pinned' | 'all' | 'settings'>(normalizedTab)
   const [isAddingPinnedList, setIsAddingPinnedList] = useState(false)
   const [newPinnedListTitle, setNewPinnedListTitle] = useState('')
   const pinnedListInputRef = useRef<HTMLInputElement>(null)
@@ -68,17 +78,43 @@ const TodoAppContent = () => {
     [],
   )
 
+  // Синхронизация URL при смене вкладки пользователем
+  const applyTabToUrl = (tab: 'pinned' | 'all' | 'settings') => {
+    const params = new URLSearchParams(searchParams)
+    params.set('tab', tab)
+    const next = `${pathname}?${params.toString()}`
+    router.replace(next, { scroll: false })
+  }
+
+  const handleSwitchTab = (tab: 'pinned' | 'all' | 'settings') => {
+    if (tab === activeTab) return
+    setActiveTab(tab)
+    applyTabToUrl(tab)
+  }
+
+  // Обратная синхронизация: если URL поменялся (например, навигация назад/вперёд), обновим стейт
+  useEffect(() => {
+    const current = searchParams.get('tab')
+    const nextTab = (current === 'pinned' || current === 'all' || current === 'settings')
+      ? (current as 'pinned' | 'all' | 'settings')
+      : 'pinned'
+    if (nextTab !== activeTab) {
+      setActiveTab(nextTab)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
+
   return (
     <div className="min-h-screen bg-canvas-light text-slate-900">
       <div className="mx-auto flex min-h-screen max-w-4xl flex-col px-4 py-10 sm:px-6 lg:px-8">
         <section className="flex-1 rounded-3xl bg-white/60 p-5 shadow-inner ring-1 ring-white/40">
           <div className="mb-6 flex justify-start">
             <div className="flex rounded-2xl bg-white/70 p-1 text-sm font-medium text-slate-500 shadow-sm ring-1 ring-slate-200/70">
-              {tabs.map((tab) => (
+        {tabs.map((tab) => (
                 <button
                   key={tab.key}
                   type="button"
-                  onClick={() => setActiveTab(tab.key)}
+          onClick={() => handleSwitchTab(tab.key)}
                   className={[
                     'rounded-xl px-4 py-2 transition focus-visible:outline-none',
                     activeTab === tab.key
