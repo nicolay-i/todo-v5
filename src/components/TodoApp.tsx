@@ -242,6 +242,9 @@ const SettingsTab = () => {
   const [isExporting, setIsExporting] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [newTag, setNewTag] = useState('')
+  const [editingTagId, setEditingTagId] = useState<string | null>(null)
+  const [editingTagName, setEditingTagName] = useState('')
 
   const handleExport = async () => {
     setStatus(null)
@@ -307,6 +310,98 @@ const SettingsTab = () => {
 
   return (
     <div className="space-y-6">
+      {/* Tags management */}
+      <div className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
+        <h3 className="text-base font-semibold text-slate-700">Теги</h3>
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault()
+            const trimmed = newTag.trim()
+            if (!trimmed) return
+            await store.addTag(trimmed)
+            setNewTag('')
+          }}
+          className="mt-3 flex gap-2"
+        >
+          <input
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-inner focus:border-slate-400 focus:outline-none"
+            placeholder="Новый тег"
+            value={newTag}
+            onChange={(e) => setNewTag(e.target.value)}
+          />
+          <button
+            type="submit"
+            className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
+          >
+            Добавить
+          </button>
+        </form>
+
+        <ul className="mt-4 space-y-2">
+          {store.tags.map((tag) => (
+            <li key={tag.id} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
+              {editingTagId === tag.id ? (
+                <>
+                  <input
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-inner focus:border-slate-400 focus:outline-none"
+                    value={editingTagName}
+                    onChange={(e) => setEditingTagName(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await store.renameTag(tag.id, editingTagName)
+                      setEditingTagId(null)
+                      setEditingTagName('')
+                    }}
+                    className="rounded-lg bg-emerald-500 p-2 text-white hover:bg-emerald-500/90"
+                    aria-label="Сохранить тег"
+                  >
+                    Сохранить
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingTagId(null)
+                      setEditingTagName('')
+                    }}
+                    className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+                    aria-label="Отменить редактирование"
+                  >
+                    Отмена
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="flex-1 text-sm text-slate-700">{tag.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingTagId(tag.id)
+                      setEditingTagName(tag.name)
+                    }}
+                    className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+                    aria-label="Редактировать тег"
+                  >
+                    Редактировать
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => store.deleteTag(tag.id)}
+                    className="rounded-lg p-2 text-rose-500 hover:bg-rose-50"
+                    aria-label="Удалить тег"
+                  >
+                    Удалить
+                  </button>
+                </>
+              )}
+            </li>
+          ))}
+          {store.tags.length === 0 && (
+            <li className="rounded-xl border border-dashed border-slate-200 bg-white/70 px-3 py-4 text-center text-sm text-slate-500">Тегов пока нет</li>
+          )}
+        </ul>
+      </div>
       {status && (
         <div
           className={[

@@ -88,6 +88,10 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
     void store.togglePinned(todo.id)
   }
 
+  const availableTags = store.tags
+  const todoTagIds = new Set((todo.tags ?? []).map((t) => t.id))
+  const addableTags = availableTags.filter((t) => !todoTagIds.has(t.id))
+
   const handleToggleCollapsed = () => {
     // Разрешаем сворачивать только если потенциально есть дети (или уже есть), иначе кнопка не показывается
     store.toggleCollapse(todo.id)
@@ -213,6 +217,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
             {todo.completed ? <FiCheckCircle /> : <FiCircle />}
           </button>
 
+          {/* Заголовок и теги в одной строке: теги перед текстом, чтобы перенос был под тегами */}
           <div className="flex-1">
             {isEditing ? (
               <form onSubmit={handleEditSubmit} className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -251,7 +256,32 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                 </div>
               </form>
             ) : (
-              <p className={titleStyles}>{todo.title}</p>
+              <div className="flex flex-wrap items-start gap-2">
+                <p className={titleStyles}>
+                  {(todo.tags ?? []).map((tag) => (<>
+                    <span
+                      key={tag.id}
+                      className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-700"
+                    >
+                      {tag.name}
+                      <button
+                        type="button"
+                        onClick={() => store.detachTag(todo.id, tag.id)}
+                        className="rounded p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+                        aria-label="Удалить тег"
+                      >
+                        <FiX />
+                      </button>
+                    </span>
+                    &nbsp;
+                    </>
+                  ))}
+
+                  {todo.tags?.length ? <>&nbsp;</> : null}
+
+                  {todo.title}
+                </p>
+              </div>
             )}
           </div>
 
@@ -282,6 +312,27 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                     <FiPlus />
                   </button>
                 )}
+                {/* Add-tag select placed near + button */}
+                {addableTags.length > 0 && (
+                  <select
+                    className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 shadow-inner focus:border-slate-400 focus:outline-none"
+                    value=""
+                    onChange={(e) => {
+                      const id = e.target.value
+                      if (id) void store.attachTag(todo.id, id)
+                    }}
+                    aria-label="Добавить тег"
+                  >
+                    <option value="" disabled>
+                      + тег
+                    </option>
+                    {addableTags.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 <button
                   type="button"
                   onClick={() => setIsEditing(true)}
@@ -303,7 +354,9 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
           </div>
         </div>
 
-  {canAddChild && isAddingChild && !isCollapsed && (
+        {/* Removed bottom tags row; tags are now inline above */}
+
+        {canAddChild && isAddingChild && !isCollapsed && (
           <form onSubmit={handleAddChild} className="flex items-center gap-2 border-t border-slate-100 bg-slate-50 px-4 py-3">
             <input
               ref={childInputRef}

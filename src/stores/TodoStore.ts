@@ -1,6 +1,6 @@
 import { makeAutoObservable } from 'mobx'
 import { MAX_DEPTH } from '@/lib/constants'
-import type { TodoNode, TodoState, PinnedListState } from '@/lib/types'
+import type { TodoNode, TodoState, PinnedListState, Tag } from '@/lib/types'
 
 export interface PinnedListView extends PinnedListState {
   todos: TodoNode[]
@@ -16,6 +16,7 @@ interface TodoLookup {
 export class TodoStore {
   todos: TodoNode[] = []
   pinnedLists: PinnedListState[] = []
+  tags: Tag[] = []
   draggedId: string | null = null
   // Set со свернутыми узлами дерева (хранит id задач)
   collapsedIds: Set<string> = new Set()
@@ -26,6 +27,7 @@ export class TodoStore {
     makeAutoObservable(this, {}, { autoBind: true })
     this.todos = initialState.todos
     this.pinnedLists = initialState.pinnedLists
+  this.tags = initialState.tags ?? []
     this.loadCollapsed()
   }
 
@@ -89,6 +91,7 @@ export class TodoStore {
   setState(state: TodoState) {
     this.todos = state.todos
     this.pinnedLists = state.pinnedLists
+  this.tags = state.tags ?? []
   }
 
   // ---- Collapse API ----
@@ -179,6 +182,44 @@ export class TodoStore {
 
   async deletePinnedList(id: string) {
     await this.mutate(`/api/pinned-lists/${id}`, { method: 'DELETE' })
+  }
+
+  // ---- Tags CRUD ----
+  async addTag(name: string) {
+    if (!name.trim()) return
+    await this.mutate('/api/tags', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    })
+  }
+
+  async renameTag(id: string, name: string) {
+    if (!name.trim()) return
+    await this.mutate('/api/tags', {
+      method: 'PATCH',
+      body: JSON.stringify({ id, name }),
+    })
+  }
+
+  async deleteTag(id: string) {
+    await this.mutate('/api/tags', {
+      method: 'DELETE',
+      body: JSON.stringify({ id }),
+    })
+  }
+
+  async attachTag(todoId: string, tagId: string) {
+    await this.mutate(`/api/todos/${todoId}/tags`, {
+      method: 'POST',
+      body: JSON.stringify({ tagId }),
+    })
+  }
+
+  async detachTag(todoId: string, tagId: string) {
+    await this.mutate(`/api/todos/${todoId}/tags`, {
+      method: 'DELETE',
+      body: JSON.stringify({ tagId }),
+    })
   }
 
   isPinned(id: string): boolean {
