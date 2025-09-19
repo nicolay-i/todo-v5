@@ -5,7 +5,6 @@ import { observer } from 'mobx-react-lite'
 import { FiCheck, FiEdit2, FiTrash2, FiX } from 'react-icons/fi'
 import type { PinnedListView } from '@/stores/TodoStore'
 import { useTodoStore } from '@/stores/TodoStoreContext'
-import { PinnedDropZone } from './PinnedDropZone'
 import { TodoItem } from './TodoItem'
 
 interface PinnedListProps {
@@ -120,11 +119,16 @@ const PinnedListComponent = ({ list }: PinnedListProps) => {
       </div>
 
       <div className="mt-4 space-y-3">
-        <PinnedDropZone listId={list.id} index={0} />
         {todos.map((todo, index) => (
           <Fragment key={todo.id}>
-            <TodoItem todo={todo} depth={0} allowChildren={false} />
-            <PinnedDropZone listId={list.id} index={index + 1} />
+            <TodoItem
+              todo={todo}
+              depth={0}
+              allowChildren={false}
+              parentId={null}
+              index={index}
+              pinnedListId={list.id}
+            />
           </Fragment>
         ))}
       </div>

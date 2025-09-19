@@ -17,24 +17,30 @@ import {
 import { MAX_DEPTH } from '@/lib/constants'
 import type { TodoNode } from '@/lib/types'
 import { useTodoStore } from '@/stores/TodoStoreContext'
-import { DropZone } from './DropZone'
+// DropZone больше не используется для сортировки; логика дропа реализована на карточке
 
 interface TodoItemProps {
   todo: TodoNode
   depth: number
   allowChildren?: boolean
+  // Для сортировки в рамках родителя
+  parentId: string | null
+  index: number
+  // Для сортировки в закреплённых списках
+  pinnedListId?: string
 }
 
 const actionButtonStyles =
   'rounded-lg p-1.5 text-slate-400 transition-colors duration-150 hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none'
 
-const TodoItemComponent = ({ todo, depth, allowChildren = true }: TodoItemProps) => {
+const TodoItemComponent = ({ todo, depth, allowChildren = true, parentId, index, pinnedListId }: TodoItemProps) => {
   const store = useTodoStore()
   const [isEditing, setIsEditing] = useState(false)
   const [isAddingChild, setIsAddingChild] = useState(false)
   const [titleDraft, setTitleDraft] = useState(todo.title)
   const [childTitle, setChildTitle] = useState('')
   const [isOverInside, setIsOverInside] = useState(false)
+  const [hoverPos, setHoverPos] = useState<'none' | 'top' | 'middle' | 'bottom'>('none')
   const childInputRef = useRef<HTMLInputElement>(null)
 
   const canAddChild = allowChildren && depth < MAX_DEPTH
@@ -43,6 +49,11 @@ const TodoItemComponent = ({ todo, depth, allowChildren = true }: TodoItemProps)
   const draggedId = store.draggedId
   const canDropInside =
     allowChildren && depth < MAX_DEPTH && draggedId !== null && store.canDrop(draggedId, todo.id)
+
+  const canReorderInTree =
+    draggedId !== null && parentId !== undefined && store.canDrop(draggedId, parentId)
+
+  const canReorderInPinned = draggedId !== null && Boolean(pinnedListId) && store.isPinned(draggedId!)
 
   useEffect(() => {
     setTitleDraft(todo.title)
@@ -96,22 +107,66 @@ const TodoItemComponent = ({ todo, depth, allowChildren = true }: TodoItemProps)
 
   // Allow dropping directly onto the card to append as a child (even when collapsed)
   const handleCardDragOver: React.DragEventHandler<HTMLDivElement> = (event) => {
-    if (!canDropInside) return
+    // Позволяем сортировку по верх/низ и дроп внутрь по центру
+    if (!(canReorderInTree || canReorderInPinned || canDropInside)) return
+    const rect = (event.currentTarget as HTMLDivElement).getBoundingClientRect()
+    const y = event.clientY - rect.top
+    const ratio = rect.height > 0 ? y / rect.height : 0.5
+
+    let nextHover: 'top' | 'middle' | 'bottom' = 'middle'
+    if (ratio < 0.25) nextHover = 'top'
+    else if (ratio > 0.75) nextHover = 'bottom'
+    else nextHover = 'middle'
+
+    // Если середина, но дроп внутрь запрещён, смещаем к ближайшей сортировочной зоне
+    if (nextHover === 'middle' && !(canDropInside)) {
+      nextHover = ratio < 0.5 ? 'top' : 'bottom'
+    }
+
+    setHoverPos(nextHover)
+    setIsOverInside(nextHover === 'middle' && canDropInside)
+
     event.preventDefault()
     event.dataTransfer.dropEffect = 'move'
-    if (!isOverInside) setIsOverInside(true)
   }
 
   const handleCardDragLeave: React.DragEventHandler<HTMLDivElement> = () => {
     if (isOverInside) setIsOverInside(false)
+    if (hoverPos !== 'none') setHoverPos('none')
   }
 
   const handleCardDrop: React.DragEventHandler<HTMLDivElement> = (event) => {
-    if (!canDropInside || draggedId === null) return
+    if (draggedId === null) return
+    if (!(canReorderInTree || canReorderInPinned || canDropInside)) return
     event.preventDefault()
+    const rect = (event.currentTarget as HTMLDivElement).getBoundingClientRect()
+    const y = event.clientY - rect.top
+    const ratio = rect.height > 0 ? y / rect.height : 0.5
+
+    let zone: 'top' | 'middle' | 'bottom'
+    if (ratio < 0.25) zone = 'top'
+    else if (ratio > 0.75) zone = 'bottom'
+    else zone = 'middle'
+    if (zone === 'middle' && !canDropInside) zone = ratio < 0.5 ? 'top' : 'bottom'
+
     setIsOverInside(false)
-    // append to the end of children
-    void store.moveTodo(draggedId, todo.id, todo.children.length)
+    setHoverPos('none')
+
+    if (zone === 'middle' && canDropInside) {
+      // дроп как потомок
+      void store.moveTodo(draggedId, todo.id, todo.children.length)
+      return
+    }
+
+    if (zone === 'top' || zone === 'bottom') {
+      const targetIndex = zone === 'top' ? index : index + 1
+      if (pinnedListId && canReorderInPinned) {
+        void store.movePinnedTodo(draggedId, pinnedListId, targetIndex)
+        store.clearDragged()
+      } else if (canReorderInTree) {
+        void store.moveTodo(draggedId, parentId, targetIndex)
+      }
+    }
   }
 
   const titleStyles = useMemo(
@@ -130,6 +185,8 @@ const TodoItemComponent = ({ todo, depth, allowChildren = true }: TodoItemProps)
           'group rounded-xl bg-white/95 ring-1 ring-slate-200 transition-all duration-200 hover:shadow-md',
           isDragging ? 'opacity-60 ring-2 ring-slate-300' : '',
           isOverInside && canDropInside ? 'ring-2 ring-emerald-400/80 bg-emerald-50/50' : '',
+          hoverPos === 'top' && !isOverInside ? 'border-t-2 border-emerald-400' : '',
+          hoverPos === 'bottom' && !isOverInside ? 'border-b-2 border-emerald-400' : '',
         ].join(' ')}
         draggable={!isEditing && !isAddingChild}
         onDragStart={handleDragStart}
@@ -285,11 +342,14 @@ const TodoItemComponent = ({ todo, depth, allowChildren = true }: TodoItemProps)
 
       {canAddChild && !isCollapsed && (
         <div className="space-y-2 border-l border-slate-200/70 pl-6">
-          <DropZone parentId={todo.id} depth={depth + 1} index={0} />
           {todo.children.map((child, childIndex) => (
             <Fragment key={child.id}>
-              <TodoItem todo={child} depth={depth + 1} />
-              <DropZone parentId={todo.id} depth={depth + 1} index={childIndex + 1} />
+              <TodoItem
+                todo={child}
+                depth={depth + 1}
+                parentId={todo.id}
+                index={childIndex}
+              />
             </Fragment>
           ))}
         </div>

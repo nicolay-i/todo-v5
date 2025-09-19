@@ -7,7 +7,6 @@ import { FiPlus } from 'react-icons/fi'
 import type { TodoState } from '@/lib/types'
 import { TodoStore } from '@/stores/TodoStore'
 import { TodoStoreProvider, useTodoStore } from '@/stores/TodoStoreContext'
-import { DropZone } from './DropZone'
 import { PinnedList } from './PinnedList'
 import { TodoItem } from './TodoItem'
 
@@ -66,6 +65,23 @@ const TodoAppContent = () => {
     ],
     [],
   )
+
+  // DnD: дроп в пустую область корневого списка (в конец)
+  const handleRootDragOver: React.DragEventHandler<HTMLDivElement> = (event) => {
+    const draggedId = store.draggedId
+    if (draggedId === null) return
+    if (!store.canDrop(draggedId, null)) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+  }
+
+  const handleRootDrop: React.DragEventHandler<HTMLDivElement> = (event) => {
+    const draggedId = store.draggedId
+    if (draggedId === null) return
+    if (!store.canDrop(draggedId, null)) return
+    event.preventDefault()
+    void store.moveTodo(draggedId, null, store.todos.length)
+  }
 
   return (
     <div className="min-h-screen bg-canvas-light text-slate-900">
@@ -173,12 +189,10 @@ const TodoAppContent = () => {
                   Добавить
                 </button>
               </form>
-              <div className="space-y-3">
-                <DropZone parentId={null} depth={0} index={0} />
+              <div className="space-y-3" onDragOver={handleRootDragOver} onDrop={handleRootDrop}>
                 {store.todos.map((todo, index) => (
                   <Fragment key={todo.id}>
-                    <TodoItem todo={todo} depth={0} />
-                    <DropZone parentId={null} depth={0} index={index + 1} />
+                    <TodoItem todo={todo} depth={0} parentId={null} index={index} />
                   </Fragment>
                 ))}
               </div>
