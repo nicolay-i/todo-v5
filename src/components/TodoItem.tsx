@@ -10,11 +10,13 @@ import {
   FiChevronRight,
   FiEdit2,
   FiPlus,
+  FiTag,
   FiStar,
   FiTrash2,
   FiX,
 } from 'react-icons/fi'
 import { MAX_DEPTH } from '@/lib/constants'
+import { useDropdown } from '@/lib/hooks/useDropdown'
 import type { TodoNode } from '@/lib/types'
 import { useTodoStore } from '@/stores/TodoStoreContext'
 // мини-плейсхолдеры для сортировки больше не используются
@@ -42,6 +44,8 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
   const [isOverInside, setIsOverInside] = useState(false)
   const [overPosition, setOverPosition] = useState<null | 'above' | 'below' | 'inside'>(null)
   const childInputRef = useRef<HTMLInputElement>(null)
+  // Выпадающий список тегов: управляeм через общий хук
+  const tagDropdown = useDropdown({ hoverOpenDelay: 300, closeDelay: 300, animationDuration: 200, groupKey: 'tag-picker' })
   // Многострочное редактирование: вычисляем строки один раз при входе в режим
   const [editRows, setEditRows] = useState(1)
   const editWrapRef = useRef<HTMLDivElement>(null)
@@ -100,6 +104,9 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
       childInputRef.current.focus()
     }
   }, [isAddingChild])
+
+  // Привязываем ref корня выпадушки для клика-вне
+  const tagPickerRef = tagDropdown.rootRef
 
   const handleToggle = () => {
     void store.toggleTodo(todo.id)
@@ -362,26 +369,42 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                     <FiPlus />
                   </button>
                 )}
-                {/* Add-tag select placed near + button */}
+                {/* Кнопка тегов с выпадающим списком */}
                 {addableTags.length > 0 && (
-                  <select
-                    className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 shadow-inner focus:border-slate-400 focus:outline-none"
-                    value=""
-                    onChange={(e) => {
-                      const id = e.target.value
-                      if (id) void store.attachTag(todo.id, id)
-                    }}
-                    aria-label="Добавить тег"
-                  >
-                    <option value="" disabled>
-                      + тег
-                    </option>
-                    {addableTags.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </select>
+                  <div ref={tagPickerRef} className="relative">
+                    <button
+                      type="button"
+                      {...tagDropdown.getTriggerProps()}
+                      className={actionButtonStyles}
+                      aria-label="Добавить тег"
+                      aria-expanded={tagDropdown.isOpen}
+                    >
+                      <FiTag />
+                    </button>
+                    {tagDropdown.isMounted && (
+                      <div
+                        className={tagDropdown.getMenuClassName('absolute right-0 z-20 mt-2 w-48 origin-top-right rounded-lg border border-slate-200 bg-white p-2 shadow-lg')}
+                        {...tagDropdown.getMenuProps()}
+                      >
+                        <div className="mb-2 px-1 text-xs font-medium text-slate-500">Добавить тег</div>
+                        <ul className="max-h-56 overflow-auto">
+                          {addableTags.map((t) => (
+                            <li key={t.id}>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  void store.attachTag(todo.id, t.id)
+                                }}
+                                className="w-full rounded-md px-2 py-1.5 text-left text-sm text-slate-700 hover:bg-slate-100"
+                              >
+                                {t.name}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
                 )}
                 <button
                   type="button"
