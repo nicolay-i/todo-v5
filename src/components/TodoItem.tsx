@@ -42,6 +42,31 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
   const [isOverInside, setIsOverInside] = useState(false)
   const [overPosition, setOverPosition] = useState<null | 'above' | 'below' | 'inside'>(null)
   const childInputRef = useRef<HTMLInputElement>(null)
+  // Многострочное редактирование: вычисляем строки один раз при входе в режим
+  const [editRows, setEditRows] = useState(1)
+  const editWrapRef = useRef<HTMLDivElement>(null)
+  const measureRef = useRef<HTMLDivElement>(null)
+
+  // Общая функция измерения требуемого количества строк.
+  const recalcRows = () => {
+    const wrapEl = editWrapRef.current
+    const measureEl = measureRef.current
+    if (!wrapEl || !measureEl) return
+
+    const width = wrapEl.clientWidth
+    if (width <= 0) return
+
+    measureEl.style.width = `${width}px`
+    measureEl.textContent = titleDraft || ''
+
+    const style = window.getComputedStyle(measureEl)
+    const lineHeightPx = parseFloat(style.lineHeight || '20')
+    const totalHeight = measureEl.scrollHeight
+    let rows = lineHeightPx > 0 ? Math.ceil(totalHeight / lineHeightPx) : 1
+    if (!Number.isFinite(rows) || rows <= 0) rows = 1
+    rows = Math.min(rows, 12)
+    setEditRows(rows)
+  }
 
   const canAddChild = allowChildren && depth < MAX_DEPTH
   const isDragging = store.draggedId === todo.id
@@ -56,6 +81,19 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
   useEffect(() => {
     setTitleDraft(todo.title)
   }, [todo.title])
+
+  // При входе в режим редактирования определяем число строк на основе ширины поля и текущего текста
+  useEffect(() => {
+    if (!isEditing) return
+    // сбрасываем на 1 строку, затем вычисляем фактическое количество
+    setEditRows(1)
+    const raf = requestAnimationFrame(() => {
+  recalcRows()
+    })
+    return () => cancelAnimationFrame(raf)
+    // ВАЖНО: зависит только от входа в режим, а не от текста
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditing])
 
   useEffect(() => {
     if (isAddingChild && childInputRef.current) {
@@ -221,19 +259,23 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
           <div className="flex-1">
             {isEditing ? (
               <form onSubmit={handleEditSubmit} className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <input
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-400 focus:outline-none"
-                  autoFocus
-                  value={titleDraft}
-                  onChange={(event) => setTitleDraft(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Escape') {
-                      setTitleDraft(todo.title)
-                      setIsEditing(false)
-                    }
-                  }}
-                  placeholder="Название задачи"
-                />
+                <div ref={editWrapRef} className="w-full">
+                  <textarea
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm leading-snug text-slate-700 shadow-sm focus:border-slate-400 focus:outline-none resize-none"
+                    autoFocus
+                    value={titleDraft}
+                    onChange={(event) => setTitleDraft(event.target.value)}
+                    onBlur={recalcRows}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Escape') {
+                        setTitleDraft(todo.title)
+                        setIsEditing(false)
+                      }
+                    }}
+                    placeholder="Название задачи"
+                    rows={editRows}
+                  />
+                </div>
                 <div className="flex items-center gap-1 self-end sm:self-auto">
                   <button
                     type="submit"
@@ -254,6 +296,14 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                     <FiX />
                   </button>
                 </div>
+
+                {/* Невидимый измеритель для расчёта количества строк */}
+                <div
+                  ref={measureRef}
+                  aria-hidden
+                  className="pointer-events-none absolute -z-10 whitespace-pre-wrap break-words rounded-lg border border-transparent px-3 py-2 text-sm leading-snug"
+                  style={{ visibility: 'hidden' }}
+                />
               </form>
             ) : (
               <div className="flex flex-wrap items-start gap-2">
