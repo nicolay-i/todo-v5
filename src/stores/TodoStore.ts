@@ -20,15 +20,19 @@ export class TodoStore {
   draggedId: string | null = null
   // Set со свернутыми узлами дерева (хранит id задач)
   collapsedIds: Set<string> = new Set()
+  // Set со свернутыми закрепленными слотами (хранит id списков)
+  collapsedPinnedListIds: Set<string> = new Set()
 
   private static readonly COLLAPSE_STORAGE_KEY = 'todoCollapsedIds_v1'
+  private static readonly PINNED_COLLAPSE_STORAGE_KEY = 'pinnedCollapsedIds_v1'
 
   constructor(initialState: TodoState) {
     makeAutoObservable(this, {}, { autoBind: true })
     this.todos = initialState.todos
     this.pinnedLists = initialState.pinnedLists
   this.tags = initialState.tags ?? []
-    this.loadCollapsed()
+  this.loadCollapsed()
+  this.loadPinnedCollapsed()
   }
 
   get pinnedListsWithTodos(): PinnedListView[] {
@@ -137,6 +141,54 @@ export class TodoStore {
     try {
       const arr = Array.from(this.collapsedIds)
       window.localStorage.setItem(TodoStore.COLLAPSE_STORAGE_KEY, JSON.stringify(arr))
+    } catch (e) {
+      // ignore storage errors
+    }
+  }
+
+  // ---- Collapse API for pinned lists ----
+  isPinnedListCollapsed(id: string): boolean {
+    return this.collapsedPinnedListIds.has(id)
+  }
+
+  setPinnedListCollapsed(id: string, collapsed: boolean) {
+    if (collapsed) {
+      this.collapsedPinnedListIds.add(id)
+    } else {
+      this.collapsedPinnedListIds.delete(id)
+    }
+    this.savePinnedCollapsed()
+  }
+
+  togglePinnedListCollapse(id: string) {
+    if (this.collapsedPinnedListIds.has(id)) {
+      this.collapsedPinnedListIds.delete(id)
+    } else {
+      this.collapsedPinnedListIds.add(id)
+    }
+    this.savePinnedCollapsed()
+  }
+
+  private loadPinnedCollapsed() {
+    if (typeof window === 'undefined') return
+    try {
+      const raw = window.localStorage.getItem(TodoStore.PINNED_COLLAPSE_STORAGE_KEY)
+      if (!raw) return
+      const arr = JSON.parse(raw) as string[]
+      if (Array.isArray(arr)) {
+        this.collapsedPinnedListIds = new Set(arr)
+      }
+    } catch (e) {
+      // ignore parsing/storage errors
+      console.warn('Failed to load pinned collapsed ids from storage')
+    }
+  }
+
+  private savePinnedCollapsed() {
+    if (typeof window === 'undefined') return
+    try {
+      const arr = Array.from(this.collapsedPinnedListIds)
+      window.localStorage.setItem(TodoStore.PINNED_COLLAPSE_STORAGE_KEY, JSON.stringify(arr))
     } catch (e) {
       // ignore storage errors
     }

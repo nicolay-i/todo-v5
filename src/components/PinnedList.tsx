@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { observer } from 'mobx-react-lite'
-import { FiCheck, FiEdit2, FiTrash2, FiX } from 'react-icons/fi'
+import { FiCheck, FiEdit2, FiTrash2, FiX, FiChevronDown, FiChevronRight } from 'react-icons/fi'
 import type { PinnedListView } from '@/stores/TodoStore'
 import { useTodoStore } from '@/stores/TodoStoreContext'
 // мини-плейсхолдеры для сортировки больше не используются
@@ -25,6 +25,7 @@ const PinnedListComponent = ({ list }: PinnedListProps) => {
   const isPrimary = store.isPrimaryPinnedList(list.id)
   const todos = list.todos
   const isRenameValid = titleDraft.trim().length > 0
+  const isCollapsed = store.isPinnedListCollapsed(list.id)
 
   useEffect(() => {
     setTitleDraft(list.title)
@@ -91,7 +92,19 @@ const PinnedListComponent = ({ list }: PinnedListProps) => {
           </form>
         ) : (
           <>
-            <h3 className="flex-1 text-sm font-semibold text-slate-700">{list.title}</h3>
+            <button
+              type="button"
+              onClick={() => store.togglePinnedListCollapse(list.id)}
+              className="mr-2 rounded-md p-1 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none"
+              aria-label={isCollapsed ? 'Развернуть слот' : 'Свернуть слот'}
+              title={isCollapsed ? 'Развернуть' : 'Свернуть'}
+            >
+              {isCollapsed ? <FiChevronRight /> : <FiChevronDown />}
+            </button>
+            <h3 className="flex-1 text-sm font-semibold text-slate-700">
+              {list.title}
+              <span className="ml-2 rounded bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">{todos.length}</span>
+            </h3>
             <div className="flex items-center gap-1">
               <button
                 type="button"
@@ -119,15 +132,17 @@ const PinnedListComponent = ({ list }: PinnedListProps) => {
         )}
       </div>
 
-      <PinnedListContainer listId={list.id} todosCount={todos.length}>
-        {todos.map((todo, index) => (
-          <Fragment key={todo.id}>
-            <TodoItem todo={todo} depth={0} parentId={null} index={index} pinnedListId={list.id} allowChildren={false} />
-          </Fragment>
-        ))}
-      </PinnedListContainer>
+      {!isCollapsed && (
+        <PinnedListContainer listId={list.id} todosCount={todos.length}>
+          {todos.map((todo, index) => (
+            <Fragment key={todo.id}>
+              <TodoItem todo={todo} depth={0} parentId={null} index={index} pinnedListId={list.id} allowChildren={false} />
+            </Fragment>
+          ))}
+        </PinnedListContainer>
+      )}
 
-      {todos.length === 0 && (
+      {todos.length === 0 && !isCollapsed && (
         <div className="mt-4 rounded-xl border border-dashed border-amber-200 bg-amber-50/60 px-4 py-6 text-center text-xs text-amber-600">
           {emptyStateMessage}
         </div>
