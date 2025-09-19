@@ -172,7 +172,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
   const titleStyles = useMemo(
     () =>
       [
-        'text-base font-medium leading-snug transition-colors',
+        'font-medium leading-snug transition-colors',
         todo.completed ? 'text-slate-400 line-through' : 'text-slate-700',
       ].join(' '),
     [todo.completed],
@@ -195,7 +195,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
         onDragLeave={handleCardDragLeave}
         onDrop={handleCardDrop}
       >
-        <div className="flex items-center gap-3 px-4 py-3">
+        <div className="flex items-center gap-3 px-4 py-2">
           {/* Toggle collapse button for nodes that can have children */}
           {allowChildren && (
             <button
@@ -257,7 +257,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
               </form>
             ) : (
               <div className="flex flex-wrap items-start gap-2">
-                <p className={titleStyles}>
+                <p className={`${titleStyles} text-sm`}>
                   {(todo.tags ?? []).map((tag) => (<>
                     <span
                       key={tag.id}
