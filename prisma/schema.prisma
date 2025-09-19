@@ -13,6 +13,7 @@ model Todo {
   id        String   @id @default(cuid())
   title     String
   completed Boolean  @default(false)
+  completedAt DateTime?
   pinned    Boolean  @default(false)
   position  Int
   parentId  String?

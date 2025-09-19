@@ -71,6 +71,7 @@ async function ensureSeedData() {
           {
             title: 'Прогнать авто-тесты',
             completed: true,
+            completedAt: new Date(),
             pinned: false,
             parentId: qaChecklist.id,
             position: 0,
@@ -573,7 +574,7 @@ export async function toggleTodoCompleted(id: string): Promise<TodoState> {
 
   await prisma.todo.update({
     where: { id },
-    data: { completed: !todo.completed },
+  data: { completed: !todo.completed, completedAt: todo.completed ? null : new Date() },
   })
 
   return getTodoState()

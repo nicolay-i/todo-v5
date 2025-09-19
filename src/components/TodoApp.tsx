@@ -6,6 +6,7 @@ import { observer } from 'mobx-react-lite'
 import { FiPlus } from 'react-icons/fi'
 import type { TodoState } from '@/lib/types'
 import { TodoStore } from '@/stores/TodoStore'
+import type { VisibilityMode } from '@/stores/TodoStore'
 import { TodoStoreProvider, useTodoStore } from '@/stores/TodoStoreContext'
 // мини-плейсхолдеры для сортировки больше не используются
 import { PinnedList } from './PinnedList'
@@ -95,6 +96,12 @@ const TodoAppContent = () => {
             <>
               <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h2 className="text-base font-semibold text-slate-600">Слоты на день</h2>
+                <div className="flex items-center gap-2">
+                  <FilterSelect
+                    value={store.pinnedFilterMode}
+                    onChange={(v) => store.setPinnedFilterMode(v)}
+                  />
+                </div>
                 {isAddingPinnedList ? (
                   <form
                     onSubmit={handlePinnedListSubmit}
@@ -173,6 +180,9 @@ const TodoAppContent = () => {
                   Добавить
                 </button>
               </form>
+              <div className="mb-3 flex items-center justify-end">
+                <FilterSelect value={store.listFilterMode} onChange={(v) => store.setListFilterMode(v)} />
+              </div>
               <ListContainer />
 
               {store.todos.length === 0 && (
@@ -202,6 +212,30 @@ export const TodoApp = ({ initialState }: TodoAppProps) => {
   )
 }
 
+const filterOptions: { value: VisibilityMode; label: string }[] = [
+  { value: 'activeOnly', label: 'Только активные' },
+  { value: 'today', label: 'Активные сегодня' },
+  { value: 'oneDay', label: 'За день' },
+  { value: 'twoDays', label: 'За два дня' },
+  { value: 'week', label: 'За неделю' },
+]
+
+function FilterSelect({ value, onChange }: { value: VisibilityMode; onChange: (v: VisibilityMode) => void }) {
+  return (
+    <select
+      className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 shadow-inner focus:border-slate-400 focus:outline-none"
+      value={value}
+      onChange={(e) => onChange(e.target.value as VisibilityMode)}
+    >
+      {filterOptions.map((opt) => (
+        <option key={opt.value} value={opt.value}>
+          {opt.label}
+        </option>
+      ))}
+    </select>
+  )
+}
+
 // Контейнер списка верхнего уровня: без мини-плейсхолдеров.
 const ListContainer = observer(() => {
   const store = useTodoStore()
@@ -227,7 +261,7 @@ const ListContainer = observer(() => {
       onDragOver={handleEmptyDragOver}
       onDrop={handleEmptyDrop}
     >
-      {store.todos.map((todo, index) => (
+  {store.visibleTodos.map((todo, index) => (
         <Fragment key={todo.id}>
           <TodoItem todo={todo} depth={0} parentId={null} index={index} />
         </Fragment>
