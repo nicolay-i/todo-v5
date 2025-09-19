@@ -29,6 +29,7 @@ model PinnedList {
   title     String
   position  Int
   isPrimary Boolean      @default(false)
+  isActive  Boolean      @default(false)
   todos     PinnedTodo[]
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt

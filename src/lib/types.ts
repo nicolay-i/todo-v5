@@ -18,6 +18,7 @@ export interface PinnedListState {
   order: string[]
   isPrimary: PinnedList['isPrimary']
   position: PinnedList['position']
+  isActive?: boolean
 }
 
 export interface TodoState {

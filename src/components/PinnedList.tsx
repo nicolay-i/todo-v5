@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { observer } from 'mobx-react-lite'
-import { FiCheck, FiEdit2, FiTrash2, FiX, FiChevronDown, FiChevronRight } from 'react-icons/fi'
+import { FiCheck, FiEdit2, FiTrash2, FiX, FiChevronDown, FiChevronRight, FiStar } from 'react-icons/fi'
 import type { PinnedListView } from '@/stores/TodoStore'
 import { useTodoStore } from '@/stores/TodoStoreContext'
 // мини-плейсхолдеры для сортировки больше не используются
@@ -26,6 +26,7 @@ const PinnedListComponent = ({ list }: PinnedListProps) => {
   const todos = list.todos
   const isRenameValid = titleDraft.trim().length > 0
   const isCollapsed = store.isPinnedListCollapsed(list.id)
+  const isActive = store.isActivePinnedList(list.id)
 
   useEffect(() => {
     setTitleDraft(list.title)
@@ -47,7 +48,7 @@ const PinnedListComponent = ({ list }: PinnedListProps) => {
   }
 
   return (
-    <div className="flex flex-col rounded-2xl bg-white/90 p-4 shadow-sm ring-1 ring-slate-200">
+    <div className={["flex flex-col rounded-2xl bg-white/90 p-4 shadow-sm ring-1", isActive ? 'ring-emerald-400' : 'ring-slate-200'].join(' ')}>
       <div className="flex items-start gap-2">
         {isEditingTitle ? (
           <form onSubmit={handleRenameSubmit} className="flex flex-1 items-center gap-2">
@@ -68,11 +69,10 @@ const PinnedListComponent = ({ list }: PinnedListProps) => {
               <button
                 type="submit"
                 disabled={!isRenameValid}
-                className={`${
-                  isRenameValid
+                className={`${isRenameValid
                     ? actionConfirmButtonStyles
                     : `${actionConfirmButtonStyles} cursor-not-allowed opacity-60`
-                }`}
+                  }`}
                 aria-label="Сохранить название слота"
               >
                 <FiCheck />
@@ -108,6 +108,15 @@ const PinnedListComponent = ({ list }: PinnedListProps) => {
             <div className="flex items-center gap-1">
               <button
                 type="button"
+                onClick={() => store.setActivePinnedList(list.id)}
+                className={[headerButtonStyles, isActive ? 'text-emerald-600 hover:text-emerald-700' : ''].join(' ')}
+                aria-label={isActive ? 'Активный слот' : 'Сделать активным'}
+                title={isActive ? 'Активный слот' : 'Сделать активным'}
+              >
+                <FiStar />
+              </button>
+              <button
+                type="button"
                 onClick={() => setIsEditingTitle(true)}
                 className={headerButtonStyles}
                 aria-label="Переименовать слот"
@@ -119,9 +128,8 @@ const PinnedListComponent = ({ list }: PinnedListProps) => {
                 onClick={() => {
                   void store.deletePinnedList(list.id)
                 }}
-                className={`${headerButtonStyles} ${
-                  isPrimary ? 'cursor-not-allowed opacity-40 hover:bg-transparent hover:text-slate-400' : 'text-rose-400 hover:text-rose-600'
-                }`}
+                className={`${headerButtonStyles} ${isPrimary ? 'cursor-not-allowed opacity-40 hover:bg-transparent hover:text-slate-400' : 'text-rose-400 hover:text-rose-600'
+                  }`}
                 aria-label={isPrimary ? 'Первый слот нельзя удалить' : 'Удалить слот'}
                 disabled={isPrimary}
               >

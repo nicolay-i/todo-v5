@@ -22,6 +22,7 @@ interface NormalizedPinnedList {
   title: string
   position: number
   isPrimary: boolean
+  isActive?: boolean
   order: string[]
 }
 
@@ -39,10 +40,17 @@ async function ensureSeedData() {
   let primary = await prisma.pinnedList.findFirst({ orderBy: { position: 'asc' } })
   if (!primary) {
     primary = await prisma.pinnedList.create({
-      data: { title: 'Главное', isPrimary: true, position: 0 },
+      data: { title: 'Главное', isPrimary: true, isActive: true, position: 0 },
     })
-  } else if (!primary.isPrimary) {
-    await prisma.pinnedList.update({ where: { id: primary.id }, data: { isPrimary: true } })
+  } else {
+    if (!primary.isPrimary) {
+      await prisma.pinnedList.update({ where: { id: primary.id }, data: { isPrimary: true } })
+    }
+    // Ensure there is exactly one active list; default to primary if none
+    const active = await prisma.pinnedList.findFirst({ where: { isActive: true } })
+    if (!active) {
+      await prisma.pinnedList.update({ where: { id: primary.id }, data: { isActive: true } })
+    }
   }
 
   // Seed demo todos only if DB is empty
@@ -144,6 +152,16 @@ async function getPrimaryList() {
   return primary
 }
 
+async function getActiveList() {
+  await ensureSeedData()
+  let active = await prisma.pinnedList.findFirst({ where: { isActive: true }, orderBy: { position: 'asc' } })
+  if (!active) {
+    const primary = await getPrimaryList()
+    active = await prisma.pinnedList.update({ where: { id: primary.id }, data: { isActive: true } })
+  }
+  return active
+}
+
 async function getNextTodoPosition(parentId: string | null) {
   await ensureSeedData()
   const lastTodo = await prisma.todo.findFirst({
@@ -214,6 +232,7 @@ async function composePinnedLists(): Promise<PinnedListState[]> {
     order: entries.filter((entry) => entry.pinnedListId === list.id).map((entry) => entry.todoId),
     isPrimary: list.isPrimary,
     position: list.position,
+    isActive: (list as any).isActive ?? false,
   }))
 }
 
@@ -283,6 +302,7 @@ function normalizePinnedLists(
         title: 'Главное',
         position: 0,
         isPrimary: true,
+        isActive: true,
         order: [],
       },
     ]
@@ -301,8 +321,8 @@ function normalizePinnedLists(
     const title = typeof raw.title === 'string' && raw.title.trim().length > 0 ? raw.title.trim() : 'Главное'
     const order = Array.isArray(raw.order)
       ? raw.order
-          .map((value) => (typeof value === 'string' ? value : String(value)))
-          .filter((todoId) => todoIds.has(todoId))
+        .map((value) => (typeof value === 'string' ? value : String(value)))
+        .filter((todoId) => todoIds.has(todoId))
       : []
 
     normalized.push({
@@ -310,6 +330,7 @@ function normalizePinnedLists(
       title,
       position: index,
       isPrimary: Boolean(raw.isPrimary),
+      isActive: Boolean((raw as any).isActive),
       order,
     })
   })
@@ -321,15 +342,19 @@ function normalizePinnedLists(
         title: 'Главное',
         position: 0,
         isPrimary: true,
+        isActive: true,
         order: [],
       },
     ]
   }
 
   const firstPrimaryIndex = normalized.findIndex((item) => item.isPrimary)
+  let firstActiveIndex = normalized.findIndex((item) => item.isActive)
+  if (firstActiveIndex === -1) firstActiveIndex = firstPrimaryIndex === -1 ? 0 : firstPrimaryIndex
   normalized.forEach((item, index) => {
     item.position = index
     item.isPrimary = index === (firstPrimaryIndex === -1 ? 0 : firstPrimaryIndex)
+    item.isActive = index === firstActiveIndex
   })
 
   return normalized
@@ -509,13 +534,15 @@ export async function addTodo(parentId: string | null, title: string): Promise<T
     })
 
     // Create the new todo at position 0
-    await tx.todo.create({
+    const created = await tx.todo.create({
       data: {
         title: trimmed,
         parentId,
         position: 0,
       },
     })
+
+    // If adding as pinned (later via togglePinned), do nothing here.
   })
 
   return getTodoState()
@@ -655,9 +682,9 @@ export async function moveTodo(
   const targetSiblings = targetParentId === sourceParentId
     ? sourceSiblings
     : await prisma.todo.findMany({
-        where: { parentId: targetParentId },
-        orderBy: { position: 'asc' },
-      })
+      where: { parentId: targetParentId },
+      orderBy: { position: 'asc' },
+    })
 
   const currentIndex = sourceSiblings.findIndex((item) => item.id === id)
   if (currentIndex === -1) {
@@ -728,14 +755,15 @@ export async function togglePinned(id: string): Promise<TodoState> {
       prisma.pinnedTodo.deleteMany({ where: { todoId: id } }),
     ])
   } else {
-    const primary = await getPrimaryList()
-    const position = await getNextPinnedTodoPosition(primary.id)
+    // Choose active list if set, otherwise primary
+    const active = await getActiveList()
+    const position = await getNextPinnedTodoPosition(active.id)
     await prisma.$transaction([
       prisma.todo.update({ where: { id }, data: { pinned: true } }),
       prisma.pinnedTodo.create({
         data: {
           todoId: id,
-          pinnedListId: primary.id,
+          pinnedListId: active.id,
           position,
         },
       }),
@@ -772,9 +800,9 @@ export async function movePinnedTodo(
   const targetEntries = sameList
     ? sourceEntries
     : await prisma.pinnedTodo.findMany({
-        where: { pinnedListId: targetListId },
-        orderBy: { position: 'asc' },
-      })
+      where: { pinnedListId: targetListId },
+      orderBy: { position: 'asc' },
+    })
 
   const boundedIndex = Math.min(Math.max(targetIndex, 0), targetEntries.length)
 
@@ -838,6 +866,7 @@ export async function addPinnedList(title: string): Promise<TodoState> {
       title: trimmed,
       position,
       isPrimary: position === 0,
+      isActive: position === 0 && !(await prisma.pinnedList.findFirst({ where: { isActive: true } })),
     },
   })
 
@@ -902,8 +931,24 @@ export async function deletePinnedList(id: string): Promise<TodoState> {
     }
 
     await tx.pinnedTodo.deleteMany({ where: { pinnedListId: id } })
+    // If the deleted list was active, switch active to primary
+    const wasActive = list.isActive
     await tx.pinnedList.delete({ where: { id } })
+    if (wasActive) {
+      await tx.pinnedList.update({ where: { id: primary.id }, data: { isActive: true } })
+    }
   })
 
+  return getTodoState()
+}
+
+export async function setActivePinnedList(id: string): Promise<TodoState> {
+  await ensureSeedData()
+  const list = await prisma.pinnedList.findUnique({ where: { id } })
+  if (!list) return getTodoState()
+  await prisma.$transaction(async (tx) => {
+    await tx.pinnedList.updateMany({ data: { isActive: false } })
+    await tx.pinnedList.update({ where: { id }, data: { isActive: true } })
+  })
   return getTodoState()
 }

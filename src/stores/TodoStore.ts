@@ -30,9 +30,9 @@ export class TodoStore {
     makeAutoObservable(this, {}, { autoBind: true })
     this.todos = initialState.todos
     this.pinnedLists = initialState.pinnedLists
-  this.tags = initialState.tags ?? []
-  this.loadCollapsed()
-  this.loadPinnedCollapsed()
+    this.tags = initialState.tags ?? []
+    this.loadCollapsed()
+    this.loadPinnedCollapsed()
   }
 
   get pinnedListsWithTodos(): PinnedListView[] {
@@ -95,7 +95,7 @@ export class TodoStore {
   setState(state: TodoState) {
     this.todos = state.todos
     this.pinnedLists = state.pinnedLists
-  this.tags = state.tags ?? []
+    this.tags = state.tags ?? []
   }
 
   // ---- Collapse API ----
@@ -281,6 +281,18 @@ export class TodoStore {
 
   isPrimaryPinnedList(id: string): boolean {
     return this.pinnedLists[0]?.id === id
+  }
+
+  isActivePinnedList(id: string): boolean {
+    const list = this.pinnedLists.find((l) => l.id === id)
+    return Boolean(list?.isActive)
+  }
+
+  async setActivePinnedList(id: string) {
+    await this.mutate(`/api/pinned-lists/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ action: 'setActive' }),
+    })
   }
 
   canDrop(id: string, parentId: string | null): boolean {
