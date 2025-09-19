@@ -135,7 +135,6 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
 
   const availableTags = store.tags
   const todoTagIds = new Set((todo.tags ?? []).map((t) => t.id))
-  const addableTags = availableTags.filter((t) => !todoTagIds.has(t.id))
 
   const handleToggleCollapsed = () => {
     // Разрешаем сворачивать только если потенциально есть дети (или уже есть), иначе кнопка не показывается
@@ -227,7 +226,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
     <div className="space-y-1">
       <div
         className={[
-          'group rounded-xl bg-white/95 ring-1 ring-slate-200 transition-all duration-200 hover:shadow-md',
+          'group/todo rounded-xl bg-white/95 ring-1 ring-slate-200 transition-all duration-200 hover:shadow-md',
           isDragging ? 'opacity-60 ring-2 ring-slate-300' : '',
           isOverInside && canDropInside ? 'ring-2 ring-emerald-400/80 bg-emerald-50/50' : '',
           overPosition === 'above' ? 'shadow-[inset_0_2px_0_0_rgba(16,185,129,0.7)]' : '',
@@ -318,13 +317,13 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                   {(todo.tags ?? []).map((tag) => (<>
                     <span
                       key={tag.id}
-                      className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-700"
+                      className="group/tag inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-700"
                     >
                       {tag.name}
                       <button
                         type="button"
                         onClick={() => store.detachTag(todo.id, tag.id)}
-                        className="rounded p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+                        className="hidden h-4 w-4 shrink-0 items-center justify-center rounded text-slate-400 hover:bg-slate-200 hover:text-slate-700 group-hover/tag:flex focus-visible:flex"
                         aria-label="Удалить тег"
                       >
                         <FiX />
@@ -370,13 +369,13 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                   </button>
                 )}
                 {/* Кнопка тегов с выпадающим списком */}
-                {addableTags.length > 0 && (
+                {availableTags.length > 0 && (
                   <div ref={tagPickerRef} className="relative">
                     <button
                       type="button"
                       {...tagDropdown.getTriggerProps()}
                       className={actionButtonStyles}
-                      aria-label="Добавить тег"
+                      aria-label="Выбрать теги"
                       aria-expanded={tagDropdown.isOpen}
                     >
                       <FiTag />
@@ -386,21 +385,33 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                         className={tagDropdown.getMenuClassName('absolute right-0 z-20 mt-2 w-48 origin-top-right rounded-lg border border-slate-200 bg-white p-2 shadow-lg')}
                         {...tagDropdown.getMenuProps()}
                       >
-                        <div className="mb-2 px-1 text-xs font-medium text-slate-500">Добавить тег</div>
+                        <div className="mb-2 px-1 text-xs font-medium text-slate-500">Теги</div>
                         <ul className="max-h-56 overflow-auto">
-                          {addableTags.map((t) => (
-                            <li key={t.id}>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  void store.attachTag(todo.id, t.id)
-                                }}
-                                className="w-full rounded-md px-2 py-1.5 text-left text-sm text-slate-700 hover:bg-slate-100"
-                              >
-                                {t.name}
-                              </button>
-                            </li>
-                          ))}
+                          {availableTags.map((t) => {
+                            const selected = todoTagIds.has(t.id)
+                            return (
+                              <li key={t.id}>
+                                <button
+                                  type="button"
+                                  role="menuitemcheckbox"
+                                  aria-checked={selected}
+                                  onClick={() => {
+                                    if (selected) {
+                                      void store.detachTag(todo.id, t.id)
+                                    } else {
+                                      void store.attachTag(todo.id, t.id)
+                                    }
+                                  }}
+                                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-slate-100"
+                                >
+                                  <span className={`inline-flex h-4 w-4 items-center justify-center rounded-sm border ${selected ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-slate-300 text-transparent'}`}>
+                                    <FiCheck className="h-3 w-3" />
+                                  </span>
+                                  <span className={`flex-1 ${selected ? 'font-semibold text-slate-900' : 'text-slate-700'}`}>{t.name}</span>
+                                </button>
+                              </li>
+                            )
+                          })}
                         </ul>
                       </div>
                     )}
