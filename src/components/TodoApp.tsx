@@ -39,7 +39,7 @@ const TodoAppContent = () => {
   const [isTextViewOpen, setIsTextViewOpen] = useState(false)
   const [newPinnedListTitle, setNewPinnedListTitle] = useState('')
   const pinnedListInputRef = useRef<HTMLInputElement>(null)
-  
+
   const handleAdd = async () => {
     const trimmed = newTitle.trim()
     if (!trimmed) return
@@ -446,15 +446,11 @@ const ListContainer = observer(() => {
       onDragLeave={handleEmptyDragLeave}
       onDrop={handleEmptyDrop}
     >
-      {visibleTodos.map((todo, index) => (
-        <Fragment key={todo.id}>
-          <TodoItem todo={todo} depth={0} parentId={null} index={index} />
-        </Fragment>
-      ))}
       {searchActive && visibleTodos.length === 0 && (
         <div className="rounded-2xl border border-dashed border-slate-300/70 bg-white/70 px-6 py-10 text-center text-sm text-slate-500">
           Ничего не найдено — попробуйте изменить текст запроса или фильтр по тегам.
         </div>)}
+
       {isRootEmpty ? (
         <div
           className={[
