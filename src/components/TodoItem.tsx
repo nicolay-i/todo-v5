@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { observer } from 'mobx-react-lite'
 import {
   FiCheck,
@@ -17,6 +17,7 @@ import {
 } from 'react-icons/fi'
 import { MAX_DEPTH } from '@/lib/constants'
 import { useDropdown } from '@/lib/hooks/useDropdown'
+import { findFuzzyMatches, type HighlightRange } from '@/lib/fuzzySearch'
 import type { TodoNode } from '@/lib/types'
 import { useTodoStore } from '@/stores/TodoStoreContext'
 // мини-плейсхолдеры для сортировки больше не используются
@@ -74,7 +75,8 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
 
   const canAddChild = allowChildren && depth < MAX_DEPTH
   const isDragging = store.draggedId === todo.id
-  const isCollapsed = store.isCollapsed(todo.id)
+  const isSearchActive = store.hasActiveSearch
+  const isCollapsed = isSearchActive ? false : store.isCollapsed(todo.id)
   const draggedId = store.draggedId
   const canDropInside =
     allowChildren && depth < MAX_DEPTH && draggedId !== null && store.canDrop(draggedId, todo.id)
@@ -222,6 +224,18 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
     [todo.completed],
   )
 
+  const trimmedSearchQuery = store.searchQuery.trim()
+  const highlightRanges = useMemo<HighlightRange[]>(() => {
+    if (!trimmedSearchQuery) return []
+    const matches = findFuzzyMatches(todo.title ?? '', trimmedSearchQuery)
+    if (!matches) return []
+    return matches
+  }, [todo.title, trimmedSearchQuery])
+
+  const highlightedTitle = useMemo<ReactNode>(() => {
+    return buildHighlightedTitle(todo.title ?? '', highlightRanges)
+  }, [highlightRanges, todo.title])
+
   return (
     <div className="space-y-1">
       <div
@@ -247,7 +261,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
               onClick={handleToggleCollapsed}
               className={`${actionButtonStyles} -ml-1.5 text-lg ${todo.children.length > 0 ? 'text-slate-500' : 'text-slate-300 cursor-default'}`}
               aria-label={isCollapsed ? 'Развернуть' : 'Свернуть'}
-              disabled={todo.children.length === 0}
+              disabled={todo.children.length === 0 || isSearchActive}
             >
               {isCollapsed ? <FiChevronRight /> : <FiChevronDown />}
             </button>
@@ -335,7 +349,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
 
                   {todo.tags?.length ? <>&nbsp;</> : null}
 
-                  {todo.title}
+                  {highlightedTitle}
                 </p>
               </div>
             )}
@@ -484,6 +498,39 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
       )}
     </div>
   )
+}
+
+function buildHighlightedTitle(text: string, ranges: HighlightRange[]): ReactNode {
+  if (ranges.length === 0) {
+    return text
+  }
+
+  const segments: ReactNode[] = []
+  let cursor = 0
+  ranges.forEach(([start, end], index) => {
+    const safeStart = Math.max(0, Math.min(start, text.length))
+    const safeEnd = Math.max(safeStart, Math.min(end, text.length))
+    if (safeStart > cursor) {
+      segments.push(text.slice(cursor, safeStart))
+    }
+    if (safeEnd > safeStart) {
+      segments.push(
+        <mark
+          key={`highlight-${index}`}
+          className="rounded bg-amber-200/70 px-1 text-slate-900"
+        >
+          {text.slice(safeStart, safeEnd)}
+        </mark>,
+      )
+    }
+    cursor = safeEnd
+  })
+
+  if (cursor < text.length) {
+    segments.push(text.slice(cursor))
+  }
+
+  return segments
 }
 
 export const TodoItem = observer(TodoItemComponent)

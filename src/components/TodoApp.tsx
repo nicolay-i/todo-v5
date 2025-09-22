@@ -3,7 +3,9 @@
 import type { ChangeEventHandler, FormEventHandler } from 'react'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { observer } from 'mobx-react-lite'
-import { FiPlus } from 'react-icons/fi'
+import { FiCheck, FiFilter, FiPlus, FiSearch, FiX } from 'react-icons/fi'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useDropdown } from '@/lib/hooks/useDropdown'
 import type { TodoState } from '@/lib/types'
 import { TodoStore } from '@/stores/TodoStore'
 import type { VisibilityMode } from '@/stores/TodoStore'
@@ -11,7 +13,6 @@ import { TodoStoreProvider, useTodoStore } from '@/stores/TodoStoreContext'
 // мини-плейсхолдеры для сортировки больше не используются
 import { PinnedList } from './PinnedList'
 import { TodoItem } from './TodoItem'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 interface TodoAppProps {
   initialState: TodoState
@@ -216,16 +217,22 @@ const TodoAppContent = () => {
                   Добавить
                 </button>
               </form>
+              <div className="mb-4">
+                <SearchControls />
+              </div>
               <div className="mb-3 flex items-center justify-end">
                 <FilterSelect value={store.listFilterMode} onChange={(v) => store.setListFilterMode(v)} />
               </div>
               <ListContainer />
-
-              {store.todos.length === 0 && (
+              {store.hasActiveSearch && store.visibleTodos.length === 0 ? (
+                <div className="mt-6 rounded-2xl border border-dashed border-slate-300/80 bg-white/70 px-6 py-10 text-center text-sm text-slate-500">
+                  Не найдено задач, соответствующих поисковому запросу и выбранным тегам.
+                </div>
+              ) : store.todos.length === 0 ? (
                 <div className="mt-6 rounded-2xl border border-dashed border-slate-300/80 bg-white/70 px-6 py-10 text-center text-sm text-slate-500">
                   Начните с новой задачи — вы всегда сможете добавить вложенные подзадачи и перетащить элементы между уровнями.
                 </div>
-              )}
+              ) : null}
             </>
           ) : (
             <SettingsTab />
@@ -297,11 +304,116 @@ const ListContainer = observer(() => {
       onDragOver={handleEmptyDragOver}
       onDrop={handleEmptyDrop}
     >
-  {store.visibleTodos.map((todo, index) => (
+      {store.visibleTodos.map((todo, index) => (
         <Fragment key={todo.id}>
           <TodoItem todo={todo} depth={0} parentId={null} index={index} />
         </Fragment>
       ))}
+    </div>
+  )
+})
+
+const SearchControls = observer(() => {
+  const store = useTodoStore()
+  const dropdown = useDropdown({ closeDelay: 150, animationDuration: 150, groupKey: 'search-tag-filter' })
+  const searchQuery = store.searchQuery
+  const availableTags = store.tags
+  const selectedTagIds = store.activeSearchTagIds
+  const selectedTags = useMemo(
+    () => availableTags.filter((tag) => selectedTagIds.includes(tag.id)),
+    [availableTags, selectedTagIds],
+  )
+
+  const handleSearchChange: ChangeEventHandler<HTMLInputElement> = (event) => {
+    store.setSearchQuery(event.target.value)
+  }
+
+  return (
+    <div className="rounded-2xl bg-white/80 p-4 shadow-sm ring-1 ring-slate-200">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <FiSearch className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden />
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={handleSearchChange}
+            placeholder="Поиск задач"
+            className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-3 text-sm text-slate-700 shadow-inner focus:border-slate-400 focus:outline-none"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <div ref={dropdown.rootRef} className="relative">
+            <button
+              type="button"
+              {...dropdown.getTriggerProps()}
+              className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
+              aria-label="Фильтр по тегам"
+            >
+              <FiFilter />
+              {selectedTagIds.length > 0 ? `Теги (${selectedTagIds.length})` : 'Фильтр по тегам'}
+            </button>
+            {dropdown.isMounted && (
+              <div
+                className={dropdown.getMenuClassName('absolute right-0 z-20 mt-2 w-56 origin-top-right rounded-lg border border-slate-200 bg-white p-2 shadow-lg')}
+                {...dropdown.getMenuProps()}
+              >
+                {availableTags.length === 0 ? (
+                  <p className="px-2 py-1 text-xs text-slate-500">Нет доступных тегов</p>
+                ) : (
+                  <ul className="max-h-56 overflow-auto">
+                    {availableTags.map((tag) => {
+                      const selected = store.isTagSelectedForSearch(tag.id)
+                      return (
+                        <li key={tag.id}>
+                          <button
+                            type="button"
+                            role="menuitemcheckbox"
+                            aria-checked={selected}
+                            onClick={() => store.toggleSearchTag(tag.id)}
+                            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-slate-100"
+                          >
+                            <span className={`inline-flex h-4 w-4 items-center justify-center rounded-sm border ${selected ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-slate-300 text-transparent'}`}>
+                              <FiCheck className="h-3 w-3" />
+                            </span>
+                            <span className={`flex-1 ${selected ? 'font-semibold text-slate-900' : 'text-slate-700'}`}>{tag.name}</span>
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
+          {store.hasActiveSearch && (
+            <button
+              type="button"
+              onClick={() => store.clearSearchFilters()}
+              className="inline-flex items-center gap-1 rounded-lg border border-transparent bg-slate-100 px-3 py-2 text-xs font-medium text-slate-600 transition hover:bg-slate-200"
+            >
+              <FiX />
+              Сбросить
+            </button>
+          )}
+        </div>
+      </div>
+      {selectedTags.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-600">
+          {selectedTags.map((tag) => (
+            <span key={tag.id} className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1">
+              {tag.name}
+              <button
+                type="button"
+                onClick={() => store.toggleSearchTag(tag.id)}
+                className="rounded p-0.5 text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
+                aria-label={`Убрать тег ${tag.name} из фильтра`}
+              >
+                <FiX className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   )
 })
