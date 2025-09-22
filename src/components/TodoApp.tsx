@@ -10,6 +10,7 @@ import type { VisibilityMode } from '@/stores/TodoStore'
 import { TodoStoreProvider, useTodoStore } from '@/stores/TodoStoreContext'
 // мини-плейсхолдеры для сортировки больше не используются
 import { PinnedList } from './PinnedList'
+import { PinnedTextView } from './PinnedTextView'
 import { TodoItem } from './TodoItem'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
@@ -31,6 +32,7 @@ const TodoAppContent = () => {
     : 'pinned'
   const [activeTab, setActiveTab] = useState<'pinned' | 'all' | 'settings'>(normalizedTab)
   const [isAddingPinnedList, setIsAddingPinnedList] = useState(false)
+  const [isTextViewOpen, setIsTextViewOpen] = useState(false)
   const [newPinnedListTitle, setNewPinnedListTitle] = useState('')
   const pinnedListInputRef = useRef<HTMLInputElement>(null)
 
@@ -89,6 +91,9 @@ const TodoAppContent = () => {
   const handleSwitchTab = (tab: 'pinned' | 'all' | 'settings') => {
     if (tab === activeTab) return
     setActiveTab(tab)
+    if (tab !== 'pinned') {
+      setIsTextViewOpen(false)
+    }
     applyTabToUrl(tab)
   }
 
@@ -100,6 +105,9 @@ const TodoAppContent = () => {
       : 'pinned'
     if (nextTab !== activeTab) {
       setActiveTab(nextTab)
+    }
+    if (nextTab !== 'pinned') {
+      setIsTextViewOpen(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
@@ -132,11 +140,20 @@ const TodoAppContent = () => {
             <>
               <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h2 className="text-base font-semibold text-slate-600">Слоты на день</h2>
-                <div className="flex items-center gap-2">
-                  <FilterSelect
-                    value={store.pinnedFilterMode}
-                    onChange={(v) => store.setPinnedFilterMode(v)}
-                  />
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+                  <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                    <FilterSelect
+                      value={store.pinnedFilterMode}
+                      onChange={(v) => store.setPinnedFilterMode(v)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setIsTextViewOpen((prev) => !prev)}
+                      className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white/80 px-3 py-2 text-xs font-medium text-slate-600 shadow-sm transition hover:border-slate-400 hover:bg-white"
+                    >
+                      {isTextViewOpen ? 'Скрыть текст' : 'Текстовый вид'}
+                    </button>
+                  </div>
                 </div>
                 {isAddingPinnedList ? (
                   <form
@@ -182,6 +199,12 @@ const TodoAppContent = () => {
                   </button>
                 )}
               </div>
+
+              {isTextViewOpen && (
+                <div className="mb-6">
+                  <PinnedTextView lists={pinnedLists} />
+                </div>
+              )}
 
               <div className="space-y-4">
                 {pinnedLists.map((list) => (
