@@ -300,16 +300,28 @@ const ListContainer = observer(() => {
   const store = useTodoStore()
   const draggedId = store.draggedId
   const canAcceptRoot = draggedId !== null && store.canDrop(draggedId, null)
+  const [isOverEmpty, setIsOverEmpty] = useState(false)
+  const isRootEmpty = store.todos.length === 0
 
   const handleEmptyDragOver: React.DragEventHandler<HTMLDivElement> = (event) => {
-    if (!canAcceptRoot || store.todos.length > 0) return
+    if (!canAcceptRoot || !isRootEmpty) return
     event.preventDefault()
     event.dataTransfer.dropEffect = 'move'
+    if (!isOverEmpty) {
+      setIsOverEmpty(true)
+    }
+  }
+
+  const handleEmptyDragLeave: React.DragEventHandler<HTMLDivElement> = () => {
+    if (isOverEmpty) {
+      setIsOverEmpty(false)
+    }
   }
 
   const handleEmptyDrop: React.DragEventHandler<HTMLDivElement> = (event) => {
-    if (!canAcceptRoot || draggedId === null || store.todos.length > 0) return
+    if (!canAcceptRoot || draggedId === null || !isRootEmpty) return
     event.preventDefault()
+    setIsOverEmpty(false)
     void store.moveTodo(draggedId, null, 0)
     store.clearDragged()
   }
@@ -318,13 +330,27 @@ const ListContainer = observer(() => {
     <div
       className="space-y-3"
       onDragOver={handleEmptyDragOver}
+      onDragLeave={handleEmptyDragLeave}
       onDrop={handleEmptyDrop}
     >
-  {store.visibleTodos.map((todo, index) => (
-        <Fragment key={todo.id}>
-          <TodoItem todo={todo} depth={0} parentId={null} index={index} />
-        </Fragment>
-      ))}
+      {isRootEmpty ? (
+        <div
+          className={[
+            'flex min-h-[120px] items-center justify-center rounded-2xl border border-dashed px-4 py-8 text-center text-sm transition-colors',
+            isOverEmpty && canAcceptRoot
+              ? 'border-emerald-300 bg-emerald-50/70 text-emerald-700'
+              : 'border-slate-200 bg-slate-50 text-slate-500',
+          ].join(' ')}
+        >
+          Добавьте первую задачу или перетащите её в этот список
+        </div>
+      ) : (
+        store.visibleTodos.map((todo, index) => (
+          <Fragment key={todo.id}>
+            <TodoItem todo={todo} depth={0} parentId={null} index={index} />
+          </Fragment>
+        ))
+      )}
     </div>
   )
 })
