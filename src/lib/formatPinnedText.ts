@@ -1,7 +1,7 @@
 import type { PinnedListView } from '@/stores/TodoStore'
 
-const STATUS_COMPLETED_SYMBOL = '-'
-const STATUS_ACTIVE_SYMBOL = '+'
+const STATUS_COMPLETED_SYMBOL = '+'
+const STATUS_ACTIVE_SYMBOL = '-'
 
 export function formatPinnedListsToText(lists: PinnedListView[]): string {
   if (lists.length === 0) {

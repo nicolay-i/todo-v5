@@ -118,11 +118,11 @@ const TodoAppContent = () => {
         <section className="flex-1 rounded-3xl bg-white/60 p-5 shadow-inner ring-1 ring-white/40">
           <div className="mb-6 flex justify-start">
             <div className="flex rounded-2xl bg-white/70 p-1 text-sm font-medium text-slate-500 shadow-sm ring-1 ring-slate-200/70">
-        {tabs.map((tab) => (
+              {tabs.map((tab) => (
                 <button
                   key={tab.key}
                   type="button"
-          onClick={() => handleSwitchTab(tab.key)}
+                  onClick={() => handleSwitchTab(tab.key)}
                   className={[
                     'rounded-xl px-4 py-2 transition focus-visible:outline-none',
                     activeTab === tab.key
@@ -146,13 +146,6 @@ const TodoAppContent = () => {
                       value={store.pinnedFilterMode}
                       onChange={(v) => store.setPinnedFilterMode(v)}
                     />
-                    <button
-                      type="button"
-                      onClick={() => setIsTextViewOpen((prev) => !prev)}
-                      className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white/80 px-3 py-2 text-xs font-medium text-slate-600 shadow-sm transition hover:border-slate-400 hover:bg-white"
-                    >
-                      {isTextViewOpen ? 'Скрыть текст' : 'Текстовый вид'}
-                    </button>
                   </div>
                 </div>
                 {isAddingPinnedList ? (
@@ -171,11 +164,10 @@ const TodoAppContent = () => {
                       <button
                         type="submit"
                         disabled={!isPinnedListTitleValid}
-                        className={`rounded-lg px-3 py-2 text-sm font-medium text-white transition ${
-                          isPinnedListTitleValid
+                        className={`rounded-lg px-3 py-2 text-sm font-medium text-white transition ${isPinnedListTitleValid
                             ? 'bg-slate-900 hover:bg-slate-800'
                             : 'cursor-not-allowed bg-slate-400'
-                        }`}
+                          }`}
                       >
                         Создать
                       </button>
@@ -189,14 +181,24 @@ const TodoAppContent = () => {
                     </div>
                   </form>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => setIsAddingPinnedList(true)}
-                    className="flex items-center gap-2 rounded-xl border border-slate-300 bg-white/80 px-3 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:border-slate-400 hover:bg-white"
-                  >
-                    <FiPlus />
-                    Новый слот
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setIsTextViewOpen((prev) => !prev)}
+                      className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white/80 px-3 py-2 text-xs font-medium text-slate-600 shadow-sm transition hover:border-slate-400 hover:bg-white"
+                    >
+                      {isTextViewOpen ? 'Скрыть' : 'Текстом'}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsAddingPinnedList(true)}
+                      className="flex items-center gap-2 rounded-xl border border-slate-300 bg-white/80 px-3 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:border-slate-400 hover:bg-white"
+                    >
+                      <FiPlus />
+                      Новый слот
+                    </button>
+                  </div>
                 )}
               </div>
 
@@ -543,9 +545,8 @@ const SettingsTab = () => {
           type="button"
           onClick={handleExport}
           disabled={isExporting}
-          className={`mt-4 inline-flex items-center rounded-xl px-4 py-2 text-sm font-medium text-white shadow-sm transition ${
-            isExporting ? 'cursor-not-allowed bg-slate-400' : 'bg-slate-900 hover:bg-slate-800'
-          }`}
+          className={`mt-4 inline-flex items-center rounded-xl px-4 py-2 text-sm font-medium text-white shadow-sm transition ${isExporting ? 'cursor-not-allowed bg-slate-400' : 'bg-slate-900 hover:bg-slate-800'
+            }`}
         >
           {isExporting ? 'Подготовка...' : 'Скачать JSON'}
         </button>
@@ -567,9 +568,8 @@ const SettingsTab = () => {
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={isImporting}
-          className={`mt-4 inline-flex items-center rounded-xl px-4 py-2 text-sm font-medium text-white shadow-sm transition ${
-            isImporting ? 'cursor-not-allowed bg-slate-400' : 'bg-slate-900 hover:bg-slate-800'
-          }`}
+          className={`mt-4 inline-flex items-center rounded-xl px-4 py-2 text-sm font-medium text-white shadow-sm transition ${isImporting ? 'cursor-not-allowed bg-slate-400' : 'bg-slate-900 hover:bg-slate-800'
+            }`}
         >
           {isImporting ? 'Импорт...' : 'Выбрать файл'}
         </button>
