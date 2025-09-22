@@ -1,5 +1,6 @@
 import { makeAutoObservable } from 'mobx'
 import { MAX_DEPTH } from '@/lib/constants'
+import { findFuzzyMatches } from '@/lib/fuzzySearch'
 import type { TodoNode, TodoState, PinnedListState, Tag } from '@/lib/types'
 
 export interface PinnedListView extends PinnedListState {
@@ -22,6 +23,10 @@ export class TodoStore {
   collapsedIds: Set<string> = new Set()
   // Set со свернутыми закрепленными слотами (хранит id списков)
   collapsedPinnedListIds: Set<string> = new Set()
+
+  // Параметры поиска
+  searchQuery = ''
+  searchTagIds: Set<string> = new Set()
 
   // Видимость выполненных задач
   listFilterMode: VisibilityMode = 'today'
@@ -53,7 +58,8 @@ export class TodoStore {
   }
 
   get visibleTodos(): TodoNode[] {
-    return this.filterTree(this.todos, this.listFilterMode)
+    const filtered = this.filterTree(this.todos, this.listFilterMode)
+    return this.applySearch(filtered)
   }
 
   async refresh() {
@@ -67,6 +73,36 @@ export class TodoStore {
     } catch (error) {
       console.error('Failed to refresh state', error)
     }
+  }
+
+  // ---- Search API ----
+  setSearchQuery(query: string) {
+    this.searchQuery = query
+  }
+
+  toggleSearchTag(tagId: string) {
+    if (this.searchTagIds.has(tagId)) {
+      this.searchTagIds.delete(tagId)
+    } else {
+      this.searchTagIds.add(tagId)
+    }
+  }
+
+  clearSearchFilters() {
+    this.searchQuery = ''
+    this.searchTagIds.clear()
+  }
+
+  isTagSelectedForSearch(tagId: string): boolean {
+    return this.searchTagIds.has(tagId)
+  }
+
+  get activeSearchTagIds(): string[] {
+    return Array.from(this.searchTagIds)
+  }
+
+  get hasActiveSearch(): boolean {
+    return this.searchQuery.trim().length > 0 || this.searchTagIds.size > 0
   }
 
   async addTodo(parentId: string | null, title: string) {
@@ -402,11 +438,46 @@ export class TodoStore {
   private filterTree(nodes: TodoNode[], mode: VisibilityMode): TodoNode[] {
     const result: TodoNode[] = []
     for (const node of nodes) {
-  const filteredChildren = this.filterTree(node.children, mode)
-  if (!this.shouldIncludeTodo(node, mode) && filteredChildren.length === 0) continue
-  result.push({ ...node, children: filteredChildren })
+      const filteredChildren = this.filterTree(node.children, mode)
+      if (!this.shouldIncludeTodo(node, mode) && filteredChildren.length === 0) continue
+      result.push({ ...node, children: filteredChildren })
     }
     return result
+  }
+
+  private applySearch(nodes: TodoNode[]): TodoNode[] {
+    if (!this.hasActiveSearch) return nodes
+    const query = this.searchQuery.trim()
+    const tags = this.activeSearchTagIds
+    return this.filterBySearch(nodes, query, tags)
+  }
+
+  private filterBySearch(nodes: TodoNode[], query: string, tagIds: string[]): TodoNode[] {
+    const result: TodoNode[] = []
+    for (const node of nodes) {
+      const filteredChildren = this.filterBySearch(node.children, query, tagIds)
+      const matchesSelf = this.matchesSearch(node, query, tagIds)
+      if (!matchesSelf && filteredChildren.length === 0) continue
+      result.push({ ...node, children: filteredChildren })
+    }
+    return result
+  }
+
+  private matchesSearch(node: TodoNode, query: string, tagIds: string[]): boolean {
+    if (tagIds.length > 0) {
+      const nodeTagIds = new Set((node.tags ?? []).map((tag) => tag.id))
+      for (const id of tagIds) {
+        if (!nodeTagIds.has(id)) {
+          return false
+        }
+      }
+    }
+
+    if (!query) {
+      return true
+    }
+
+    return findFuzzyMatches(node.title ?? '', query) !== null
   }
 
   private shouldIncludeTodo(node: TodoNode, mode: VisibilityMode): boolean {
