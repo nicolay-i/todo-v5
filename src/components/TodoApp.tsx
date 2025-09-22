@@ -10,6 +10,7 @@ import type { VisibilityMode } from '@/stores/TodoStore'
 import { TodoStoreProvider, useTodoStore } from '@/stores/TodoStoreContext'
 // мини-плейсхолдеры для сортировки больше не используются
 import { PinnedList } from './PinnedList'
+import { PinnedTextView } from './PinnedTextView'
 import { TodoItem } from './TodoItem'
 import { TodoSearchBar } from './TodoSearchBar'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
@@ -32,6 +33,7 @@ const TodoAppContent = () => {
     : 'pinned'
   const [activeTab, setActiveTab] = useState<'pinned' | 'all' | 'settings'>(normalizedTab)
   const [isAddingPinnedList, setIsAddingPinnedList] = useState(false)
+  const [isTextViewOpen, setIsTextViewOpen] = useState(false)
   const [newPinnedListTitle, setNewPinnedListTitle] = useState('')
   const pinnedListInputRef = useRef<HTMLInputElement>(null)
 
@@ -90,6 +92,9 @@ const TodoAppContent = () => {
   const handleSwitchTab = (tab: 'pinned' | 'all' | 'settings') => {
     if (tab === activeTab) return
     setActiveTab(tab)
+    if (tab !== 'pinned') {
+      setIsTextViewOpen(false)
+    }
     applyTabToUrl(tab)
   }
 
@@ -102,6 +107,9 @@ const TodoAppContent = () => {
     if (nextTab !== activeTab) {
       setActiveTab(nextTab)
     }
+    if (nextTab !== 'pinned') {
+      setIsTextViewOpen(false)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
 
@@ -111,11 +119,11 @@ const TodoAppContent = () => {
         <section className="flex-1 rounded-3xl bg-white/60 p-5 shadow-inner ring-1 ring-white/40">
           <div className="mb-6 flex justify-start">
             <div className="flex rounded-2xl bg-white/70 p-1 text-sm font-medium text-slate-500 shadow-sm ring-1 ring-slate-200/70">
-        {tabs.map((tab) => (
+              {tabs.map((tab) => (
                 <button
                   key={tab.key}
                   type="button"
-          onClick={() => handleSwitchTab(tab.key)}
+                  onClick={() => handleSwitchTab(tab.key)}
                   className={[
                     'rounded-xl px-4 py-2 transition focus-visible:outline-none',
                     activeTab === tab.key
@@ -133,11 +141,13 @@ const TodoAppContent = () => {
             <>
               <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h2 className="text-base font-semibold text-slate-600">Слоты на день</h2>
-                <div className="flex items-center gap-2">
-                  <FilterSelect
-                    value={store.pinnedFilterMode}
-                    onChange={(v) => store.setPinnedFilterMode(v)}
-                  />
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+                  <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                    <FilterSelect
+                      value={store.pinnedFilterMode}
+                      onChange={(v) => store.setPinnedFilterMode(v)}
+                    />
+                  </div>
                 </div>
                 {isAddingPinnedList ? (
                   <form
@@ -155,11 +165,10 @@ const TodoAppContent = () => {
                       <button
                         type="submit"
                         disabled={!isPinnedListTitleValid}
-                        className={`rounded-lg px-3 py-2 text-sm font-medium text-white transition ${
-                          isPinnedListTitleValid
-                            ? 'bg-slate-900 hover:bg-slate-800'
-                            : 'cursor-not-allowed bg-slate-400'
-                        }`}
+                        className={`rounded-lg px-3 py-2 text-sm font-medium text-white transition ${isPinnedListTitleValid
+                          ? 'bg-slate-900 hover:bg-slate-800'
+                          : 'cursor-not-allowed bg-slate-400'
+                          }`}
                       >
                         Создать
                       </button>
@@ -173,16 +182,32 @@ const TodoAppContent = () => {
                     </div>
                   </form>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => setIsAddingPinnedList(true)}
-                    className="flex items-center gap-2 rounded-xl border border-slate-300 bg-white/80 px-3 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:border-slate-400 hover:bg-white"
-                  >
-                    <FiPlus />
-                    Новый слот
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setIsTextViewOpen((prev) => !prev)}
+                      className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white/80 px-3 py-2 text-xs font-medium text-slate-600 shadow-sm transition hover:border-slate-400 hover:bg-white"
+                    >
+                      {isTextViewOpen ? 'Скрыть' : 'Текстом'}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsAddingPinnedList(true)}
+                      className="flex items-center gap-2 rounded-xl border border-slate-300 bg-white/80 px-3 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:border-slate-400 hover:bg-white"
+                    >
+                      <FiPlus />
+                      Новый слот
+                    </button>
+                  </div>
                 )}
               </div>
+
+              {isTextViewOpen && (
+                <div className="mb-6">
+                  <PinnedTextView lists={pinnedLists} />
+                </div>
+              )}
 
               <div className="space-y-4">
                 {pinnedLists.map((list) => (
@@ -281,16 +306,28 @@ const ListContainer = observer(() => {
   const canAcceptRoot = draggedId !== null && store.canDrop(draggedId, null)
   const searchActive = store.isSearchActive
   const visibleTodos = store.visibleTodos
+  const [isOverEmpty, setIsOverEmpty] = useState(false)
+  const isRootEmpty = store.todos.length === 0
 
   const handleEmptyDragOver: React.DragEventHandler<HTMLDivElement> = (event) => {
-    if (!canAcceptRoot || store.todos.length > 0) return
+    if (!canAcceptRoot || !isRootEmpty) return
     event.preventDefault()
     event.dataTransfer.dropEffect = 'move'
+    if (!isOverEmpty) {
+      setIsOverEmpty(true)
+    }
+  }
+
+  const handleEmptyDragLeave: React.DragEventHandler<HTMLDivElement> = () => {
+    if (isOverEmpty) {
+      setIsOverEmpty(false)
+    }
   }
 
   const handleEmptyDrop: React.DragEventHandler<HTMLDivElement> = (event) => {
-    if (!canAcceptRoot || draggedId === null || store.todos.length > 0) return
+    if (!canAcceptRoot || draggedId === null || !isRootEmpty) return
     event.preventDefault()
+    setIsOverEmpty(false)
     void store.moveTodo(draggedId, null, 0)
     store.clearDragged()
   }
@@ -299,6 +336,7 @@ const ListContainer = observer(() => {
     <div
       className="space-y-3"
       onDragOver={handleEmptyDragOver}
+      onDragLeave={handleEmptyDragLeave}
       onDrop={handleEmptyDrop}
     >
       {visibleTodos.map((todo, index) => (
@@ -309,7 +347,24 @@ const ListContainer = observer(() => {
       {searchActive && visibleTodos.length === 0 && (
         <div className="rounded-2xl border border-dashed border-slate-300/70 bg-white/70 px-6 py-10 text-center text-sm text-slate-500">
           Ничего не найдено — попробуйте изменить текст запроса или фильтр по тегам.
+        </div>)}
+      {isRootEmpty ? (
+        <div
+          className={[
+            'flex min-h-[120px] items-center justify-center rounded-2xl border border-dashed px-4 py-8 text-center text-sm transition-colors',
+            isOverEmpty && canAcceptRoot
+              ? 'border-emerald-300 bg-emerald-50/70 text-emerald-700'
+              : 'border-slate-200 bg-slate-50 text-slate-500',
+          ].join(' ')}
+        >
+          Добавьте первую задачу или перетащите её в этот список
         </div>
+      ) : (
+        store.visibleTodos.map((todo, index) => (
+          <Fragment key={todo.id}>
+            <TodoItem todo={todo} depth={0} parentId={null} index={index} />
+          </Fragment>
+        ))
       )}
     </div>
   )
@@ -503,9 +558,8 @@ const SettingsTab = () => {
           type="button"
           onClick={handleExport}
           disabled={isExporting}
-          className={`mt-4 inline-flex items-center rounded-xl px-4 py-2 text-sm font-medium text-white shadow-sm transition ${
-            isExporting ? 'cursor-not-allowed bg-slate-400' : 'bg-slate-900 hover:bg-slate-800'
-          }`}
+          className={`mt-4 inline-flex items-center rounded-xl px-4 py-2 text-sm font-medium text-white shadow-sm transition ${isExporting ? 'cursor-not-allowed bg-slate-400' : 'bg-slate-900 hover:bg-slate-800'
+            }`}
         >
           {isExporting ? 'Подготовка...' : 'Скачать JSON'}
         </button>
@@ -527,9 +581,8 @@ const SettingsTab = () => {
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={isImporting}
-          className={`mt-4 inline-flex items-center rounded-xl px-4 py-2 text-sm font-medium text-white shadow-sm transition ${
-            isImporting ? 'cursor-not-allowed bg-slate-400' : 'bg-slate-900 hover:bg-slate-800'
-          }`}
+          className={`mt-4 inline-flex items-center rounded-xl px-4 py-2 text-sm font-medium text-white shadow-sm transition ${isImporting ? 'cursor-not-allowed bg-slate-400' : 'bg-slate-900 hover:bg-slate-800'
+            }`}
         >
           {isImporting ? 'Импорт...' : 'Выбрать файл'}
         </button>
