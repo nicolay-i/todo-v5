@@ -3,7 +3,7 @@
 import type { ChangeEventHandler, FormEventHandler } from 'react'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { observer } from 'mobx-react-lite'
-import { FiPlus } from 'react-icons/fi'
+import { FiCopy, FiFileText, FiPlus } from 'react-icons/fi'
 import type { TodoState } from '@/lib/types'
 import { TodoStore } from '@/stores/TodoStore'
 import type { VisibilityMode } from '@/stores/TodoStore'
@@ -33,6 +33,7 @@ const TodoAppContent = () => {
   const [isAddingPinnedList, setIsAddingPinnedList] = useState(false)
   const [newPinnedListTitle, setNewPinnedListTitle] = useState('')
   const pinnedListInputRef = useRef<HTMLInputElement>(null)
+  const [isTextViewOpen, setIsTextViewOpen] = useState(false)
 
   const handleSubmit: FormEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault()
@@ -137,6 +138,16 @@ const TodoAppContent = () => {
                     value={store.pinnedFilterMode}
                     onChange={(v) => store.setPinnedFilterMode(v)}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setIsTextViewOpen((prev) => !prev)}
+                    className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white/80 px-3 py-2 text-xs font-medium text-slate-600 shadow-sm transition hover:border-slate-400 hover:bg-white"
+                    aria-pressed={isTextViewOpen}
+                    title={isTextViewOpen ? 'Скрыть текстовый вид' : 'Показать текстовый вид'}
+                  >
+                    <FiFileText />
+                    {isTextViewOpen ? 'Скрыть текст' : 'Текстовый вид'}
+                  </button>
                 </div>
                 {isAddingPinnedList ? (
                   <form
@@ -184,6 +195,7 @@ const TodoAppContent = () => {
               </div>
 
               <div className="space-y-4">
+                {isTextViewOpen && <PinnedTextView />}
                 {pinnedLists.map((list) => (
                   <PinnedList key={list.id} list={list} />
                 ))}
@@ -271,6 +283,84 @@ function FilterSelect({ value, onChange }: { value: VisibilityMode; onChange: (v
     </select>
   )
 }
+
+const PinnedTextView = observer(() => {
+  const store = useTodoStore()
+  const text = store.pinnedListsText
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'success' | 'error'>('idle')
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    setCopyStatus('idle')
+    if (timeoutRef.current !== null) {
+      clearTimeout(timeoutRef.current)
+      timeoutRef.current = null
+    }
+  }, [text])
+
+  useEffect(() => () => {
+    if (timeoutRef.current !== null) {
+      clearTimeout(timeoutRef.current)
+    }
+  }, [])
+
+  const canUseClipboard = typeof navigator !== 'undefined' && typeof navigator.clipboard !== 'undefined'
+  const trimmedText = text.trim()
+
+  const handleCopy = async () => {
+    if (!canUseClipboard || trimmedText.length === 0) {
+      setCopyStatus('error')
+      return
+    }
+
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopyStatus('success')
+    } catch (error) {
+      setCopyStatus('error')
+    }
+
+    if (timeoutRef.current !== null) {
+      clearTimeout(timeoutRef.current)
+    }
+    timeoutRef.current = setTimeout(() => {
+      setCopyStatus('idle')
+      timeoutRef.current = null
+    }, 2000)
+  }
+
+  const displayText = trimmedText.length > 0 ? text : 'Нет закрепленных слотов для отображения.'
+  const copyDisabled = !canUseClipboard || trimmedText.length === 0
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-slate-700">Текстовый вид слотов</h3>
+        <button
+          type="button"
+          onClick={handleCopy}
+          disabled={copyDisabled}
+          className={`inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium transition ${
+            copyDisabled
+              ? 'cursor-not-allowed bg-slate-200 text-slate-400'
+              : 'bg-white text-slate-600 hover:border-slate-400 hover:bg-white'
+          }`}
+          aria-disabled={copyDisabled}
+        >
+          <FiCopy />
+          {copyStatus === 'success' ? 'Скопировано' : 'Скопировать'}
+        </button>
+      </div>
+      <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 shadow-inner">
+        {displayText}
+      </pre>
+      <div aria-live="polite" className="mt-2 text-xs">
+        {copyStatus === 'error' && <span className="text-rose-500">Не удалось скопировать текст.</span>}
+        {copyStatus === 'success' && <span className="text-emerald-600">Текст скопирован.</span>}
+      </div>
+    </div>
+  )
+})
 
 // Контейнер списка верхнего уровня: без мини-плейсхолдеров.
 const ListContainer = observer(() => {

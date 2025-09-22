@@ -52,6 +52,37 @@ export class TodoStore {
     }))
   }
 
+  get pinnedListsText(): string {
+    const lists = this.pinnedListsWithTodos
+    if (lists.length === 0) {
+      return ''
+    }
+
+    return lists
+      .map((list, index) => {
+        const title = list.title.trim().length > 0 ? list.title : `Слот ${index + 1}`
+        const lines = list.todos.map((todo) => {
+          const statusSymbol = todo.completed ? '-' : '+'
+          const tagNames = (todo.tags ?? [])
+            .map((tag) => tag.name.trim())
+            .filter((name) => name.length > 0)
+          const parts = [statusSymbol]
+          if (tagNames.length > 0) {
+            parts.push(`[${tagNames.join(', ')}]`)
+          }
+          parts.push(todo.title)
+          return parts.join(' ')
+        })
+
+        if (lines.length === 0) {
+          return [`## ${title}`, '', 'Нет задач по текущему фильтру.'].join('\n')
+        }
+
+        return [`## ${title}`, '', ...lines].join('\n')
+      })
+      .join('\n\n')
+  }
+
   get visibleTodos(): TodoNode[] {
     return this.filterTree(this.todos, this.listFilterMode)
   }
