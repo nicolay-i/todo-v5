@@ -511,7 +511,7 @@ async function getSubtreeDepth(id: string): Promise<number> {
   return rows[0]?.maxDepth ?? 0
 }
 
-export async function addTodo(parentId: string | null, title: string): Promise<TodoState> {
+export async function addTodo(parentId: string | null, title: string, tagIds?: string[]): Promise<TodoState> {
   const trimmed = title.trim()
   if (!trimmed) {
     return getTodoState()
@@ -540,6 +540,9 @@ export async function addTodo(parentId: string | null, title: string): Promise<T
         title: trimmed,
         parentId,
         position: 0,
+        ...(Array.isArray(tagIds) && tagIds.length > 0
+          ? { tags: { connect: Array.from(new Set(tagIds)).map((id) => ({ id })) } }
+          : {}),
       },
     })
 

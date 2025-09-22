@@ -8,12 +8,13 @@ type DropdownOptions = {
   closeDelay?: number
   animationDuration?: number
   groupKey?: string
+  openOnHover?: boolean
 }
 
 type TriggerProps = {
   onClick: (e: React.MouseEvent) => void
-  onMouseEnter: (e: React.MouseEvent) => void
-  onMouseLeave: (e: React.MouseEvent) => void
+  onMouseEnter?: (e: React.MouseEvent) => void
+  onMouseLeave?: (e: React.MouseEvent) => void
   'aria-expanded': boolean
 }
 
@@ -23,7 +24,7 @@ type MenuProps = {
 }
 
 export function useDropdown(options: DropdownOptions = {}) {
-  const { hoverOpenDelay = 300, closeDelay = 300, animationDuration = 200, groupKey } = options
+  const { hoverOpenDelay = 300, closeDelay = 300, animationDuration = 200, groupKey, openOnHover = true } = options
 
   const [isMounted, setIsMounted] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
@@ -132,17 +133,18 @@ export function useDropdown(options: DropdownOptions = {}) {
   // Регистрация в группе для взаимного закрытия
   useEffect(() => {
     if (!groupKey) return
-    const dropdownId = idRef.current
+    const id = idRef.current
     let group = DROPDOWN_GROUPS.get(groupKey)
     if (!group) {
       group = new Map()
       DROPDOWN_GROUPS.set(groupKey, group)
     }
-    group.set(dropdownId, () => close())
+    
+    group.set(id, () => close())
     return () => {
       const g = DROPDOWN_GROUPS.get(groupKey)
       if (!g) return
-      g.delete(dropdownId)
+      g.delete(id)
       if (g.size === 0) DROPDOWN_GROUPS.delete(groupKey)
     }
   }, [close, groupKey])
@@ -155,12 +157,17 @@ export function useDropdown(options: DropdownOptions = {}) {
     }
   }, [clearCloseTimer, clearOpenHoverTimer])
 
-  const getTriggerProps = useCallback<() => TriggerProps>(() => ({
-    onClick: () => toggle(),
-    onMouseEnter: () => scheduleOpenOnHover(),
-    onMouseLeave: () => scheduleClose(),
-    'aria-expanded': isOpen,
-  }), [isOpen, scheduleClose, scheduleOpenOnHover, toggle])
+  const getTriggerProps = useCallback<() => TriggerProps>(() => {
+    const props: TriggerProps = {
+      onClick: () => toggle(),
+      onMouseLeave: () => scheduleClose(),
+      'aria-expanded': isOpen,
+    }
+    if (openOnHover) {
+      props.onMouseEnter = () => scheduleOpenOnHover()
+    }
+    return props
+  }, [isOpen, openOnHover, scheduleClose, scheduleOpenOnHover, toggle])
 
   const getMenuProps = useCallback<() => MenuProps>(() => ({
     onMouseEnter: () => clearCloseTimer(),

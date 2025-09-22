@@ -7,7 +7,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const { parentId = null, title } = await request.json()
-  const state = await addTodo(parentId, title ?? '')
+  const { parentId = null, title, tagIds } = await request.json()
+  const state = await addTodo(parentId, title ?? '', Array.isArray(tagIds) ? tagIds : undefined)
   return NextResponse.json(state)
 }
