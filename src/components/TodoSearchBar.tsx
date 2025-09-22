@@ -35,7 +35,7 @@ export const TodoSearchBar = observer(() => {
         <div className="relative flex-1">
           <FiSearch className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
-            type="search"
+            type="text"
             value={store.searchQuery}
             onChange={(event) => store.setSearchQuery(event.target.value)}
             placeholder="Поиск задач"
