@@ -133,18 +133,18 @@ export function useDropdown(options: DropdownOptions = {}) {
   // Регистрация в группе для взаимного закрытия
   useEffect(() => {
     if (!groupKey) return
-    const id = idRef.current
+    const dropdownId = idRef.current
     let group = DROPDOWN_GROUPS.get(groupKey)
     if (!group) {
       group = new Map()
       DROPDOWN_GROUPS.set(groupKey, group)
     }
     
-    group.set(id, () => close())
+    group.set(dropdownId, () => close())
     return () => {
       const g = DROPDOWN_GROUPS.get(groupKey)
       if (!g) return
-      g.delete(id)
+      g.delete(dropdownId)
       if (g.size === 0) DROPDOWN_GROUPS.delete(groupKey)
     }
   }, [close, groupKey])
