@@ -74,7 +74,8 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
 
   const canAddChild = allowChildren && depth < MAX_DEPTH
   const isDragging = store.draggedId === todo.id
-  const isCollapsed = store.isCollapsed(todo.id)
+  const forcedExpanded = store.shouldForceExpand(todo.id)
+  const isCollapsed = store.isCollapsed(todo.id) && !forcedExpanded
   const draggedId = store.draggedId
   const canDropInside =
     allowChildren && depth < MAX_DEPTH && draggedId !== null && store.canDrop(draggedId, todo.id)
@@ -216,11 +217,12 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
   const titleStyles = useMemo(
     () =>
       [
-        'font-medium leading-snug transition-colors',
+        'font-medium leading-snug whitespace-pre-wrap transition-colors',
         todo.completed ? 'text-slate-400 line-through' : 'text-slate-700',
       ].join(' '),
     [todo.completed],
   )
+  const highlightSegments = store.getHighlightSegments(todo.id)
 
   return (
     <div className="space-y-1">
@@ -313,29 +315,35 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
               </form>
             ) : (
               <div className="flex flex-wrap items-start gap-2">
-                <p className={`${titleStyles} text-sm`}>
-                  {(todo.tags ?? []).map((tag) => (<>
-                    <span
-                      key={tag.id}
-                      className="group/tag inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-700"
+                {(todo.tags ?? []).map((tag) => (
+                  <span
+                    key={tag.id}
+                    className="group/tag inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-700"
+                  >
+                    {tag.name}
+                    <button
+                      type="button"
+                      onClick={() => store.detachTag(todo.id, tag.id)}
+                      className="hidden h-4 w-4 shrink-0 items-center justify-center rounded text-slate-400 hover:bg-slate-200 hover:text-slate-700 group-hover/tag:flex focus-visible:flex"
+                      aria-label="Удалить тег"
                     >
-                      {tag.name}
-                      <button
-                        type="button"
-                        onClick={() => store.detachTag(todo.id, tag.id)}
-                        className="hidden h-4 w-4 shrink-0 items-center justify-center rounded text-slate-400 hover:bg-slate-200 hover:text-slate-700 group-hover/tag:flex focus-visible:flex"
-                        aria-label="Удалить тег"
-                      >
-                        <FiX />
-                      </button>
-                    </span>
-                    &nbsp;
-                    </>
-                  ))}
+                      <FiX />
+                    </button>
+                  </span>
+                ))}
 
-                  {todo.tags?.length ? <>&nbsp;</> : null}
-
-                  {todo.title}
+                <p className={`${titleStyles} text-sm`}>
+                  {highlightSegments
+                    ? highlightSegments.map((segment, index) => (
+                        <span
+                          // eslint-disable-next-line react/no-array-index-key
+                          key={index}
+                          className={segment.matched ? 'rounded bg-amber-200/80 px-1 text-slate-900' : undefined}
+                        >
+                          {segment.text}
+                        </span>
+                      ))
+                    : todo.title}
                 </p>
               </div>
             )}
