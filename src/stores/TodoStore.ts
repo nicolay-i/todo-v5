@@ -109,11 +109,13 @@ export class TodoStore {
     }
   }
 
-  async addTodo(parentId: string | null, title: string) {
+  async addTodo(parentId: string | null, title: string, tagIds?: string[]) {
     if (!title.trim()) return
+    const payload: any = { parentId, title }
+    if (Array.isArray(tagIds) && tagIds.length > 0) payload.tagIds = Array.from(new Set(tagIds))
     await this.mutate('/api/todos', {
       method: 'POST',
-      body: JSON.stringify({ parentId, title }),
+      body: JSON.stringify(payload),
     })
   }
 

@@ -22,6 +22,9 @@ interface TodoAppProps {
 const TodoAppContent = () => {
   const store = useTodoStore()
   const [newTitle, setNewTitle] = useState('')
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [isAddModalMounted, setIsAddModalMounted] = useState(false)
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -36,13 +39,14 @@ const TodoAppContent = () => {
   const [isTextViewOpen, setIsTextViewOpen] = useState(false)
   const [newPinnedListTitle, setNewPinnedListTitle] = useState('')
   const pinnedListInputRef = useRef<HTMLInputElement>(null)
-
-  const handleSubmit: FormEventHandler<HTMLFormElement> = async (event) => {
-    event.preventDefault()
+  
+  const handleAdd = async () => {
     const trimmed = newTitle.trim()
     if (!trimmed) return
-    await store.addTodo(null, trimmed)
+    await store.addTodo(null, trimmed, selectedTagIds)
     setNewTitle('')
+    setSelectedTagIds([])
+    closeAddModal()
   }
 
   const handlePinnedListSubmit: FormEventHandler<HTMLFormElement> = async (event) => {
@@ -71,6 +75,30 @@ const TodoAppContent = () => {
       pinnedListInputRef.current.focus()
     }
   }, [isAddingPinnedList])
+
+  useEffect(() => {
+    if (!isAddModalOpen) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeAddModal()
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'enter') {
+        void handleAdd()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [isAddModalOpen, newTitle])
+
+  const openAddModal = () => {
+    setIsAddModalMounted(true)
+    setSelectedTagIds([])
+    // next tick to trigger transition
+    requestAnimationFrame(() => setIsAddModalOpen(true))
+  }
+
+  const closeAddModal = () => {
+    setIsAddModalOpen(false)
+    setTimeout(() => setIsAddModalMounted(false), 200)
+  }
 
   const tabs: { key: 'pinned' | 'all' | 'settings'; label: string }[] = useMemo(
     () => [
@@ -117,7 +145,7 @@ const TodoAppContent = () => {
     <div className="min-h-screen bg-canvas-light text-slate-900">
       <div className="mx-auto flex min-h-screen max-w-4xl flex-col px-4 py-10 sm:px-6 lg:px-8">
         <section className="flex-1 rounded-3xl bg-white/60 p-5 shadow-inner ring-1 ring-white/40">
-          <div className="mb-6 flex justify-start">
+          <div className="mb-6 flex items-center justify-between gap-3">
             <div className="flex rounded-2xl bg-white/70 p-1 text-sm font-medium text-slate-500 shadow-sm ring-1 ring-slate-200/70">
               {tabs.map((tab) => (
                 <button
@@ -135,6 +163,17 @@ const TodoAppContent = () => {
                 </button>
               ))}
             </div>
+            {activeTab === 'all' && (
+              <button
+                type="button"
+                onClick={openAddModal}
+                className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
+                aria-label="Добавить задачу"
+              >
+                <FiPlus />
+                Добавить
+              </button>
+            )}
           </div>
 
           {activeTab === 'pinned' ? (
@@ -223,25 +262,7 @@ const TodoAppContent = () => {
             </>
           ) : activeTab === 'all' ? (
             <>
-              <form
-                onSubmit={handleSubmit}
-                className="mb-8 flex flex-col gap-3 rounded-2xl bg-white/80 p-4 shadow-sm ring-1 ring-slate-200 sm:flex-row sm:items-center"
-              >
-                <input
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-inner focus:border-slate-400 focus:outline-none"
-                  placeholder="Новая задача"
-                  value={newTitle}
-                  onChange={(event) => setNewTitle(event.target.value)}
-                />
-                <button
-                  type="submit"
-                  className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 sm:w-auto"
-                  aria-label="Добавить задачу"
-                >
-                  <FiPlus />
-                  Добавить
-                </button>
-              </form>
+              {/* Добавление задачи теперь через модал */}
               <TodoSearchBar />
               <div className="mb-3 flex items-center justify-end">
                 <FilterSelect value={store.listFilterMode} onChange={(v) => store.setListFilterMode(v)} />
@@ -258,6 +279,92 @@ const TodoAppContent = () => {
             <SettingsTab />
           )}
         </section>
+        {/* Modal for adding new todo with animation and tag selection */}
+        {isAddModalMounted && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div
+              className={`absolute inset-0 transition-opacity duration-200 ease-out ${isAddModalOpen ? 'opacity-100' : 'opacity-0'} bg-black/30`}
+              onClick={closeAddModal}
+            />
+            <div
+              className={`relative z-10 w-full max-w-lg transform rounded-2xl border border-slate-200 bg-white p-5 shadow-xl transition-all duration-200 ease-out ${isAddModalOpen ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 translate-y-1'}`}
+            >
+              <h3 className="text-base font-semibold text-slate-700">Новая задача</h3>
+              <div className="mt-3">
+                <input
+                  autoFocus
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-inner focus:border-slate-400 focus:outline-none"
+                  placeholder="Введите название задачи"
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      void handleAdd()
+                    }
+                  }}
+                />
+              </div>
+              {/* Tag selector */}
+              {store.tags.length > 0 && (
+                <div className="mt-4">
+                  <div className="mb-2 text-xs font-medium text-slate-500">Теги</div>
+                  <div className="flex flex-wrap gap-2">
+                    {store.tags.map((t) => {
+                      const selected = selectedTagIds.includes(t.id)
+                      return (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedTagIds((prev) =>
+                              prev.includes(t.id) ? prev.filter((id) => id !== t.id) : [...prev, t.id],
+                            )
+                          }}
+                          className={[
+                            'rounded-xl border px-2 py-1 text-xs transition',
+                            selected
+                              ? 'border-slate-900 bg-slate-900 text-white'
+                              : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50',
+                          ].join(' ')}
+                        >
+                          {t.name}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {selectedTagIds.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTagIds([])}
+                      className="mt-2 text-xs text-slate-500 underline underline-offset-4 hover:text-slate-700"
+                    >
+                      Сбросить теги
+                    </button>
+                  )}
+                </div>
+              )}
+              <div className="mt-5 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={closeAddModal}
+                  className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleAdd()}
+                  disabled={newTitle.trim().length === 0}
+                  className={`rounded-lg px-3 py-2 text-sm font-medium text-white shadow-sm transition ${newTitle.trim().length > 0 ? 'bg-slate-900 hover:bg-slate-800' : 'bg-slate-400 cursor-not-allowed'}`}
+                >
+                  Добавить
+                </button>
+              </div>
+              <p className="mt-2 text-xs text-slate-400">Подсказка: Enter — добавить, Esc — закрыть, Ctrl/Cmd+Enter — добавить.</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
