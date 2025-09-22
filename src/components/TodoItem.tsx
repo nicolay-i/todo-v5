@@ -45,7 +45,12 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
   const [overPosition, setOverPosition] = useState<null | 'above' | 'below' | 'inside'>(null)
   const childInputRef = useRef<HTMLInputElement>(null)
   // Выпадающий список тегов: управляeм через общий хук
-  const tagDropdown = useDropdown({ hoverOpenDelay: 300, closeDelay: 300, animationDuration: 200, groupKey: 'tag-picker' })
+  const tagDropdown = useDropdown({
+    openOnHover: false,
+    closeDelay: 1000,
+    animationDuration: 200,
+    groupKey: 'tag-picker',
+  })
   // Многострочное редактирование: вычисляем строки один раз при входе в режим
   const [editRows, setEditRows] = useState(1)
   const editWrapRef = useRef<HTMLDivElement>(null)
