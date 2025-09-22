@@ -3,7 +3,7 @@
 import type { ChangeEventHandler, FormEventHandler } from 'react'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { observer } from 'mobx-react-lite'
-import { FiPlus } from 'react-icons/fi'
+import { FiCheck, FiPlus, FiSearch, FiTag, FiX } from 'react-icons/fi'
 import type { TodoState } from '@/lib/types'
 import { TodoStore } from '@/stores/TodoStore'
 import type { VisibilityMode } from '@/stores/TodoStore'
@@ -216,15 +216,25 @@ const TodoAppContent = () => {
                   Добавить
                 </button>
               </form>
-              <div className="mb-3 flex items-center justify-end">
-                <FilterSelect value={store.listFilterMode} onChange={(v) => store.setListFilterMode(v)} />
+              <div className="mb-6">
+                <SearchPanel />
               </div>
               <ListContainer />
 
-              {store.todos.length === 0 && (
-                <div className="mt-6 rounded-2xl border border-dashed border-slate-300/80 bg-white/70 px-6 py-10 text-center text-sm text-slate-500">
-                  Начните с новой задачи — вы всегда сможете добавить вложенные подзадачи и перетащить элементы между уровнями.
-                </div>
+              {store.filteredTodos.length === 0 && (
+                store.isSearchActive ? (
+                  <div className="mt-6 rounded-2xl border border-dashed border-slate-300/80 bg-white/70 px-6 py-10 text-center text-sm text-slate-500">
+                    Ничего не найдено. Попробуйте изменить запрос или снимите ограничения по тегам.
+                  </div>
+                ) : store.todos.length === 0 ? (
+                  <div className="mt-6 rounded-2xl border border-dashed border-slate-300/80 bg-white/70 px-6 py-10 text-center text-sm text-slate-500">
+                    Начните с новой задачи — вы всегда сможете добавить вложенные подзадачи и перетащить элементы между уровнями.
+                  </div>
+                ) : (
+                  <div className="mt-6 rounded-2xl border border-dashed border-slate-300/80 bg-white/70 px-6 py-10 text-center text-sm text-slate-500">
+                    В выбранном режиме отображения пока нет задач.
+                  </div>
+                )
               )}
             </>
           ) : (
@@ -247,6 +257,73 @@ export const TodoApp = ({ initialState }: TodoAppProps) => {
     </TodoStoreProvider>
   )
 }
+
+const SearchPanel = observer(() => {
+  const store = useTodoStore()
+  const tags = store.tags
+  const isActive = store.isSearchActive
+
+  return (
+    <div className="rounded-2xl bg-white/80 p-4 shadow-sm ring-1 ring-slate-200">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+        <div className="relative flex-1">
+          <FiSearch className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="search"
+            value={store.searchQuery}
+            onChange={(event) => store.setSearchQuery(event.target.value)}
+            placeholder="Поиск по задачам"
+            className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-10 text-sm text-slate-700 shadow-inner focus:border-slate-400 focus:outline-none"
+          />
+          {isActive && (
+            <button
+              type="button"
+              onClick={() => store.clearSearchFilters()}
+              className="absolute right-3 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+              aria-label="Очистить поиск"
+            >
+              <FiX />
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-2 sm:flex-none">
+          <span className="text-xs font-medium text-slate-500">Показать:</span>
+          <FilterSelect value={store.listFilterMode} onChange={(v) => store.setListFilterMode(v)} />
+        </div>
+      </div>
+      {tags.length > 0 && (
+        <div className="mt-3">
+          <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+            <FiTag />
+            Фильтр по тегам
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {tags.map((tag) => {
+              const selected = store.isTagSelected(tag.id)
+              return (
+                <button
+                  key={tag.id}
+                  type="button"
+                  onClick={() => store.toggleSearchTag(tag.id)}
+                  className={[
+                    'inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition',
+                    selected
+                      ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-800',
+                  ].join(' ')}
+                  aria-pressed={selected}
+                >
+                  {selected ? <FiCheck className="h-3 w-3" /> : null}
+                  {tag.name}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+})
 
 const filterOptions: { value: VisibilityMode; label: string }[] = [
   { value: 'activeOnly', label: 'Только активные' },
@@ -277,6 +354,7 @@ const ListContainer = observer(() => {
   const store = useTodoStore()
   const draggedId = store.draggedId
   const canAcceptRoot = draggedId !== null && store.canDrop(draggedId, null)
+  const todos = store.filteredTodos
 
   const handleEmptyDragOver: React.DragEventHandler<HTMLDivElement> = (event) => {
     if (!canAcceptRoot || store.todos.length > 0) return
@@ -297,7 +375,7 @@ const ListContainer = observer(() => {
       onDragOver={handleEmptyDragOver}
       onDrop={handleEmptyDrop}
     >
-  {store.visibleTodos.map((todo, index) => (
+      {todos.map((todo, index) => (
         <Fragment key={todo.id}>
           <TodoItem todo={todo} depth={0} parentId={null} index={index} />
         </Fragment>
