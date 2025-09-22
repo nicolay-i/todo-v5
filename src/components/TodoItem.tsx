@@ -107,6 +107,10 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
 
   // Привязываем ref корня выпадушки для клика-вне
   const tagPickerRef = tagDropdown.rootRef
+  const tagMenuPlacementClasses =
+    tagDropdown.placement === 'up'
+      ? 'bottom-full mb-2 origin-bottom-right'
+      : 'top-full mt-2 origin-top-right'
 
   const handleToggle = () => {
     void store.toggleTodo(todo.id)
@@ -382,7 +386,10 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                     </button>
                     {tagDropdown.isMounted && (
                       <div
-                        className={tagDropdown.getMenuClassName('absolute right-0 z-20 mt-2 w-48 origin-top-right rounded-lg border border-slate-200 bg-white p-2 shadow-lg')}
+                        ref={tagDropdown.setMenuRef}
+                        className={tagDropdown.getMenuClassName(
+                          `absolute right-0 z-20 w-48 rounded-lg border border-slate-200 bg-white p-2 shadow-lg ${tagMenuPlacementClasses}`,
+                        )}
                         {...tagDropdown.getMenuProps()}
                       >
                         <div className="mb-2 px-1 text-xs font-medium text-slate-500">Теги</div>
