@@ -11,6 +11,7 @@ import { TodoStoreProvider, useTodoStore } from '@/stores/TodoStoreContext'
 // мини-плейсхолдеры для сортировки больше не используются
 import { PinnedList } from './PinnedList'
 import { TodoItem } from './TodoItem'
+import { TodoSearchBar } from './TodoSearchBar'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 interface TodoAppProps {
@@ -216,6 +217,7 @@ const TodoAppContent = () => {
                   Добавить
                 </button>
               </form>
+              <TodoSearchBar />
               <div className="mb-3 flex items-center justify-end">
                 <FilterSelect value={store.listFilterMode} onChange={(v) => store.setListFilterMode(v)} />
               </div>
@@ -277,6 +279,8 @@ const ListContainer = observer(() => {
   const store = useTodoStore()
   const draggedId = store.draggedId
   const canAcceptRoot = draggedId !== null && store.canDrop(draggedId, null)
+  const searchActive = store.isSearchActive
+  const visibleTodos = store.visibleTodos
 
   const handleEmptyDragOver: React.DragEventHandler<HTMLDivElement> = (event) => {
     if (!canAcceptRoot || store.todos.length > 0) return
@@ -297,11 +301,16 @@ const ListContainer = observer(() => {
       onDragOver={handleEmptyDragOver}
       onDrop={handleEmptyDrop}
     >
-  {store.visibleTodos.map((todo, index) => (
+      {visibleTodos.map((todo, index) => (
         <Fragment key={todo.id}>
           <TodoItem todo={todo} depth={0} parentId={null} index={index} />
         </Fragment>
       ))}
+      {searchActive && visibleTodos.length === 0 && (
+        <div className="rounded-2xl border border-dashed border-slate-300/70 bg-white/70 px-6 py-10 text-center text-sm text-slate-500">
+          Ничего не найдено — попробуйте изменить текст запроса или фильтр по тегам.
+        </div>
+      )}
     </div>
   )
 })

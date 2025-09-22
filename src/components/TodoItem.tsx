@@ -74,7 +74,8 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
 
   const canAddChild = allowChildren && depth < MAX_DEPTH
   const isDragging = store.draggedId === todo.id
-  const isCollapsed = store.isCollapsed(todo.id)
+  const searchActive = store.isSearchActive
+  const isCollapsed = searchActive ? false : store.isCollapsed(todo.id)
   const draggedId = store.draggedId
   const canDropInside =
     allowChildren && depth < MAX_DEPTH && draggedId !== null && store.canDrop(draggedId, todo.id)
@@ -245,9 +246,15 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
             <button
               type="button"
               onClick={handleToggleCollapsed}
-              className={`${actionButtonStyles} -ml-1.5 text-lg ${todo.children.length > 0 ? 'text-slate-500' : 'text-slate-300 cursor-default'}`}
+              className={[
+                actionButtonStyles,
+                '-ml-1.5 text-lg',
+                todo.children.length > 0 && !searchActive
+                  ? 'text-slate-500'
+                  : 'text-slate-300 cursor-default',
+              ].join(' ')}
               aria-label={isCollapsed ? 'Развернуть' : 'Свернуть'}
-              disabled={todo.children.length === 0}
+              disabled={todo.children.length === 0 || searchActive}
             >
               {isCollapsed ? <FiChevronRight /> : <FiChevronDown />}
             </button>
@@ -335,7 +342,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
 
                   {todo.tags?.length ? <>&nbsp;</> : null}
 
-                  {todo.title}
+                  <HighlightedText text={todo.title} ranges={store.getSearchHighlight(todo.id)} />
                 </p>
               </div>
             )}
@@ -473,10 +480,10 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
         )}
       </div>
 
-      {canAddChild && !isCollapsed && (
-        <div className="space-y-2 border-l border-slate-200/70 pl-6">
-          {todo.children.map((child, childIndex) => (
-            <Fragment key={child.id}>
+        {canAddChild && !isCollapsed && (
+          <div className="space-y-2 border-l border-slate-200/70 pl-6">
+            {todo.children.map((child, childIndex) => (
+              <Fragment key={child.id}>
               <TodoItem todo={child} depth={depth + 1} parentId={todo.id} index={childIndex} />
             </Fragment>
           ))}
@@ -487,3 +494,48 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
 }
 
 export const TodoItem = observer(TodoItemComponent)
+
+interface HighlightedTextProps {
+  text: string
+  ranges: ReadonlyArray<[number, number]> | null
+}
+
+const HighlightedText = ({ text, ranges }: HighlightedTextProps) => {
+  const segments = useMemo(() => {
+    if (!ranges || ranges.length === 0) return [text]
+    const sorted = [...ranges]
+      .map(([start, end]) => [Math.max(0, start), Math.max(start, end)] as [number, number])
+      .sort((a, b) => a[0] - b[0])
+
+    const parts: (string | JSX.Element)[] = []
+    let cursor = 0
+
+    sorted.forEach(([start, end], index) => {
+      const safeStart = Math.min(start, text.length)
+      const safeEnd = Math.min(end + 1, text.length)
+      if (safeStart > cursor) {
+        parts.push(text.slice(cursor, safeStart))
+      }
+      const slice = text.slice(safeStart, safeEnd)
+      if (slice) {
+        parts.push(
+          <mark
+            key={`match-${index}`}
+            className="rounded bg-amber-200 px-0.5 text-slate-900"
+          >
+            {slice}
+          </mark>,
+        )
+      }
+      cursor = safeEnd
+    })
+
+    if (cursor < text.length) {
+      parts.push(text.slice(cursor))
+    }
+
+    return parts
+  }, [ranges, text])
+
+  return <>{segments}</>
+}
