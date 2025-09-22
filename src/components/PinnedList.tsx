@@ -27,17 +27,18 @@ const PinnedListComponent = ({ list }: PinnedListProps) => {
   const isRenameValid = titleDraft.trim().length > 0
   const isCollapsed = store.isPinnedListCollapsed(list.id)
   const isActive = store.isActivePinnedList(list.id)
+  const isSearchActive = store.hasActiveSearch
 
   useEffect(() => {
     setTitleDraft(list.title)
   }, [list.title])
 
   const emptyStateMessage = useMemo(() => {
-    if (isPrimary) {
-      return 'Слот для задач сейчас пустой'
+    if (isSearchActive) {
+      return 'Нет закреплённых задач, подходящих под поиск.'
     }
     return 'Слот для задач сейчас пустой'
-  }, [isPrimary])
+  }, [isSearchActive])
 
   const handleRenameSubmit: React.FormEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault()

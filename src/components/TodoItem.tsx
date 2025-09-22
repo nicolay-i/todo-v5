@@ -20,6 +20,7 @@ import { useDropdown } from '@/lib/hooks/useDropdown'
 import type { TodoNode } from '@/lib/types'
 import { useTodoStore } from '@/stores/TodoStoreContext'
 // мини-плейсхолдеры для сортировки больше не используются
+import { HighlightText } from './HighlightText'
 
 interface TodoItemProps {
   todo: TodoNode
@@ -74,13 +75,22 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
 
   const canAddChild = allowChildren && depth < MAX_DEPTH
   const isDragging = store.draggedId === todo.id
-  const isCollapsed = store.isCollapsed(todo.id)
+  const forcedExpanded = allowChildren ? store.shouldForceExpand(todo.id) : false
+  const baseCollapsed = store.isCollapsed(todo.id)
+  const isCollapsed = forcedExpanded ? false : baseCollapsed
   const draggedId = store.draggedId
   const canDropInside =
     allowChildren && depth < MAX_DEPTH && draggedId !== null && store.canDrop(draggedId, todo.id)
   const canReorderInTree = draggedId !== null && store.canDrop(draggedId, parentId)
   const isPinnedContext = Boolean(pinnedListId)
   const canReorderInPinned = draggedId !== null && isPinnedContext && store.isPinned(draggedId!)
+  const match = store.getSearchMatch(todo.id)
+  const collapseDisabled = todo.children.length === 0 || forcedExpanded
+  const collapseTitle = forcedExpanded
+    ? 'Ветка раскрыта из-за активного поиска'
+    : isCollapsed
+      ? 'Развернуть'
+      : 'Свернуть'
 
   useEffect(() => {
     setTitleDraft(todo.title)
@@ -245,9 +255,14 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
             <button
               type="button"
               onClick={handleToggleCollapsed}
-              className={`${actionButtonStyles} -ml-1.5 text-lg ${todo.children.length > 0 ? 'text-slate-500' : 'text-slate-300 cursor-default'}`}
-              aria-label={isCollapsed ? 'Развернуть' : 'Свернуть'}
-              disabled={todo.children.length === 0}
+              className={[
+                `${actionButtonStyles} -ml-1.5 text-lg`,
+                todo.children.length > 0 ? 'text-slate-500' : 'text-slate-300 cursor-default',
+                collapseDisabled ? 'cursor-not-allowed opacity-60 hover:bg-transparent hover:text-slate-400' : '',
+              ].join(' ')}
+              aria-label={collapseTitle}
+              title={collapseTitle}
+              disabled={collapseDisabled}
             >
               {isCollapsed ? <FiChevronRight /> : <FiChevronDown />}
             </button>
@@ -335,7 +350,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
 
                   {todo.tags?.length ? <>&nbsp;</> : null}
 
-                  {todo.title}
+                  <HighlightText text={todo.title} ranges={match?.ranges ?? []} />
                 </p>
               </div>
             )}

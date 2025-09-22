@@ -1,5 +1,7 @@
 import { makeAutoObservable } from 'mobx'
 import { MAX_DEPTH } from '@/lib/constants'
+import type { FuzzyMatchResult, SearchMetadata } from '@/lib/search'
+import { buildSearchMetadata, pruneTodosByIds } from '@/lib/search'
 import type { TodoNode, TodoState, PinnedListState, Tag } from '@/lib/types'
 
 export interface PinnedListView extends PinnedListState {
@@ -27,10 +29,27 @@ export class TodoStore {
   listFilterMode: VisibilityMode = 'today'
   pinnedFilterMode: VisibilityMode = 'today'
 
+  // Параметры поиска
+  searchQuery = ''
+  searchTagIds: string[] = []
+
   private static readonly COLLAPSE_STORAGE_KEY = 'todoCollapsedIds_v1'
   private static readonly PINNED_COLLAPSE_STORAGE_KEY = 'pinnedCollapsedIds_v1'
   private static readonly LIST_FILTER_STORAGE_KEY = 'listFilterMode_v1'
   private static readonly PINNED_FILTER_STORAGE_KEY = 'pinnedFilterMode_v1'
+
+  get hasActiveSearch(): boolean {
+    return this.searchInfo.active
+  }
+
+  getSearchMatch(id: string): FuzzyMatchResult | null {
+    return this.searchInfo.matches.get(id) ?? null
+  }
+
+  shouldForceExpand(id: string): boolean {
+    if (!this.searchInfo.active) return false
+    return this.searchInfo.expandedIds.has(id)
+  }
 
   constructor(initialState: TodoState) {
     makeAutoObservable(this, {}, { autoBind: true })
@@ -43,17 +62,25 @@ export class TodoStore {
   }
 
   get pinnedListsWithTodos(): PinnedListView[] {
+    const searchInfo = this.searchInfo
+    const requireMatch = searchInfo.active
     return this.pinnedLists.map((list) => ({
       ...list,
       todos: list.order
         .map((id) => this.findTodo(id)?.node)
         .filter((node): node is TodoNode => Boolean(node?.pinned))
-        .filter((node) => this.shouldIncludeTodo(node, this.pinnedFilterMode)),
+        .filter((node) => this.shouldIncludeTodo(node, this.pinnedFilterMode))
+        .filter((node) => !requireMatch || searchInfo.selfMatchedIds.has(node.id)),
     }))
   }
 
   get visibleTodos(): TodoNode[] {
-    return this.filterTree(this.todos, this.listFilterMode)
+    const filtered = this.filterTree(this.todos, this.listFilterMode)
+    const searchInfo = this.searchInfo
+    if (!searchInfo.active) {
+      return filtered
+    }
+    return pruneTodosByIds(filtered, searchInfo.matchedIds)
   }
 
   async refresh() {
@@ -119,6 +146,23 @@ export class TodoStore {
   setPinnedFilterMode(mode: VisibilityMode) {
     this.pinnedFilterMode = mode
     this.saveFilters()
+  }
+
+  setSearchQuery(query: string) {
+    this.searchQuery = query
+  }
+
+  toggleSearchTag(tagId: string) {
+    if (this.searchTagIds.includes(tagId)) {
+      this.searchTagIds = this.searchTagIds.filter((id) => id !== tagId)
+    } else {
+      this.searchTagIds = [...this.searchTagIds, tagId]
+    }
+  }
+
+  clearSearch() {
+    this.searchQuery = ''
+    this.searchTagIds = []
   }
 
   // ---- Collapse API ----
@@ -399,12 +443,16 @@ export class TodoStore {
     return null
   }
 
+  private get searchInfo(): SearchMetadata {
+    return buildSearchMetadata(this.todos, this.searchQuery, new Set(this.searchTagIds))
+  }
+
   private filterTree(nodes: TodoNode[], mode: VisibilityMode): TodoNode[] {
     const result: TodoNode[] = []
     for (const node of nodes) {
-  const filteredChildren = this.filterTree(node.children, mode)
-  if (!this.shouldIncludeTodo(node, mode) && filteredChildren.length === 0) continue
-  result.push({ ...node, children: filteredChildren })
+      const filteredChildren = this.filterTree(node.children, mode)
+      if (!this.shouldIncludeTodo(node, mode) && filteredChildren.length === 0) continue
+      result.push({ ...node, children: filteredChildren })
     }
     return result
   }
