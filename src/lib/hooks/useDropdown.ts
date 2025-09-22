@@ -27,11 +27,38 @@ export function useDropdown(options: DropdownOptions = {}) {
 
   const [isMounted, setIsMounted] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
+  const [placement, setPlacement] = useState<'down' | 'up'>('down')
 
   const rootRef = useRef<HTMLDivElement | null>(null)
+  const menuRef = useRef<HTMLDivElement | null>(null)
   const idRef = useRef<symbol>(Symbol('dropdown'))
   const openHoverTimerRef = useRef<number | null>(null)
   const closeTimerRef = useRef<number | null>(null)
+
+  const updatePlacement = useCallback(() => {
+    const rootEl = rootRef.current
+    if (!rootEl) return
+
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight
+    const rect = rootEl.getBoundingClientRect()
+    const spaceBelow = viewportHeight - rect.bottom
+    const spaceAbove = rect.top
+
+    const menuEl = menuRef.current
+    const menuHeight = menuEl?.offsetHeight ?? 224
+    const requiredSpace = menuHeight + 8 // небольшой отступ между триггером и меню
+
+    if (spaceBelow < requiredSpace && spaceAbove > spaceBelow) {
+      setPlacement('up')
+    } else {
+      setPlacement('down')
+    }
+  }, [])
+
+  const setMenuRef = useCallback((node: HTMLDivElement | null) => {
+    menuRef.current = node
+    if (node) updatePlacement()
+  }, [updatePlacement])
 
   const clearOpenHoverTimer = useCallback(() => {
     if (openHoverTimerRef.current !== null) {
@@ -100,19 +127,43 @@ export function useDropdown(options: DropdownOptions = {}) {
     return () => document.removeEventListener('mousedown', onDocMouseDown)
   }, [close, isMounted])
 
+  useEffect(() => {
+    if (!isMounted) return
+
+    const handleReposition = () => updatePlacement()
+    window.addEventListener('resize', handleReposition)
+    window.addEventListener('scroll', handleReposition, true)
+
+    const menuEl = menuRef.current
+    let observer: ResizeObserver | null = null
+    if (menuEl && typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(() => updatePlacement())
+      observer.observe(menuEl)
+    }
+
+    updatePlacement()
+
+    return () => {
+      window.removeEventListener('resize', handleReposition)
+      window.removeEventListener('scroll', handleReposition, true)
+      observer?.disconnect()
+    }
+  }, [isMounted, updatePlacement])
+
   // Регистрация в группе для взаимного закрытия
   useEffect(() => {
     if (!groupKey) return
+    const dropdownId = idRef.current
     let group = DROPDOWN_GROUPS.get(groupKey)
     if (!group) {
       group = new Map()
       DROPDOWN_GROUPS.set(groupKey, group)
     }
-    group.set(idRef.current, () => close())
+    group.set(dropdownId, () => close())
     return () => {
       const g = DROPDOWN_GROUPS.get(groupKey)
       if (!g) return
-      g.delete(idRef.current)
+      g.delete(dropdownId)
       if (g.size === 0) DROPDOWN_GROUPS.delete(groupKey)
     }
   }, [close, groupKey])
@@ -138,24 +189,27 @@ export function useDropdown(options: DropdownOptions = {}) {
   }), [clearCloseTimer, scheduleClose])
 
   const getMenuClassName = useCallback((base = '') => {
+    const closedTransform = placement === 'up' ? 'translate-y-1' : '-translate-y-1'
     const anim = isOpen
       ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto'
-      : 'opacity-0 -translate-y-1 scale-95 pointer-events-none'
+      : `opacity-0 ${closedTransform} scale-95 pointer-events-none`
     const trans = 'transition-all duration-200'
     return [base, trans, anim].filter(Boolean).join(' ')
-  }, [isOpen])
+  }, [isOpen, placement])
 
   return useMemo(() => ({
     rootRef,
+    setMenuRef,
     isMounted,
     isOpen,
+    placement,
     open,
     close,
     toggle,
     getTriggerProps,
     getMenuProps,
     getMenuClassName,
-  }), [close, getMenuClassName, getMenuProps, getTriggerProps, isMounted, isOpen, open, toggle])
+  }), [close, getMenuClassName, getMenuProps, getTriggerProps, isMounted, isOpen, open, placement, setMenuRef, toggle])
 }
 
 export type UseDropdownReturn = ReturnType<typeof useDropdown>
