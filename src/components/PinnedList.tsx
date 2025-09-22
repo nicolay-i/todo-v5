@@ -141,19 +141,17 @@ const PinnedListComponent = ({ list }: PinnedListProps) => {
       </div>
 
       {!isCollapsed && (
-        <PinnedListContainer listId={list.id} todosCount={todos.length}>
+        <PinnedListContainer
+          listId={list.id}
+          todosCount={todos.length}
+          emptyMessage={emptyStateMessage}
+        >
           {todos.map((todo, index) => (
             <Fragment key={todo.id}>
               <TodoItem todo={todo} depth={0} parentId={null} index={index} pinnedListId={list.id} allowChildren={false} />
             </Fragment>
           ))}
         </PinnedListContainer>
-      )}
-
-      {todos.length === 0 && !isCollapsed && (
-        <div className="mt-4 rounded-xl border border-dashed border-amber-200 bg-amber-50/60 px-4 py-6 text-center text-xs text-amber-600">
-          {emptyStateMessage}
-        </div>
       )}
     </div>
   )
@@ -164,30 +162,56 @@ export const PinnedList = observer(PinnedListComponent)
 interface PLCProps {
   listId: string
   todosCount: number
+  emptyMessage: string
   children: React.ReactNode
 }
 
-const PinnedListContainer = observer(({ listId, todosCount, children }: PLCProps) => {
+const PinnedListContainer = observer(({ listId, todosCount, emptyMessage, children }: PLCProps) => {
   const store = useTodoStore()
   const draggedId = store.draggedId
   const canAccept = draggedId !== null && store.isPinned(draggedId)
+  const [isEmptyOver, setIsEmptyOver] = useState(false)
 
   const handleEmptyOver: React.DragEventHandler<HTMLDivElement> = (event) => {
     if (!canAccept || todosCount > 0) return
     event.preventDefault()
     event.dataTransfer.dropEffect = 'move'
+    if (!isEmptyOver) {
+      setIsEmptyOver(true)
+    }
+  }
+
+  const handleEmptyLeave: React.DragEventHandler<HTMLDivElement> = () => {
+    if (!isEmptyOver) return
+    setIsEmptyOver(false)
   }
 
   const handleEmptyDrop: React.DragEventHandler<HTMLDivElement> = (event) => {
     if (!canAccept || draggedId === null || todosCount > 0) return
     event.preventDefault()
+    setIsEmptyOver(false)
     void store.movePinnedTodo(draggedId, listId, 0)
     store.clearDragged()
   }
 
-  return (
-    <div className="mt-4 space-y-3" onDragOver={handleEmptyOver} onDrop={handleEmptyDrop}>
-      {children}
-    </div>
-  )
+  if (todosCount === 0) {
+    return (
+      <div className="mt-4">
+        <div
+          className={[
+            'rounded-xl border border-dashed border-amber-200 bg-amber-50/60 px-4 py-6 text-center text-xs text-amber-600 transition-colors',
+            canAccept ? 'opacity-100' : 'opacity-80',
+            isEmptyOver && canAccept ? 'border-amber-300 bg-amber-100 shadow-inner shadow-amber-200/60' : '',
+          ].join(' ')}
+          onDragOver={handleEmptyOver}
+          onDragLeave={handleEmptyLeave}
+          onDrop={handleEmptyDrop}
+        >
+          {emptyMessage}
+        </div>
+      </div>
+    )
+  }
+
+  return <div className="mt-4 space-y-3">{children}</div>
 })
