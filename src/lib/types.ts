@@ -1,4 +1,5 @@
-import type { PinnedList, Todo } from '@prisma/client'
+// Импорт типов из локально сгенерированного Prisma клиента (см. prisma/schema.prisma output)
+import type { PinnedList, Todo } from '../generated/prisma'
 
 export interface Tag {
   id: string
