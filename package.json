@@ -8,7 +8,6 @@
     "start_local": "next start",
     "lint": "next lint",
     "prisma:generate": "prisma generate",
-    "postinstall": "prisma generate",
     "start": "node .next/standalone/server.js",
     "deploy": "node deploy-script.js"
   },

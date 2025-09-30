@@ -1,8 +1,6 @@
 generator client {
   provider      = "prisma-client-js"
   binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
-  // Генерируем клиент внутрь репо, чтобы типы были закоммичены
-  output        = "../src/generated/prisma"
 }
 
 datasource db {

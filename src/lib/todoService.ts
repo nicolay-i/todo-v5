@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
-import type { Todo, Tag } from '../generated/prisma'
-import { Prisma } from '../generated/prisma'
+import type { Todo, Tag } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 import { MAX_DEPTH } from './constants'
 import { prisma } from './prisma'
 import type { PinnedListState, TodoNode, TodoState } from './types'
