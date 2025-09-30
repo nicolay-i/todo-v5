@@ -26,12 +26,6 @@ jobs:
     # You can define any steps you want, and they will run before the agent starts.
     # If you do not check out your code, Copilot will do this for you.
     steps:
-      - name: Enable Corepack (pnpm)
-        run: corepack enable
-
-      - name: Prepare latest pnpm (optional pin)
-        run: corepack prepare pnpm@latest --activate
-
       - name: Install dependencies (pnpm)
         run: pnpm install --frozen-lockfile
 
