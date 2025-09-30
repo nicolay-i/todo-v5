@@ -14,69 +14,77 @@ on:
 jobs:
   # The job MUST be called `copilot-setup-steps` or it will not be picked up by Copilot.
   copilot-setup-steps:
-    runs-on: ubuntu-latest
+    # Используем self-hosted runner. Убедитесь, что на машине установлены git и curl.
+    # Можно добавить дополнительные метки: self-hosted, linux, x64
+    runs-on: self-hosted
 
-    # Set the permissions to the lowest permissions possible needed for your steps.
-    # Copilot will be given its own token for its operations.
+    # Минимально необходимые разрешения
     permissions:
-      # If you want to clone the repository as part of your setup steps, for example to install dependencies, you'll need the `contents: read` permission. If you don't clone the repository in your setup steps, Copilot will do this for you automatically after the steps complete.
       contents: read
 
-    # You can define any steps you want, and they will run before the agent starts.
-    # If you do not check out your code, Copilot will do this for you.
     steps:
       # Политика запрещает внешние actions, поэтому делаем checkout вручную
-      - name: Checkout repository (manual)
-        shell: bash
+      - name: Checkout (skip if already present)
+        shell: pwsh
         run: |
-          set -euo pipefail
-          echo "Cloning $GITHUB_REPOSITORY @ $GITHUB_REF..."
-          git clone --depth=1 "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" repo
-          cd repo
-          # Переносим файлы (runner стартует в пустой директории job)
-          shopt -s dotglob
-          mv * ..
-          cd ..
-          rm -rf repo
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = 'Stop'
+          if (Test-Path .git) {
+            Write-Host 'Repo already present. Fetching...'
+            git fetch --depth=1 origin $env:GITHUB_REF 2>$null || git fetch --depth=1 origin
+            try {
+              git reset --hard $env:GITHUB_SHA
+            } catch {
+              git checkout ($env:GITHUB_REF.Split('/')[-1])
+            }
+          } else {
+            Write-Host 'Fresh clone'
+            $token = '${{ secrets.GITHUB_TOKEN }}'
+            git clone --depth=1 "https://x-access-token:${token}@github.com/$env:GITHUB_REPOSITORY.git" .
+          }
+          git rev-parse --short HEAD
 
       # Устанавливаем Node 20 без actions/setup-node
-      - name: Install Node.js 20
-        shell: bash
+      - name: Ensure Node.js >=20
+        shell: pwsh
         run: |
-          set -euo pipefail
-          echo "Installing Node.js 20.x"
-          curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-          sudo apt-get install -y nodejs
-          node -v
-          npm -v
-          # Включаем corepack для pnpm, если нужно (на всякий случай)
-          corepack enable || true
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = 'Stop'
+          if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+            Write-Error 'Node.js not found. Please pre-install Node 20 or 22 on this self-hosted Windows runner.'
+          }
+          $ver = (node -v).TrimStart('v')
+          $major = [int]($ver.Split('.')[0])
+          if ($major -lt 20) { Write-Error "Node $ver found; need >=20" }
+          Write-Host "Using Node $(node -v)"
+          corepack enable 2>$null || Write-Host 'Corepack already enabled or not available'
 
-      - name: Install JavaScript dependencies (pnpm if lockfile exists, else npm)
-        shell: bash
+      - name: Install JavaScript dependencies (pnpm preferred)
+        shell: pwsh
         run: |
-          set -euo pipefail
-          if command -v pnpm >/dev/null 2>&1; then
-            echo "pnpm detected"
-          else
-            echo "Installing pnpm via corepack"
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = 'Stop'
+          if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
+            Write-Host 'Activating pnpm via corepack'
             corepack prepare pnpm@latest --activate
-          fi
-          if [ -f pnpm-lock.yaml ]; then
+          }
+          if (Test-Path pnpm-lock.yaml) {
             pnpm install --frozen-lockfile
-          elif [ -f package-lock.json ]; then
+          } elseif (Test-Path package-lock.json) {
             npm ci
-          else
+          } else {
             npm install
-          fi
+          }
 
       - name: Generate types
-        shell: bash
+        shell: pwsh
         run: |
-          if [ -f package.json ]; then
-            if npm run | grep -q "generate:types"; then
+          if (Test-Path package.json) {
+            $scripts = (Get-Content package.json -Raw)
+            if ($scripts -match '"generate:types"') {
               npm run generate:types
-            else
-              echo "No generate:types script defined, skipping"
-            fi
-          fi
+            } else {
+              Write-Host 'No generate:types script defined, skipping'
+            }
+          }
+          Write-Host 'Setup steps completed'
