@@ -1,13 +1,23 @@
 generator client {
   provider      = "prisma-client-js"
+  // AUTO: path managed by scripts/switch-db.js
+  migrations = "prisma/migrations"
   binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
+// ⚠️  ВАЖНО: Не редактируйте datasource блок вручную!
+// Используйте команды для переключения между БД:
+// - pnpm db:dev  (SQLite для разработки)
+// - pnpm db:prod (PostgreSQL для production)
+// Скрипт автоматически обновит блок между маркерами ниже.
+
+// DATASOURCE_START - Не удаляйте эту строку, используется для автоматической замены
 datasource db {
   provider          = "postgresql"
   url               = env("DATABASE_URL")
   shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
+// DATASOURCE_END - Не удаляйте эту строку, используется для автоматической замены
 
 model Todo {
   id        String   @id @default(cuid())

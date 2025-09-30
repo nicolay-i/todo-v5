@@ -3,9 +3,14 @@
 Цель: быстрый онбординг ИИ в ключевые инварианты и паттерны проекта.
 
 ## Архитектура
-Next.js (App Router) + Prisma (Postgres) + MobX + Tailwind. Все бизнес‑операции строго в `src/lib/todoService.ts`; API роуты — тонкие прокси возвращающие полный `TodoState`.
+Next.js (App Router) + Prisma (SQLite) + MobX + Tailwind. Все бизнес‑операции строго в `src/lib/todoService.ts`; API роуты — тонкие прокси возвращающие полный `TodoState`.
 
 Структура также описывается в файле plans/Техническое описание системы.md
+
+## База данных
+Проект использует **SQLite** для разработки — простая файловая БД, не требует установки сервера. База данных хранится в файле `dev.db` в корне проекта.
+
+Схема находится в `prisma/schema.prisma`.
 
 ## Домен
 `TodoState { todos, pinnedLists, tags }`. Дерево строится из плоских `Todo` по `parentId` + `position`. Глубина ограничена `MAX_DEPTH=3` (серверные проверки `getTodoDepth/getSubtreeDepth`, клиент `TodoStore.canDrop`).
@@ -37,6 +42,13 @@ Pinned lists: `POST /api/pinned-lists`, `PATCH|DELETE /api/pinned-lists/:id` (re
 Частичных ответов; множественных последовательных UPDATE где возможен батч; нарушения единственности active/primary; обхода глубинных проверок.
 
 ## Скрипты
-Dev: `pnpm dev`; build: `pnpm build` + `pnpm start` (standalone). Миграции: `pnpm prisma migrate deploy`. Генерация клиента: `pnpm prisma:generate`. Lint: `pnpm lint`.
+Dev: `pnpm dev`; build: `pnpm build` + `pnpm start` (standalone). 
+
+БД команды:
+- Синхронизация без миграций: `pnpm db:push:dev`
+- Миграции: `pnpm db:migrate:dev` (создание и применение)
+- Studio: `pnpm db:studio`
+
+Генерация клиента: `pnpm prisma:generate`. Lint: `pnpm lint`.
 
 Нужны дополнительные разделы (deployment env vars, экспорт состояния, стратегия фильтров)? — дайте знать.

@@ -26,3 +26,11 @@ dist-ssr
 .next
 .env
 ..env
+
+# SQLite database files
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+prisma/*.db
+prisma/*.db-journal
