@@ -14,78 +14,36 @@ on:
 jobs:
   # The job MUST be called `copilot-setup-steps` or it will not be picked up by Copilot.
   copilot-setup-steps:
-    # Используем self-hosted runner. Убедитесь, что на машине установлены git и curl.
-    # Можно добавить дополнительные метки: self-hosted, linux, x64
-    runs-on: self-hosted
+    # Self‑hosted Windows runner (labels must match those configured on the runner)
+    runs-on: [self-hosted, Windows]
 
-    # Минимально необходимые разрешения
+    # Set the permissions to the lowest permissions possible needed for your steps.
+    # Copilot will be given its own token for its operations.
     permissions:
+      # If you want to clone the repository as part of your setup steps, for example to install dependencies, you'll need the `contents: read` permission. If you don't clone the repository in your setup steps, Copilot will do this for you automatically after the steps complete.
       contents: read
 
+    # You can define any steps you want, and they will run before the agent starts.
+    # If you do not check out your code, Copilot will do this for you.
     steps:
-      # Политика запрещает внешние actions, поэтому делаем checkout вручную
-      - name: Checkout (skip if already present)
-        shell: pwsh
-        run: |
-          Set-StrictMode -Version Latest
-          $ErrorActionPreference = 'Stop'
-          if (Test-Path .git) {
-            Write-Host 'Repo already present. Fetching...'
-            git fetch --depth=1 origin $env:GITHUB_REF 2>$null || git fetch --depth=1 origin
-            try {
-              git reset --hard $env:GITHUB_SHA
-            } catch {
-              git checkout ($env:GITHUB_REF.Split('/')[-1])
-            }
-          } else {
-            Write-Host 'Fresh clone'
-            $token = '${{ secrets.GITHUB_TOKEN }}'
-            git clone --depth=1 "https://x-access-token:${token}@github.com/$env:GITHUB_REPOSITORY.git" .
-          }
-          git rev-parse --short HEAD
+      - name: Checkout code
+        uses: actions/checkout@v5
 
-      # Устанавливаем Node 20 без actions/setup-node
-      - name: Ensure Node.js >=20
-        shell: pwsh
-        run: |
-          Set-StrictMode -Version Latest
-          $ErrorActionPreference = 'Stop'
-          if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
-            Write-Error 'Node.js not found. Please pre-install Node 20 or 22 on this self-hosted Windows runner.'
-          }
-          $ver = (node -v).TrimStart('v')
-          $major = [int]($ver.Split('.')[0])
-          if ($major -lt 20) { Write-Error "Node $ver found; need >=20" }
-          Write-Host "Using Node $(node -v)"
-          corepack enable 2>$null || Write-Host 'Corepack already enabled or not available'
+      # Даже если Node 22 уже установлен на self-hosted раннере, фиксируем версию и включаем кеш pnpm
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
 
-      - name: Install JavaScript dependencies (pnpm preferred)
-        shell: pwsh
-        run: |
-          Set-StrictMode -Version Latest
-          $ErrorActionPreference = 'Stop'
-          if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
-            Write-Host 'Activating pnpm via corepack'
-            corepack prepare pnpm@latest --activate
-          }
-          if (Test-Path pnpm-lock.yaml) {
-            pnpm install --frozen-lockfile
-          } elseif (Test-Path package-lock.json) {
-            npm ci
-          } else {
-            npm install
-          }
+      - name: Enable Corepack (pnpm)
+        run: corepack enable
 
-      - name: Generate types
-        shell: pwsh
-        run: |
-          if (Test-Path package.json) {
-            $scripts = (Get-Content package.json -Raw)
-            if ($scripts -match '"generate:types"') {
-              npm run generate:types
-            } else {
-              Write-Host 'No generate:types script defined, skipping'
-            }
-          }
-          Write-Host 'Setup steps completed'
+      - name: Prepare latest pnpm (optional pin)
+        run: corepack prepare pnpm@latest --activate
 
+      - name: Install dependencies (pnpm)
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm prisma:generate
