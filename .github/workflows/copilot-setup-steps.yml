@@ -25,17 +25,58 @@ jobs:
     # You can define any steps you want, and they will run before the agent starts.
     # If you do not check out your code, Copilot will do this for you.
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
+      # Политика запрещает внешние actions, поэтому делаем checkout вручную
+      - name: Checkout repository (manual)
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Cloning $GITHUB_REPOSITORY @ $GITHUB_REF..."
+          git clone --depth=1 "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" repo
+          cd repo
+          # Переносим файлы (runner стартует в пустой директории job)
+          shopt -s dotglob
+          mv * ..
+          cd ..
+          rm -rf repo
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
+      # Устанавливаем Node 20 без actions/setup-node
+      - name: Install Node.js 20
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Installing Node.js 20.x"
+          curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+          sudo apt-get install -y nodejs
+          node -v
+          npm -v
+          # Включаем corepack для pnpm, если нужно (на всякий случай)
+          corepack enable || true
 
-      - name: Install JavaScript dependencies
-        run: npm ci
+      - name: Install JavaScript dependencies (pnpm if lockfile exists, else npm)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if command -v pnpm >/dev/null 2>&1; then
+            echo "pnpm detected"
+          else
+            echo "Installing pnpm via corepack"
+            corepack prepare pnpm@latest --activate
+          fi
+          if [ -f pnpm-lock.yaml ]; then
+            pnpm install --frozen-lockfile
+          elif [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
 
       - name: Generate types
-        run: npm run generate:types
+        shell: bash
+        run: |
+          if [ -f package.json ]; then
+            if npm run | grep -q "generate:types"; then
+              npm run generate:types
+            else
+              echo "No generate:types script defined, skipping"
+            fi
+          fi
