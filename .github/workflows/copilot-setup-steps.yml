@@ -36,6 +36,9 @@ jobs:
       - name: Copy env example
         run: cp .env.local.example .env
 
+      - name: Set development mode
+        run: pnpm mode:dev
+
       - name: Setup environment variables
         run: |
           echo "DATABASE_URL=file:./test.db" >> $GITHUB_ENV
