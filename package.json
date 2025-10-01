@@ -17,7 +17,7 @@
     "db:studio": "prisma studio"
   },
   "dependencies": {
-    "@prisma/client": "^6.2.1",
+    "@prisma/client": "^6.16.3",
     "dotenv": "^17.2.2",
     "mobx": "^6.13.7",
     "mobx-react-lite": "^4.1.0",
@@ -36,7 +36,7 @@
     "eslint-config-next": "14.2.15",
     "graceful-fs": "^4.2.11",
     "postcss": "8.4.49",
-    "prisma": "^6.2.1",
+    "prisma": "^6.16.3",
     "tailwindcss": "3.4.16",
     "typescript": "5.6.3"
   },

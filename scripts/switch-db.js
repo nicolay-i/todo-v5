@@ -66,53 +66,6 @@ try {
   let newLines = [...before, ...newDatasource, ...after];
   let newContent = newLines.join('\n');
 
-  // === Второй шаг: обновляем/добавляем migrations в generator client ===
-  // dev -> prisma/migrations-sqlite
-  // prod -> prisma/migrations
-  const migrationDir = mode === 'dev' ? 'prisma/migrations-sqlite' : 'prisma/migrations';
-  const contentLines = newContent.split('\n');
-  let genStart = -1;
-  let genEnd = -1;
-  for (let i = 0; i < contentLines.length; i++) {
-    if (genStart === -1 && /^generator\s+client\s*\{/.test(contentLines[i])) {
-      genStart = i;
-    }
-    if (genStart !== -1 && genEnd === -1) {
-      if (/^\}/.test(contentLines[i]) || contentLines[i].trim() === '}') {
-        genEnd = i; // строка с закрывающей скобкой
-        break;
-      }
-    }
-  }
-  if (genStart === -1 || genEnd === -1) {
-    console.warn('⚠️  Не найден блок generator client — пропускаю обновление migrations пути.');
-  } else {
-    // Проверяем существование строки migrations
-    let hasMigrations = false;
-    for (let i = genStart + 1; i < genEnd; i++) {
-      if (/^\s*migrations\s*=/.test(contentLines[i])) {
-        hasMigrations = true;
-        contentLines[i] = contentLines[i].replace(/migrations\s*=.*/, `migrations = "${migrationDir}"`);
-        break;
-      }
-    }
-    if (!hasMigrations) {
-      // Найти строку provider чтобы вставить после неё
-      let inserted = false;
-      for (let i = genStart + 1; i < genEnd; i++) {
-        if (/^\s*provider\s*=/.test(contentLines[i])) {
-          contentLines.splice(i + 1, 0, '  // AUTO: path managed by scripts/switch-db.js', `  migrations = "${migrationDir}"`);
-          inserted = true;
-          break;
-        }
-      }
-      if (!inserted) {
-        contentLines.splice(genEnd, 0, '  // AUTO: path managed by scripts/switch-db.js', `  migrations = "${migrationDir}"`);
-      }
-    }
-    newContent = contentLines.join('\n');
-  }
-
   // Записываем обновлённый файл
   fs.writeFileSync(schemaPath, newContent, 'utf8');
 
