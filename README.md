@@ -26,8 +26,7 @@ pnpm install
 # Настройте переменные окружения
 cp .env.local.example .env
 
-# Синхронизируйте схему БД
-pnpm db:push:dev
+npx prisma db push  # создаст SQLite файл и таблицы
 
 # Запустите dev-сервер
 pnpm dev

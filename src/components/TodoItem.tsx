@@ -318,9 +318,9 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                   style={{ visibility: 'hidden' }}
                 />
               </form>
-            ) : (
-              <div className="flex flex-wrap items-start gap-2">
-                <p className={`${titleStyles} text-sm`}>
+             ) : (
+               <div className="flex flex-wrap items-start gap-2" onDoubleClick={() => setIsEditing(true)}>
+                 <p className={`${titleStyles} text-sm`}>
                   {(todo.tags ?? []).map((tag) => (<>
                     <span
                       key={tag.id}
