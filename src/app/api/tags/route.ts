@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { addTag, deleteTag, listTags, renameTag } from '@/lib/todoService'
+import { addTag, deleteTag, listTags, renameTag, reorderTags } from '@/lib/todoService'
 
 export async function GET() {
   const state = await listTags()
@@ -21,5 +21,11 @@ export async function PATCH(request: Request) {
 export async function DELETE(request: Request) {
   const { id } = await request.json()
   const state = await deleteTag(id)
+  return NextResponse.json(state)
+}
+
+export async function PUT(request: Request) {
+  const { tagIds } = await request.json()
+  const state = await reorderTags(tagIds)
   return NextResponse.json(state)
 }
