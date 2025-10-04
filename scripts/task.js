@@ -7,7 +7,7 @@
  2. Копирование .env* файлов (если есть .env.example → .env) в новую папку worktree
  3. pnpm install в worktree
  4. Добавление записи в plans/tasks.md (дата, ветка, описание)
- 5. Запуск GitHub Copilot Chat CLI с моделью gpt-5 и промптом как текст задачи
+ 5. Запуск GitHub Copilot CLI с моделью gpt-5 и промптом как текст задачи. Пример запуска: `copilot --model gpt-5 -p "нужно доработать системные теги: на сначала доступен тег Проект, и только внутри него доступен тег Раздел." --allow-all-tools`
  6. Открытие VS Code в worktree и финальное сообщение
 
  Дополнительно:
@@ -37,6 +37,23 @@ function run(cmd, options={}) {
 	const out = execSync(cmd, { stdio: 'pipe', encoding: 'utf8', ...options });
 	log(COLORS.dim(`✔ (${((Date.now()-start)/1000).toFixed(2)}s)`));
 	return out.trim();
+}
+
+// Поиск исполняемого файла в PATH (учёт Windows .cmd/.exe)
+function findExecutable(candidates){
+	const isWin = process.platform === 'win32';
+	const exts = isWin ? ['.cmd','.exe',''] : [''];
+	for (const base of candidates){
+		for (const ext of exts){
+			const name = base.endsWith(ext) ? base : base+ext;
+			try {
+				const cmd = isWin ? `where ${name}` : `which ${name}`;
+				const res = run(cmd);
+				if (res) return name; // вернём короткое имя; spawn с shell:true всё равно найдёт
+			} catch { /* ignore */ }
+		}
+	}
+	return null;
 }
 
 function log(msg){ console.log(msg); }
@@ -119,17 +136,30 @@ function appendTaskRecord({ branch, title, description }){
 }
 
 function tryLaunchCopilot({ prompt, worktreePath }){
+	const skip = process.argv.includes('--no-copilot');
+	if (skip){
+		log(COLORS.dim('Пропуск запуска Copilot (--no-copilot).'));
+		return;
+	}
+	let exe = findExecutable(['copilot']);
+	if (!exe){
+		log(COLORS.yellow('GitHub Copilot CLI не найден в PATH, шаг пропущен. Установите: https://github.com/github/gh-copilot/releases'));
+		return;
+	}
 	try {
-		// Проверим доступность команды copilot.
-		run('copilot --version');
-	} catch { 
-		log(COLORS.yellow('GitHub copilot отсутствует или недоступен, пропускаю шаг Copilot.'));
-		return; 
+		// Проверим версию (shell нужен для .cmd в Windows)
+		run(`${exe} --version`);
+	} catch {
+		log(COLORS.yellow('Copilot найден, но не запускается (версия не получена). Шаг пропущен.'));
+		return;
 	}
 	try {
 		const args = ['--model','gpt-5','-p', prompt, '--allow-all-tools'];
 		log(COLORS.magenta('Запуск Copilot...'));
-		const proc = spawn('copilot', args, { stdio: 'inherit', cwd: worktreePath, shell: false });
+		const proc = spawn(exe, args, { stdio: 'inherit', cwd: worktreePath, shell: process.platform === 'win32' });
+		proc.on('error', (e)=>{
+			error('Ошибка запуска Copilot: '+e.message+' (шаг будет пропущен)');
+		});
 		proc.on('exit', code => {
 			if (code !== 0) error('Copilot завершился с кодом '+code);
 		});
@@ -139,6 +169,13 @@ function tryLaunchCopilot({ prompt, worktreePath }){
 }
 
 async function main(){
+	// Глобальные обработчики чтобы скрипт не падал некрасиво
+	process.on('uncaughtException', (e)=>{
+		error('Необработанная ошибка: '+(e && e.stack || e));
+	});
+	process.on('unhandledRejection', (e)=>{
+		error('Необработанное отклонение промиса: '+(e && e.stack || e));
+	});
 	section('Интерактивный ввод');
 	const baseBranch = detectBaseBranch();
 		const answers = await ask([
@@ -209,8 +246,18 @@ async function main(){
 
 	section('Открытие VS Code');
 	try {
-		const codeCmd = process.platform === 'win32' ? 'code.cmd' : 'code';
-		spawn(codeCmd, [worktreePath], { stdio: 'ignore', detached: true });
+		if (!process.argv.includes('--no-code')){
+			let codeExe = findExecutable(['code','code-insiders']);
+			if (!codeExe){
+				log(COLORS.yellow('VS Code не найден в PATH, пропускаю открытие редактора.'));
+			} else {
+				const child = spawn(codeExe, [worktreePath], { stdio: 'ignore', detached: true, shell: process.platform === 'win32' });
+				child.on('error', e=> error('Не удалось открыть VS Code: '+e.message));
+				child.unref();
+			}
+		} else {
+			log(COLORS.dim('Пропуск открытия VS Code (--no-code).'));
+		}
 	} catch(e){ error('Не удалось открыть VS Code: '+e.message); }
 
 	log('\n'+COLORS.green('Готово!')+' Рабочая директория: '+COLORS.magenta(worktreePath));
