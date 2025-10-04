@@ -136,36 +136,51 @@ function appendTaskRecord({ branch, title, description }){
 }
 
 function tryLaunchCopilot({ prompt, worktreePath }){
-	const skip = process.argv.includes('--no-copilot');
-	if (skip){
-		log(COLORS.dim('Пропуск запуска Copilot (--no-copilot).'));
-		return;
-	}
-	let exe = findExecutable(['copilot']);
-	if (!exe){
-		log(COLORS.yellow('GitHub Copilot CLI не найден в PATH, шаг пропущен. Установите: https://github.com/github/gh-copilot/releases'));
-		return;
-	}
-	try {
-		// Проверим версию (shell нужен для .cmd в Windows)
-		run(`${exe} --version`);
-	} catch {
-		log(COLORS.yellow('Copilot найден, но не запускается (версия не получена). Шаг пропущен.'));
-		return;
-	}
-	try {
-		const args = ['--model','gpt-5','-p', prompt, '--allow-all-tools'];
-		log(COLORS.magenta('Запуск Copilot...'));
-		const proc = spawn(exe, args, { stdio: 'inherit', cwd: worktreePath, shell: process.platform === 'win32' });
-		proc.on('error', (e)=>{
-			error('Ошибка запуска Copilot: '+e.message+' (шаг будет пропущен)');
-		});
-		proc.on('exit', code => {
-			if (code !== 0) error('Copilot завершился с кодом '+code);
-		});
-	} catch(e){
-		error('Не удалось запустить Copilot: '+e.message);
-	}
+	// Возвращаем Promise чтобы можно было дождаться завершения
+	return new Promise((resolve) => {
+		const skip = process.argv.includes('--no-copilot');
+		if (skip){
+			log(COLORS.dim('Пропуск запуска Copilot (--no-copilot).'));
+			return resolve({ skipped: true });
+		}
+		let exe = findExecutable(['copilot']);
+		if (!exe){
+			log(COLORS.yellow('GitHub Copilot CLI не найден в PATH, шаг пропущен. Установите: https://github.com/github/gh-copilot/releases'));
+			return resolve({ skipped: true, reason: 'not-found' });
+		}
+		try {
+			// Проверим версию (shell нужен для .cmd в Windows)
+			run(`${exe} --version`);
+		} catch {
+			log(COLORS.yellow('Copilot найден, но не запускается (версия не получена). Шаг пропущен.'));
+			return resolve({ skipped: true, reason: 'bad-version' });
+		}
+		try {
+			// Добавляем флаг --add-dir с директорией worktree для контекстного индексирования Copilot CLI
+			const args = ['--model','gpt-5','-p', prompt, '--allow-all-tools', '--add-dir', worktreePath];
+			log(COLORS.magenta('Запуск Copilot...'));
+			const proc = spawn(exe, args, { stdio: 'inherit', cwd: worktreePath, shell: process.platform === 'win32' });
+			let settled = false;
+			proc.on('error', (e)=>{
+				if (!settled) {
+					settled = true;
+					error('Ошибка запуска Copilot: '+e.message+' (шаг будет пропущен)');
+					resolve({ skipped: true, error: e });
+				}
+			});
+			proc.on('exit', code => {
+				if (!settled){
+					settled = true;
+					if (code !== 0) error('Copilot завершился с кодом '+code);
+					else log(COLORS.green('Copilot завершён.'));
+					resolve({ skipped: false, code });
+				}
+			});
+		} catch(e){
+			error('Не удалось запустить Copilot: '+e.message);
+			return resolve({ skipped: true, error: e });
+		}
+	});
 }
 
 async function main(){
@@ -241,8 +256,9 @@ async function main(){
 		appendTaskRecord({ branch, title: heading, description });
 
 			const copilotPrompt = '"' + description + '\n @/plans/Техническое описание системы.md"';
-			section('Copilot Chat');
-			tryLaunchCopilot({ prompt: copilotPrompt, worktreePath });
+			section('Copilot CLI');
+			await tryLaunchCopilot({ prompt: copilotPrompt, worktreePath });
+			log(COLORS.dim('Copilot шаг завершён → открываем VS Code...'));
 
 	section('Открытие VS Code');
 	try {
