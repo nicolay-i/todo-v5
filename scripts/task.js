@@ -156,8 +156,7 @@ function tryLaunchCopilot({ prompt, worktreePath }){
 			return resolve({ skipped: true, reason: 'bad-version' });
 		}
 		try {
-			// Добавляем флаг --add-dir с директорией worktree для контекстного индексирования Copilot CLI
-			const args = ['--model','gpt-5','-p', prompt, '--allow-all-tools', '--add-dir', worktreePath];
+			const args = ['--model','gpt-5','-p', prompt, '--allow-all-tools', '--add-dir', worktreePath, ' --log-level all'];
 			log(COLORS.magenta('Запуск Copilot...'));
 			const proc = spawn(exe, args, { stdio: 'inherit', cwd: worktreePath, shell: process.platform === 'win32' });
 			let settled = false;
@@ -255,7 +254,7 @@ async function main(){
 	section('Запись задачи');
 		appendTaskRecord({ branch, title: heading, description });
 
-			const copilotPrompt = '"' + description + '\n @/plans/Техническое описание системы.md"';
+			const copilotPrompt = '"' + description + ' @/plans/Техническое описание системы.md"';
 			section('Copilot CLI');
 			await tryLaunchCopilot({ prompt: copilotPrompt, worktreePath });
 			log(COLORS.dim('Copilot шаг завершён → открываем VS Code...'));
