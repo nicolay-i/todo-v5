@@ -203,7 +203,7 @@ async function main(){
 	section('Запись задачи');
 		appendTaskRecord({ branch, title: heading, description });
 
-			const copilotPrompt = description;
+			const copilotPrompt = description + '\n @/plans/Техническое описание системы.md';
 			section('Copilot Chat');
 			tryLaunchCopilot({ prompt: copilotPrompt, worktreePath });
 
