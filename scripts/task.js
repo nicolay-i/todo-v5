@@ -6,7 +6,7 @@
  1. Создание git worktree (ветка от текущего origin/<baseBranch> или локальной текущей)
  2. Копирование .env* файлов (если есть .env.example → .env) в новую папку worktree
  3. pnpm install в worktree
- 4. Добавление записи в plans/tasks.md (дата, ветка, заголовок, описание)
+ 4. Добавление записи в plans/tasks.md (дата, ветка, описание)
  5. Запуск GitHub Copilot Chat CLI с моделью gpt-5 и промптом как текст задачи
  6. Открытие VS Code в worktree и финальное сообщение
 
@@ -113,8 +113,7 @@ function appendTaskRecord({ branch, title, description }){
 	if (!fs.existsSync(plansDir)) fs.mkdirSync(plansDir,{recursive:true});
 	const file = path.join(plansDir,'tasks.md');
 	const date = nowISODate();
-	const block = `\n### ${date} — ${title}\nВетка: \
-${branch}\n\n${description}\n`; // keep simple
+	const block = `\n${date}\nВетка: ${branch}\n\n${description}\n`;
 	fs.appendFileSync(file, block, 'utf8');
 	log('Запись добавлена в plans/tasks.md');
 }
@@ -143,7 +142,7 @@ async function main(){
 	section('Интерактивный ввод');
 	const baseBranch = detectBaseBranch();
 		const answers = await ask([
-				{ name: 'description', message: 'Описание задачи (первая строка = заголовок). Можно сразу одной строкой: ' },
+				{ name: 'description', message: 'Описание задачи: ' },
 				{ name: 'branch', message: `Имя ветки (enter чтобы сгенерировать): ` }
 		]);
 
