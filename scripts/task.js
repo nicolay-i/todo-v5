@@ -156,23 +156,50 @@ function tryLaunchCopilot({ prompt, worktreePath }){
 			return resolve({ skipped: true, reason: 'bad-version' });
 		}
 		try {
-			const args = ['--model','gpt-5','-p', prompt, '--allow-all-tools', '--add-dir', worktreePath, ' --log-level all'];
+			// Корректный список аргументов (исправлено объединение '--log-level all' в один аргумент)
+			const args = ['--model','gpt-5','-p', prompt, '--allow-all-tools', '--add-dir', worktreePath, '--log-level','all', "--deny-tool", "shell(git)"];
 			log(COLORS.magenta('Запуск Copilot...'));
-			const proc = spawn(exe, args, { stdio: 'inherit', cwd: worktreePath, shell: process.platform === 'win32' });
+			// Подготовим лог-файл
+			let logFile = null;
+			let logStream = null;
+			try {
+				const logsDir = path.join(worktreePath, 'logs');
+				fs.mkdirSync(logsDir, { recursive: true });
+				const ts = new Date().toISOString().replace(/[:.]/g,'-');
+				logFile = path.join(logsDir, `copilot-${ts}.log`);
+				logStream = fs.createWriteStream(logFile, { flags: 'a' });
+				logStream.write(`[${new Date().toISOString()}] START Copilot CLI\n`);
+				logStream.write(`Prompt: ${prompt}\n`);
+				logStream.write(`Args: ${args.join(' ')}\n\n`);
+				log(COLORS.dim('Лог Copilot: '+logFile));
+			} catch (e){
+				log(COLORS.yellow('Не удалось создать лог-файл Copilot: '+e.message));
+			}
+
+			const proc = spawn(exe, args, { cwd: worktreePath, shell: process.platform === 'win32' });
 			let settled = false;
+
+			const forward = (chunk, isErr=false) => {
+				if (isErr) process.stderr.write(chunk); else process.stdout.write(chunk);
+				if (logStream) logStream.write(chunk);
+			};
+			if (proc.stdout) proc.stdout.on('data', d => forward(d));
+			if (proc.stderr) proc.stderr.on('data', d => forward(d, true));
+
 			proc.on('error', (e)=>{
 				if (!settled) {
 					settled = true;
 					error('Ошибка запуска Copilot: '+e.message+' (шаг будет пропущен)');
-					resolve({ skipped: true, error: e });
+					if (logStream) { logStream.write(`\n[${new Date().toISOString()}] ERROR ${e.stack||e.message}\n`); logStream.end(); }
+					resolve({ skipped: true, error: e, logFile });
 				}
 			});
 			proc.on('exit', code => {
 				if (!settled){
 					settled = true;
-					if (code !== 0) error('Copilot завершился с кодом '+code);
-					else log(COLORS.green('Copilot завершён.'));
-					resolve({ skipped: false, code });
+					if (code !== 0) error('Copilot завершился с кодом '+code); else log(COLORS.green('Copilot завершён.'));
+					if (logStream) { logStream.write(`\n[${new Date().toISOString()}] EXIT code=${code}\n`); logStream.end(); }
+					resolve({ skipped: false, code, logFile });
 				}
 			});
 		} catch(e){
@@ -256,7 +283,10 @@ async function main(){
 
 			const copilotPrompt = '"' + description + ' @/plans/Техническое описание системы.md"';
 			section('Copilot CLI');
-			await tryLaunchCopilot({ prompt: copilotPrompt, worktreePath });
+			const copilotResult = await tryLaunchCopilot({ prompt: copilotPrompt, worktreePath });
+			if (copilotResult && copilotResult.logFile){
+				log(COLORS.dim('Логи Copilot сохранены: '+copilotResult.logFile));
+			}
 			log(COLORS.dim('Copilot шаг завершён → открываем VS Code...'));
 
 	section('Открытие VS Code');
