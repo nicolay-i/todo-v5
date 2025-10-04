@@ -120,15 +120,15 @@ function appendTaskRecord({ branch, title, description }){
 
 function tryLaunchCopilot({ prompt, worktreePath }){
 	try {
-		// Проверим доступность команды (gh или copilot). Допустим есть gh extension: gh copilot
-		run('gh --version');
+		// Проверим доступность команды copilot.
+		run('copilot --version');
 	} catch { 
-		log(COLORS.yellow('GitHub CLI отсутствует или недоступен, пропускаю шаг Copilot.'));
+		log(COLORS.yellow('GitHub copilot отсутствует или недоступен, пропускаю шаг Copilot.'));
 		return; 
 	}
 	try {
-		const args = ['copilot','chat','--model','gpt-5','-p', prompt, '--allow-all-tools'];
-		log(COLORS.magenta('Запуск Copilot Chat...'));
+		const args = ['copilot','--model','gpt-5','-p', prompt, '--allow-all-tools'];
+		log(COLORS.magenta('Запуск Copilot...'));
 		const proc = spawn('gh', args, { stdio: 'inherit', cwd: worktreePath, shell: false });
 		proc.on('exit', code => {
 			if (code !== 0) error('Copilot завершился с кодом '+code);
