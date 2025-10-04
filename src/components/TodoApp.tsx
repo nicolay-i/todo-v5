@@ -482,6 +482,7 @@ const SettingsTab = () => {
   const [newTag, setNewTag] = useState('')
   const [editingTagId, setEditingTagId] = useState<string | null>(null)
   const [editingTagName, setEditingTagName] = useState('')
+  const [draggedTagId, setDraggedTagId] = useState<string | null>(null)
 
   const handleExport = async () => {
     setStatus(null)
@@ -575,8 +576,31 @@ const SettingsTab = () => {
         </form>
 
         <ul className="mt-4 space-y-2">
-          {store.tags.map((tag) => (
-            <li key={tag.id} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
+           {store.tags.map((tag) => (
+             <li
+               key={tag.id}
+               className={`flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 ${draggedTagId === tag.id ? 'opacity-50' : ''}`}
+               draggable
+               onDragStart={(e) => {
+                 setDraggedTagId(tag.id)
+                 e.dataTransfer.effectAllowed = 'move'
+               }}
+               onDragEnd={() => setDraggedTagId(null)}
+               onDragOver={(e) => e.preventDefault()}
+               onDrop={(e) => {
+                 e.preventDefault()
+                 if (draggedTagId && draggedTagId !== tag.id) {
+                   const draggedIndex = store.tags.findIndex(t => t.id === draggedTagId)
+                   const targetIndex = store.tags.findIndex(t => t.id === tag.id)
+                   const newOrder = [...store.tags]
+                   const [removed] = newOrder.splice(draggedIndex, 1)
+                   newOrder.splice(targetIndex, 0, removed)
+                   const tagIds = newOrder.map(t => t.id)
+                   void store.reorderTags(tagIds)
+                 }
+                 setDraggedTagId(null)
+               }}
+             >
               {editingTagId === tag.id ? (
                 <>
                   <input

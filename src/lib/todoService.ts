@@ -242,7 +242,7 @@ export async function getTodoState(): Promise<TodoState> {
 
   const [todos, tags] = await Promise.all([
     prisma.todo.findMany({ include: { tags: true } }),
-    prisma.tag.findMany({ orderBy: { name: 'asc' } }),
+    prisma.tag.findMany({ orderBy: { position: 'asc' } }),
   ])
   const tree = buildTree(todos)
   const pinnedLists = await composePinnedLists()
@@ -368,16 +368,17 @@ export async function replaceTodoState(state: unknown): Promise<TodoState> {
   normalizeTodos(parsed.todos ?? [], null, 0, todos, idSet)
 
   // normalize tags (top-level)
-  const tagRecords: { id: string; name: string }[] = []
+  const tagRecords: { id: string; name: string; position: number }[] = []
   const tagIdSet = new Set<string>()
   if (Array.isArray((parsed as any).tags)) {
-    for (const raw of (parsed as any).tags as any[]) {
+    for (const [index, raw] of (parsed as any).tags.entries()) {
       if (!raw || typeof raw !== 'object') continue
       const rid = typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : randomUUID()
       const id = tagIdSet.has(rid) ? randomUUID() : rid
       tagIdSet.add(id)
       const name = typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim() : 'Без имени'
-      tagRecords.push({ id, name })
+      const position = typeof raw.position === 'number' ? raw.position : index
+      tagRecords.push({ id, name, position })
     }
   }
 
@@ -599,7 +600,9 @@ export async function addTag(name: string): Promise<TodoState> {
   const trimmed = name.trim()
   if (!trimmed) return getTodoState()
   await ensureSeedData()
-  await prisma.tag.create({ data: { name: trimmed } })
+  const maxPosition = await prisma.tag.findFirst({ orderBy: { position: 'desc' } })
+  const position = (maxPosition?.position ?? -1) + 1
+  await prisma.tag.create({ data: { name: trimmed, position } })
   return getTodoState()
 }
 
@@ -614,6 +617,19 @@ export async function renameTag(id: string, name: string): Promise<TodoState> {
 export async function deleteTag(id: string): Promise<TodoState> {
   await ensureSeedData()
   await prisma.tag.delete({ where: { id } })
+  return getTodoState()
+}
+
+export async function reorderTags(tagIds: string[]): Promise<TodoState> {
+  await ensureSeedData()
+  await prisma.$transaction(
+    tagIds.map((id, index) =>
+      prisma.tag.update({
+        where: { id },
+        data: { position: index },
+      }),
+    ),
+  )
   return getTodoState()
 }
 

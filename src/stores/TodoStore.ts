@@ -385,6 +385,13 @@ export class TodoStore {
     })
   }
 
+  async reorderTags(tagIds: string[]) {
+    await this.mutate('/api/tags', {
+      method: 'PUT',
+      body: JSON.stringify({ tagIds }),
+    })
+  }
+
   isPinned(id: string): boolean {
     const info = this.findTodo(id)
     return info?.node.pinned ?? false

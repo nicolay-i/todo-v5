@@ -3,6 +3,7 @@ import type { PinnedList, Todo } from '@prisma/client'
 export interface Tag {
   id: string
   name: string
+  position: number
   createdAt: Date
   updatedAt: Date
 }
