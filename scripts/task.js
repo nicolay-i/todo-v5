@@ -278,6 +278,10 @@ async function main(){
 	try { run('pnpm install', { cwd: worktreePath }); }
 	catch(e){ error('pnpm install завершился ошибкой: '+e.message); }
 
+	section('Подготовка проекта');
+	try { run('pnpm mode:dev', { cwd: worktreePath }); }
+	catch(e){ error('pnpm mode:dev завершился ошибкой: '+e.message); }
+
 	section('Запись задачи');
 		appendTaskRecord({ branch, title: heading, description });
 
