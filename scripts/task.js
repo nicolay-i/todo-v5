@@ -127,9 +127,9 @@ function tryLaunchCopilot({ prompt, worktreePath }){
 		return; 
 	}
 	try {
-		const args = ['copilot','--model','gpt-5','-p', prompt, '--allow-all-tools'];
+		const args = ['--model','gpt-5','-p', prompt, '--allow-all-tools'];
 		log(COLORS.magenta('Запуск Copilot...'));
-		const proc = spawn('gh', args, { stdio: 'inherit', cwd: worktreePath, shell: false });
+		const proc = spawn('copilot', args, { stdio: 'inherit', cwd: worktreePath, shell: false });
 		proc.on('exit', code => {
 			if (code !== 0) error('Copilot завершился с кодом '+code);
 		});
@@ -203,7 +203,7 @@ async function main(){
 	section('Запись задачи');
 		appendTaskRecord({ branch, title: heading, description });
 
-			const copilotPrompt = description + '\n @/plans/Техническое описание системы.md';
+			const copilotPrompt = '"' + description + '\n @/plans/Техническое описание системы.md"';
 			section('Copilot Chat');
 			tryLaunchCopilot({ prompt: copilotPrompt, worktreePath });
 
