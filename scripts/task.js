@@ -157,7 +157,7 @@ function tryLaunchCopilot({ prompt, worktreePath }){
 		}
 		try {
 			// Корректный список аргументов (исправлено объединение '--log-level all' в один аргумент)
-			const args = ['--model','gpt-5','-p', prompt, '--allow-all-tools', '--add-dir', worktreePath, '--log-level','all', "--deny-tool", "'shell(git commit)'"];
+			const args = ['--model','gpt-5','-p', prompt, '--allow-all-tools', '--add-dir', worktreePath, '--log-level','all'];
 			log(COLORS.magenta('Запуск Copilot...'));
 			// Подготовим лог-файл
 			let logFile = null;
@@ -279,8 +279,8 @@ async function main(){
 	catch(e){ error('pnpm install завершился ошибкой: '+e.message); }
 
 	section('Подготовка проекта');
-	try { run('pnpm mode:dev', { cwd: worktreePath }); }
-	catch(e){ error('pnpm mode:dev завершился ошибкой: '+e.message); }
+	try { run('node scripts/switch-db.js dev && prisma migrate dev', { cwd: worktreePath }); }
+	catch(e){ error('node scripts/switch-db.js dev && prisma migrate dev завершился ошибкой: '+e.message); }
 
 	section('Запись задачи');
 		appendTaskRecord({ branch, title: heading, description });
