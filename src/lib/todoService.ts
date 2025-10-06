@@ -602,7 +602,8 @@ export async function addTag(name: string): Promise<TodoState> {
   await ensureSeedData()
   const maxPosition = await prisma.tag.findFirst({ orderBy: { position: 'desc' } })
   const position = (maxPosition?.position ?? -1) + 1
-  await prisma.tag.create({ data: { name: trimmed, position } })
+  const isSystem = trimmed === 'Проект' || trimmed === 'Раздел'
+  await prisma.tag.create({ data: { name: trimmed, position, isSystem } })
   return getTodoState()
 }
 
@@ -610,7 +611,8 @@ export async function renameTag(id: string, name: string): Promise<TodoState> {
   const trimmed = name.trim()
   if (!trimmed) return getTodoState()
   await ensureSeedData()
-  await prisma.tag.update({ where: { id }, data: { name: trimmed } })
+  const isSystem = trimmed === 'Проект' || trimmed === 'Раздел'
+  await prisma.tag.update({ where: { id }, data: { name: trimmed, isSystem } })
   return getTodoState()
 }
 
@@ -635,6 +637,48 @@ export async function reorderTags(tagIds: string[]): Promise<TodoState> {
 
 export async function attachTagToTodo(todoId: string, tagId: string): Promise<TodoState> {
   await ensureSeedData()
+  // Ограничения системных тегов: "Проект" и "Раздел"
+  const tag = await prisma.tag.findUnique({ where: { id: tagId } })
+  if (!tag) return getTodoState()
+
+  if (tag.name === 'Проект') {
+    // Нельзя если на этом узле или у потомков есть "Раздел"
+    const rows = await prisma.$queryRaw<{ exists: boolean }[]>`
+      WITH RECURSIVE subtree AS (
+        SELECT "id" FROM "Todo" WHERE "id" = ${todoId}
+        UNION ALL
+        SELECT t."id" FROM "Todo" t
+        JOIN subtree ON t."parentId" = subtree."id"
+      )
+      SELECT EXISTS(
+        SELECT 1 FROM "Todo" tt
+        JOIN "_TagToTodo" j ON j."B" = tt."id"
+        JOIN "Tag" tg ON tg."id" = j."A"
+        WHERE tg."name" = 'Раздел' AND tt."id" IN (SELECT "id" FROM subtree)
+      ) AS exists;
+    `
+    if (rows[0]?.exists) return getTodoState()
+  }
+
+  if (tag.name === 'Раздел') {
+    // Разрешен только если в иерархии вверх есть "Проект"
+    const rows = await prisma.$queryRaw<{ hasProject: boolean }[]>`
+      WITH RECURSIVE ancestors AS (
+        SELECT "id", "parentId" FROM "Todo" WHERE "id" = ${todoId}
+        UNION ALL
+        SELECT t."id", t."parentId" FROM "Todo" t
+        JOIN ancestors a ON a."parentId" = t."id"
+      )
+      SELECT EXISTS(
+        SELECT 1 FROM ancestors anc
+        JOIN "_TagToTodo" j ON j."B" = anc."id"
+        JOIN "Tag" tg ON tg."id" = j."A"
+        WHERE tg."name" = 'Проект'
+      ) AS "hasProject";
+    `
+    if (!rows[0]?.hasProject) return getTodoState()
+  }
+
   await prisma.todo.update({ where: { id: todoId }, data: { tags: { connect: { id: tagId } } } })
   return getTodoState()
 }

@@ -4,6 +4,7 @@ export interface Tag {
   id: string
   name: string
   position: number
+  isSystem?: boolean
   createdAt: Date
   updatedAt: Date
 }
