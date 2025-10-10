@@ -10,6 +10,23 @@ body {
   @apply min-h-screen bg-canvas-light text-slate-900 antialiased;
 }
 
+/* Mobile ( <800px ) compact todo item layout: split into 2 rows */
+@media (max-width: 799px) {
+  .todo-card-row { /* original flex row becomes wrapped grid-like */
+    @apply flex-wrap gap-y-2;
+  }
+  .todo-card-row > :nth-child(1), /* collapse toggle */
+  .todo-card-row > :nth-child(2) { /* complete toggle */
+    @apply shrink-0;
+  }
+  .todo-card-row > :nth-child(3) { /* title & tags container */
+    @apply order-3 basis-full; /* move before actions second row */
+  }
+  .todo-card-row > :nth-child(4) { /* actions group */
+    @apply order-2 ml-auto;
+  }
+}
+
 button {
   @apply focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400;
 }

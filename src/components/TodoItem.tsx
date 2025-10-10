@@ -262,7 +262,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
         onDragLeave={handleCardDragLeave}
         onDrop={handleCardDrop}
       >
-        <div className="flex items-center gap-3 px-4 py-2">
+        <div className="todo-card-row flex items-center gap-3 px-4 py-2">
           {/* Toggle collapse button for nodes that can have children */}
           {allowChildren && (
             <button
