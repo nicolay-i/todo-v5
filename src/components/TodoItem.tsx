@@ -134,7 +134,29 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
     void store.togglePinned(todo.id)
   }
 
-  const availableTags = store.tags
+  // Фильтруем видимые теги по системным правилам
+  const availableTags = store.tags.filter((t) => {
+    if (t.name === 'Проект') {
+      // скрыть, если у текущей или потомков есть 'Раздел'
+      const hasSection = (function check(node: TodoNode): boolean {
+        if ((node.tags ?? []).some(tag => tag.name === 'Раздел')) return true
+        return node.children.some(check)
+      })(todo)
+      return !hasSection
+    }
+    if (t.name === 'Раздел') {
+      // показывать только если у предков есть 'Проект'
+      const hasProjectAncestor = (function checkParent(parentId: string | null): boolean {
+        if (!parentId) return false
+        const info = store.findTodo(parentId as string)
+        if (!info) return false
+        if ((info.node.tags ?? []).some(tag => tag.name === 'Проект')) return true
+        return checkParent(info.parent ? info.parent.id : info.node.parentId ?? null)
+      })(parentId)
+      return hasProjectAncestor
+    }
+    return true
+  })
   const todoTagIds = new Set((todo.tags ?? []).map((t) => t.id))
 
   const handleToggleCollapsed = () => {

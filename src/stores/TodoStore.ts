@@ -453,7 +453,7 @@ export class TodoStore {
     }
   }
 
-  private findTodo(
+  findTodo(
     id: string,
     nodes: TodoNode[] = this.todos,
     depth = 0,
