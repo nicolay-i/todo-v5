@@ -274,6 +274,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                 todo.children.length > 0 && !searchActive
                   ? 'text-slate-500'
                   : 'text-slate-300 cursor-default',
+                  'btn-collapse'
               ].join(' ')}
               aria-label={isCollapsed ? 'Развернуть' : 'Свернуть'}
               disabled={todo.children.length === 0 || searchActive}
@@ -284,16 +285,16 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
           <button
             type="button"
             onClick={handleToggle}
-            className={`${actionButtonStyles} text-xl text-slate-500`}
+            className={`${actionButtonStyles} text-xl text-slate-500 btn-toggle`}
             aria-label={todo.completed ? 'Отметить как невыполненную' : 'Отметить как выполненную'}
           >
             {todo.completed ? <FiCheckCircle /> : <FiCircle />}
           </button>
 
           {/* Заголовок и теги в одной строке: теги перед текстом, чтобы перенос был под тегами */}
-          <div className="flex-1">
+          <div className="flex-1 todo-main">
             {isEditing ? (
-              <form onSubmit={handleEditSubmit} className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <form onSubmit={handleEditSubmit} className="flex flex-col gap-3 sm:flex-row sm:items-center form-title">
                 <div ref={editWrapRef} className="w-full">
                   <textarea
                     className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm leading-snug text-slate-700 shadow-sm focus:border-slate-400 focus:outline-none resize-none"
@@ -341,7 +342,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                 />
               </form>
              ) : (
-               <div className="flex flex-wrap items-start gap-2" onDoubleClick={() => setIsEditing(true)}>
+               <div className="flex flex-wrap items-start gap-2 tags-span" onDoubleClick={() => setIsEditing(true)}>
                  <p className={`${titleStyles} text-sm`}>
                   {(todo.tags ?? []).map((tag) => (<>
                     <span
@@ -370,7 +371,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
             )}
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 btn-pin">
             {!isEditing && (
               <>
                 <button
@@ -399,7 +400,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                 )}
                 {/* Кнопка тегов с выпадающим списком */}
                 {availableTags.length > 0 && (
-                  <div ref={tagPickerRef} className="relative">
+                  <div ref={tagPickerRef} className="relative btn-add-tags">
                     <button
                       type="button"
                       {...tagDropdown.getTriggerProps()}
@@ -458,7 +459,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                 <button
                   type="button"
                   onClick={handleDelete}
-                  className={`${actionButtonStyles} text-rose-400 hover:text-rose-600`}
+                  className={`${actionButtonStyles} text-rose-400 hover:text-rose-600 btn-remove-tags`}
                   aria-label="Удалить задачу"
                 >
                   <FiTrash2 />

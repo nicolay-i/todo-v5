@@ -15,15 +15,15 @@ body {
   .todo-card-row { /* original flex row becomes wrapped grid-like */
     @apply flex-wrap gap-y-2;
   }
-  .todo-card-row > :nth-child(1), /* collapse toggle */
-  .todo-card-row > :nth-child(2) { /* complete toggle */
+  .todo-card-row > .btn-collapse,
+  .todo-card-row > .btn-toggle { /* collapse & complete toggles */
     @apply shrink-0;
   }
-  .todo-card-row > :nth-child(3) { /* title & tags container */
-    @apply order-3 basis-full; /* move before actions second row */
+  .todo-card-row > .todo-main { /* title & tags container stays on first row */
+    @apply flex-1 order-2; /* occupies remaining space on first row */
   }
-  .todo-card-row > :nth-child(4) { /* actions group */
-    @apply order-2 ml-auto;
+  .todo-card-row > .btn-pin { /* actions group forced to second row */
+    @apply order-3 basis-full justify-end; /* full width second row aligned right */
   }
 }
 
