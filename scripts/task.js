@@ -109,7 +109,7 @@ function ensureCleanWorktreeWarn() {
 
 function copyEnvFiles(targetDir) {
     const root = process.cwd();
-    const candidates = fs.readdirSync(root).filter(f => f.startsWith('.env'));
+    const candidates = fs.readdirSync(root).filter(f => f.startsWith('.env.dev'));
     if (candidates.length === 0 && fs.existsSync(path.join(root, '.env.example'))) {
         candidates.push('.env.example');
     }
@@ -117,6 +117,7 @@ function copyEnvFiles(targetDir) {
         const src = path.join(root, f);
         let destName = f;
         if (f === '.env.example') destName = '.env';
+        if (f === '.env.dev') destName = '.env';
         const dest = path.join(targetDir, destName);
         if (!fs.existsSync(dest)) {
             fs.copyFileSync(src, dest);
