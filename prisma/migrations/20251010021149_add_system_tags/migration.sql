@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Tag" ADD COLUMN     "isSystem" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "position" INTEGER NOT NULL DEFAULT 0;
