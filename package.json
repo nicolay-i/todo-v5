@@ -9,7 +9,7 @@
     "lint": "next lint",
     "prisma:generate": "prisma generate",
     "start": "node .next/standalone/server.js",
-    "deploy": "node scripts/deploy-script.js",
+    "deploy": "npm i && npm run mode:prod && node scripts/deploy-script.js",
     "mode:dev": "node scripts/switch-db.js dev && prisma migrate dev",
     "mode:prod": "node scripts/switch-db.js prod && prisma migrate dev",
     "db:push": "prisma db push",
