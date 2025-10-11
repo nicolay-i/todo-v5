@@ -23,6 +23,21 @@ interface ListViewResult {
   highlightMap: Map<string, SearchHighlight>
 }
 
+type FocusScope = 'list' | 'pinned'
+
+type KeyboardActionType = 'edit' | 'openTags'
+
+interface KeyboardAction {
+  type: KeyboardActionType
+  targetId: string
+  token: number
+}
+
+interface PinnedTodoRef {
+  todoId: string
+  listId: string
+}
+
 export class TodoStore {
   todos: TodoNode[] = []
   pinnedLists: PinnedListState[] = []
@@ -32,6 +47,7 @@ export class TodoStore {
   collapsedIds: Set<string> = new Set()
   // Set со свернутыми закрепленными слотами (хранит id списков)
   collapsedPinnedListIds: Set<string> = new Set()
+  focusedTodoId: string | null = null
 
   // Видимость выполненных задач
   listFilterMode: VisibilityMode = 'today'
@@ -40,6 +56,9 @@ export class TodoStore {
   // Поиск и фильтрация по тегам в основном списке
   searchQuery = ''
   searchTagIds: string[] = []
+
+  keyboardAction: KeyboardAction | null = null
+  private actionToken = 0
 
   private static readonly COLLAPSE_STORAGE_KEY = 'todoCollapsedIds_v1'
   private static readonly PINNED_COLLAPSE_STORAGE_KEY = 'pinnedCollapsedIds_v1'
@@ -70,6 +89,21 @@ export class TodoStore {
     return this.listView.todos
   }
 
+  get linearVisibleTodoIds(): string[] {
+    const result: string[] = []
+    const traverse = (nodes: TodoNode[]) => {
+      for (const node of nodes) {
+        result.push(node.id)
+        const collapsed = !this.isSearchActive && this.isCollapsed(node.id)
+        if (!collapsed && node.children.length > 0) {
+          traverse(node.children)
+        }
+      }
+    }
+    traverse(this.visibleTodos)
+    return result
+  }
+
   get listView(): ListViewResult {
     const byMode = this.filterTreeByMode(this.todos, this.listFilterMode)
     if (!this.isSearchActive) {
@@ -83,6 +117,22 @@ export class TodoStore {
 
   get isSearchActive(): boolean {
     return this.searchQuery.trim().length > 0 || this.searchTagIds.length > 0
+  }
+
+  get pinnedTodoRefs(): PinnedTodoRef[] {
+    const result: PinnedTodoRef[] = []
+    for (const list of this.pinnedListsWithTodos) {
+      for (const todo of list.todos) {
+        result.push({ todoId: todo.id, listId: list.id })
+      }
+    }
+    return result
+  }
+
+  get activePinnedListId(): string | null {
+    const active = this.pinnedLists.find((list) => list.isActive)
+    if (active) return active.id
+    return this.pinnedLists[0]?.id ?? null
   }
 
   get selectedSearchTags(): Tag[] {
@@ -136,6 +186,134 @@ export class TodoStore {
 
   async deleteTodo(id: string) {
     await this.mutate(`/api/todos/${id}`, { method: 'DELETE' })
+  }
+
+  setFocusedTodoId(id: string | null) {
+    this.focusedTodoId = id
+  }
+
+  focusTodo(id: string | null, scope: FocusScope) {
+    this.focusedTodoId = id
+    if (scope === 'pinned' && id) {
+      const listId = this.findPinnedListIdForTodo(id)
+      if (listId && !this.isActivePinnedList(listId)) {
+        void this.setActivePinnedList(listId)
+      }
+    }
+  }
+
+  focusFirstTodo(scope: FocusScope): string | null {
+    if (scope === 'list') {
+      const sequence = this.linearVisibleTodoIds
+      if (sequence.length === 0) {
+        this.focusedTodoId = null
+        return null
+      }
+      const firstId = sequence[0]
+      this.focusTodo(firstId, 'list')
+      return firstId
+    }
+
+    const refs = this.pinnedTodoRefs
+    if (refs.length === 0) {
+      this.focusedTodoId = null
+      return null
+    }
+    const first = refs[0]
+    this.focusTodo(first.todoId, 'pinned')
+    return first.todoId
+  }
+
+  focusFirstTodoInPinnedList(listId: string): string | null {
+    const list = this.pinnedListsWithTodos.find((item) => item.id === listId)
+    const firstId = list?.todos[0]?.id ?? null
+    if (firstId) {
+      this.focusTodo(firstId, 'pinned')
+    } else {
+      this.focusedTodoId = null
+    }
+    return firstId
+  }
+
+  isTodoVisibleInScope(id: string | null, scope: FocusScope): boolean {
+    if (!id) return false
+    if (scope === 'list') {
+      return this.linearVisibleTodoIds.includes(id)
+    }
+    return this.pinnedTodoRefs.some((ref) => ref.todoId === id)
+  }
+
+  focusNextTodo(direction: 1 | -1, scope: FocusScope): string | null {
+    if (scope === 'list') {
+      const sequence = this.linearVisibleTodoIds
+      if (sequence.length === 0) return null
+      const currentIndex = this.focusedTodoId ? sequence.indexOf(this.focusedTodoId) : -1
+      let nextIndex = currentIndex + direction
+      if (currentIndex === -1) {
+        nextIndex = direction > 0 ? 0 : sequence.length - 1
+      }
+      if (nextIndex < 0 || nextIndex >= sequence.length) return null
+      const nextId = sequence[nextIndex]
+      this.focusTodo(nextId, 'list')
+      return nextId
+    }
+
+    const refs = this.pinnedTodoRefs
+    if (refs.length === 0) return null
+    const currentIndex = this.focusedTodoId
+      ? refs.findIndex((ref) => ref.todoId === this.focusedTodoId)
+      : -1
+    let nextIndex = currentIndex + direction
+    if (currentIndex === -1) {
+      nextIndex = direction > 0 ? 0 : refs.length - 1
+    }
+    if (nextIndex < 0 || nextIndex >= refs.length) return null
+    const nextRef = refs[nextIndex]
+    this.focusTodo(nextRef.todoId, 'pinned')
+    return nextRef.todoId
+  }
+
+  focusParentTodo(id: string): string | null {
+    const info = this.findTodo(id)
+    if (!info?.parent) return null
+    this.focusTodo(info.parent.id, 'list')
+    return info.parent.id
+  }
+
+  focusFirstChildTodo(id: string): string | null {
+    const info = this.findTodo(id)
+    if (!info || info.node.children.length === 0) return null
+    const firstChild = info.node.children[0]
+    this.focusTodo(firstChild.id, 'list')
+    return firstChild.id
+  }
+
+  getAdjacentPinnedListId(direction: 1 | -1): string | null {
+    if (this.pinnedLists.length === 0) return null
+    let index = this.pinnedLists.findIndex((list) => list.isActive)
+    if (index === -1) index = 0
+    const nextIndex = index + direction
+    if (nextIndex < 0 || nextIndex >= this.pinnedLists.length) return null
+    return this.pinnedLists[nextIndex].id
+  }
+
+  requestKeyboardAction(type: KeyboardActionType, targetId: string) {
+    this.actionToken += 1
+    this.keyboardAction = { type, targetId, token: this.actionToken }
+  }
+
+  clearKeyboardAction(token: number) {
+    if (this.keyboardAction?.token === token) {
+      this.keyboardAction = null
+    }
+  }
+
+  async detachLastTag(todoId: string) {
+    const info = this.findTodo(todoId)
+    const tags = info?.node.tags ?? []
+    if (tags.length === 0) return
+    const last = tags[tags.length - 1]
+    await this.detachTag(todoId, last.id)
   }
 
   setDragged(id: string | null) {
@@ -471,6 +649,15 @@ export class TodoStore {
       }
     }
 
+    return null
+  }
+
+  findPinnedListIdForTodo(todoId: string): string | null {
+    for (const ref of this.pinnedTodoRefs) {
+      if (ref.todoId === todoId) {
+        return ref.listId
+      }
+    }
     return null
   }
 
