@@ -119,11 +119,27 @@ export class TodoStore {
     })
   }
 
-  async updateTitle(id: string, title: string) {
-    if (!title.trim()) return
+  async updateTodoDetails(id: string, details: { title?: string; alias?: string | null }) {
+    const payload: Record<string, unknown> = { action: 'updateDetails' }
+    let hasChanges = false
+
+    if (typeof details.title === 'string') {
+      const trimmed = details.title.trim()
+      if (!trimmed) return
+      payload.title = trimmed
+      hasChanges = true
+    }
+
+    if (Object.prototype.hasOwnProperty.call(details, 'alias')) {
+      payload.alias = details.alias
+      hasChanges = true
+    }
+
+    if (!hasChanges) return
+
     await this.mutate(`/api/todos/${id}`, {
       method: 'PATCH',
-      body: JSON.stringify({ action: 'rename', title }),
+      body: JSON.stringify(payload),
     })
   }
 
@@ -383,6 +399,27 @@ export class TodoStore {
       method: 'DELETE',
       body: JSON.stringify({ tagId }),
     })
+  }
+
+  getNearestAlias(todoId: string): { todoId: string; alias: string } | null {
+    const info = this.findTodo(todoId)
+    if (!info) return null
+
+    let currentParent = info.parent
+    while (currentParent) {
+      const aliasValue = typeof currentParent.alias === 'string' ? currentParent.alias.trim() : ''
+      const hasAlias = aliasValue.length > 0
+      const hasRequiredTag = (currentParent.tags ?? []).some((tag) => tag.name === 'Проект' || tag.name === 'Раздел')
+
+      if (hasAlias && hasRequiredTag) {
+        return { todoId: currentParent.id, alias: aliasValue }
+      }
+
+      const parentInfo = this.findTodo(currentParent.id)
+      currentParent = parentInfo?.parent ?? null
+    }
+
+    return null
   }
 
   async reorderTags(tagIds: string[]) {
