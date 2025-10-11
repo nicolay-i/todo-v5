@@ -1,7 +1,7 @@
 'use client'
 
 import type { ChangeEventHandler, FormEventHandler } from 'react'
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { observer } from 'mobx-react-lite'
 import { FiPlus } from 'react-icons/fi'
 import type { TodoState } from '@/lib/types'
@@ -40,14 +40,41 @@ const TodoAppContent = () => {
   const [newPinnedListTitle, setNewPinnedListTitle] = useState('')
   const pinnedListInputRef = useRef<HTMLInputElement>(null)
 
-  const handleAdd = async () => {
+  const closeAddModal = useCallback(() => {
+    setIsAddModalOpen(false)
+    setTimeout(() => setIsAddModalMounted(false), 200)
+  }, [])
+
+  const handleAdd = useCallback(async () => {
     const trimmed = newTitle.trim()
     if (!trimmed) return
     await store.addTodo(null, trimmed, selectedTagIds)
     setNewTitle('')
     setSelectedTagIds([])
     closeAddModal()
-  }
+  }, [closeAddModal, newTitle, selectedTagIds, store])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    let isRefreshing = false
+
+    const refreshIfVisible = () => {
+      if (document.visibilityState !== 'visible' || isRefreshing) return
+      isRefreshing = true
+      void store.refresh().finally(() => {
+        isRefreshing = false
+      })
+    }
+
+    document.addEventListener('visibilitychange', refreshIfVisible)
+    window.addEventListener('focus', refreshIfVisible)
+
+    return () => {
+      document.removeEventListener('visibilitychange', refreshIfVisible)
+      window.removeEventListener('focus', refreshIfVisible)
+    }
+  }, [store])
 
   const handlePinnedListSubmit: FormEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault()
@@ -86,18 +113,13 @@ const TodoAppContent = () => {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [isAddModalOpen, newTitle])
+  }, [closeAddModal, handleAdd, isAddModalOpen])
 
   const openAddModal = () => {
     setIsAddModalMounted(true)
     setSelectedTagIds([])
     // next tick to trigger transition
     requestAnimationFrame(() => setIsAddModalOpen(true))
-  }
-
-  const closeAddModal = () => {
-    setIsAddModalOpen(false)
-    setTimeout(() => setIsAddModalMounted(false), 200)
   }
 
   const tabs: { key: 'pinned' | 'all' | 'settings'; label: string }[] = useMemo(
