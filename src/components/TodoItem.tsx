@@ -41,6 +41,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
   const [isEditing, setIsEditing] = useState(false)
   const [isAddingChild, setIsAddingChild] = useState(false)
   const [titleDraft, setTitleDraft] = useState(todo.title)
+  const [aliasDraft, setAliasDraft] = useState(todo.alias ?? '')
   const [childTitle, setChildTitle] = useState('')
   const [isOverInside, setIsOverInside] = useState(false)
   const [overPosition, setOverPosition] = useState<null | 'above' | 'below' | 'inside'>(null)
@@ -90,6 +91,10 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
     setTitleDraft(todo.title)
   }, [todo.title])
 
+  useEffect(() => {
+    setAliasDraft(todo.alias ?? '')
+  }, [todo.alias])
+
   // При входе в режим редактирования определяем число строк на основе ширины поля и текущего текста
   useEffect(() => {
     if (!isEditing) return
@@ -119,7 +124,6 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
     }
     wasEditingRef.current = isEditing
   }, [isEditing])
-
   const wasAddingChildRef = useRef(false)
   useEffect(() => {
     if (wasAddingChildRef.current && !isAddingChild && focusRef.current) {
@@ -128,6 +132,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
     wasAddingChildRef.current = isAddingChild
   }, [isAddingChild])
 
+  // Фокус менеджмент для меню тегов
   useEffect(() => {
     if (!tagDropdown.isOpen) {
       const active = document.activeElement
@@ -146,21 +151,13 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
     void store.toggleTodo(todo.id)
   }, [store, todo.id])
 
-  const commitEdit = useCallback(async () => {
-    const trimmed = titleDraft.trim()
-    if (!trimmed) {
-      setTitleDraft(todo.title)
-      setIsEditing(false)
-      return
-    }
-    await store.updateTitle(todo.id, trimmed)
+  const cancelEditing = useCallback(() => {
+    setTitleDraft(todo.title)
+    setAliasDraft(todo.alias ?? '')
     setIsEditing(false)
-  }, [store, titleDraft, todo.id, todo.title])
+  }, [todo.alias, todo.title])
 
-  const handleEditSubmit: React.FormEventHandler<HTMLFormElement> = (event) => {
-    event.preventDefault()
-    void commitEdit()
-  }
+  // --- Фильтрация тегов и вычислимые значения ниже нужны commitEdit, поэтому объявим commitEdit после них ---
 
   const handleAddChild: React.FormEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault()
@@ -206,6 +203,33 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
     return true
   })
   const todoTagIds = useMemo(() => new Set((todo.tags ?? []).map((t) => t.id)), [todo.tags])
+  const canEditAlias = useMemo(
+    () => (todo.tags ?? []).some((tag) => tag.name === 'Проект' || tag.name === 'Раздел'),
+    [todo.tags],
+  )
+  const aliasBadge = store.getNearestAlias(todo.id)
+  const aliasInputId = `todo-alias-${todo.id}`
+  const hasVisualTags = Boolean(aliasBadge) || (todo.tags?.length ?? 0) > 0
+
+  const commitEdit = useCallback(async () => {
+    const trimmed = titleDraft.trim()
+    const aliasTrimmed = aliasDraft.trim()
+    if (!trimmed) {
+      cancelEditing()
+      return
+    }
+    const details: { title: string; alias?: string | null } = { title: trimmed }
+    if (canEditAlias) {
+      details.alias = aliasTrimmed ? aliasTrimmed : null
+    }
+    await store.updateTodoDetails(todo.id, details)
+    setIsEditing(false)
+  }, [aliasDraft, cancelEditing, canEditAlias, store, titleDraft, todo.id])
+
+  const handleEditSubmit: React.FormEventHandler<HTMLFormElement> = (event) => {
+    event.preventDefault()
+    void commitEdit()
+  }
 
   const handleToggleCollapsed = () => {
     // Разрешаем сворачивать только если потенциально есть дети (или уже есть), иначе кнопка не показывается
@@ -506,8 +530,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                     onBlur={recalcRows}
                     onKeyDown={(event) => {
                       if (event.key === 'Escape') {
-                        setTitleDraft(todo.title)
-                        setIsEditing(false)
+                        cancelEditing()
                         return
                       }
                       if (event.key === 'Enter' && !event.shiftKey) {
@@ -522,6 +545,26 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                     rows={editRows}
                   />
                 </div>
+                {canEditAlias && (
+                  <div className="w-full sm:w-64">
+                    <label htmlFor={aliasInputId} className="mb-1 block text-xs font-medium text-slate-500">
+                      Алиас
+                    </label>
+                    <input
+                      id={aliasInputId}
+                      type="text"
+                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm leading-snug text-slate-700 shadow-sm focus:border-slate-400 focus:outline-none"
+                      value={aliasDraft}
+                      onChange={(event) => setAliasDraft(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Escape') {
+                          cancelEditing()
+                        }
+                      }}
+                      placeholder="Алиас для дочерних задач"
+                    />
+                  </div>
+                )}
                 <div className="flex items-center gap-1 self-end sm:self-auto">
                   <button
                     type="submit"
@@ -532,10 +575,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      setTitleDraft(todo.title)
-                      setIsEditing(false)
-                    }}
+                    onClick={cancelEditing}
                     className={`${actionButtonStyles} hover:bg-slate-200`}
                     aria-label="Отменить редактирование"
                   >
@@ -554,6 +594,15 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
              ) : (
                <div className="flex flex-wrap items-start gap-2 tags-span" onDoubleClick={() => setIsEditing(true)}>
                  <p className={`${titleStyles} text-sm`}>
+                  {aliasBadge ? (
+                    <>
+                      <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-700">
+                        {aliasBadge.alias}
+                      </span>
+                      &nbsp;
+                    </>
+                  ) : null}
+
                   {(todo.tags ?? []).map((tag) => (<>
                     <span
                       key={tag.id}
@@ -573,7 +622,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                     </>
                   ))}
 
-                  {todo.tags?.length ? <>&nbsp;</> : null}
+                  {hasVisualTags ? <>&nbsp;</> : null}
 
                   <HighlightedText text={todo.title} ranges={store.getSearchHighlight(todo.id)} />
                 </p>
