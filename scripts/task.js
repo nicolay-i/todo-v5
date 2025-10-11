@@ -220,25 +220,30 @@ async function main() {
     });
     section('Интерактивный ввод');
     const baseBranch = detectBaseBranch();
-    const answers = await ask([
-        { name: 'description', message: 'Описание задачи: ' },
+    // Многострочный ввод описания сразу, чтобы поддержать вставку текста с переносами строк.
+    const description = await (async () => {
+        return new Promise(resolve => {
+            const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+            log('Описание задачи (вставьте текст, пустая строка — завершение ввода):');
+            const lines = [];
+            rl.on('line', line => {
+                if (line === '' && lines.length > 0) {
+                    rl.close();
+                } else if (line === '' && lines.length === 0) {
+                    // Пустой ввод — просто завершаем (описание может быть пустым)
+                    rl.close();
+                } else {
+                    lines.push(line);
+                }
+            });
+            rl.on('close', () => resolve(lines.join('\n')));
+        });
+    })();
+
+    const { branch: rawBranch } = await ask([
         { name: 'branch', message: `Имя ветки (enter чтобы сгенерировать): ` }
     ]);
-
-    let { description, branch } = answers;
-    if (!description) {
-        // собрать многострочный ввод до пустой строки
-        description = await new Promise(resolve => {
-            const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-            let lines = [];
-            const askLine = () => rl.question('', line => {
-                if (!line) { rl.close(); resolve(lines.join('\n')); return; }
-                lines.push(line); askLine();
-            });
-            log(COLORS.dim('Введите описание построчно, пустая строка — конец:'));
-            askLine();
-        });
-    }
+    let branch = rawBranch;
     // Первая непустая строка описания = heading
     const firstLine = (description.split(/\r?\n/).find(l => l.trim()) || '').trim();
     const heading = firstLine || 'Без названия';
