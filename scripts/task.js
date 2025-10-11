@@ -388,9 +388,9 @@ async function main() {
     section('Копирование env файлов');
     copyEnvFiles(worktreePath);
 
-    section('Установка зависимостей (pnpm install)');
-    try { run('pnpm install', { cwd: worktreePath }); }
-    catch (e) { error('pnpm install завершился ошибкой: ' + e.message); }
+    section('Установка зависимостей (npm install)');
+    try { run('npm install', { cwd: worktreePath }); }
+    catch (e) { error('npm install завершился ошибкой: ' + e.message); }
 
     section('Подготовка проекта');
     try { run('node scripts/switch-db.js dev && prisma migrate dev', { cwd: worktreePath }); }
