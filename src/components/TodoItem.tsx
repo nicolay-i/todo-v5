@@ -50,6 +50,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
   const [editRows, setEditRows] = useState(1)
   const editWrapRef = useRef<HTMLDivElement>(null)
   const measureRef = useRef<HTMLDivElement>(null)
+  const cardRef = useRef<HTMLDivElement>(null)
 
   // Общая функция измерения требуемого количества строк.
   const recalcRows = () => {
@@ -82,6 +83,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
   const canReorderInTree = draggedId !== null && store.canDrop(draggedId, parentId)
   const isPinnedContext = Boolean(pinnedListId)
   const canReorderInPinned = draggedId !== null && isPinnedContext && store.isPinned(draggedId!)
+  const isFocused = store.focusedTodoId === todo.id
 
   useEffect(() => {
     setTitleDraft(todo.title)
@@ -106,6 +108,18 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
     }
   }, [isAddingChild])
 
+  useEffect(() => {
+    if (!isFocused || isEditing || isAddingChild) return
+    const element = cardRef.current
+    if (!element) return
+    if (document.activeElement !== element) {
+      element.focus({ preventScroll: true })
+    }
+    if (typeof element.scrollIntoView === 'function') {
+      element.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    }
+  }, [isAddingChild, isEditing, isFocused])
+
   // Привязываем ref корня выпадушки для клика-вне
   const tagPickerRef = tagDropdown.rootRef
 
@@ -113,10 +127,14 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
     void store.toggleTodo(todo.id)
   }
 
-  const handleEditSubmit: React.FormEventHandler<HTMLFormElement> = async (event) => {
-    event.preventDefault()
+  const commitEdit = async () => {
     await store.updateTitle(todo.id, titleDraft)
     setIsEditing(false)
+  }
+
+  const handleEditSubmit: React.FormEventHandler<HTMLFormElement> = async (event) => {
+    event.preventDefault()
+    await commitEdit()
   }
 
   const handleAddChild: React.FormEventHandler<HTMLFormElement> = async (event) => {
@@ -161,6 +179,31 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
     return true
   })
   const todoTagIds = new Set((todo.tags ?? []).map((t) => t.id))
+
+  useEffect(() => {
+    const action = store.keyboardAction
+    if (!action || action.targetId !== todo.id) return
+
+    if (action.type === 'edit') {
+      setIsEditing(true)
+      store.clearKeyboardAction(action.token)
+      return
+    }
+
+    if (action.type === 'openTags') {
+      if (availableTags.length === 0) {
+        store.clearKeyboardAction(action.token)
+        return
+      }
+      tagDropdown.open()
+      window.setTimeout(() => {
+        const root = tagPickerRef.current
+        const firstButton = root?.querySelector<HTMLButtonElement>('button[role="menuitemcheckbox"]')
+        firstButton?.focus()
+      }, 0)
+      store.clearKeyboardAction(action.token)
+    }
+  }, [availableTags.length, store, tagDropdown, todo.id, tagPickerRef])
 
   const handleToggleCollapsed = () => {
     // Разрешаем сворачивать только если потенциально есть дети (или уже есть), иначе кнопка не показывается
@@ -251,13 +294,21 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
   return (
     <div className="space-y-1">
       <div
+        ref={cardRef}
+        tabIndex={isEditing ? -1 : 0}
+        onFocus={() => store.focusTodo(todo.id, isPinnedContext ? 'pinned' : 'list')}
+        onMouseDown={() => store.focusTodo(todo.id, isPinnedContext ? 'pinned' : 'list')}
         className={[
-          'group/todo rounded-xl bg-white/95 ring-1 ring-slate-200 transition-all duration-200 hover:shadow-md',
+          'group/todo rounded-xl bg-white/95 ring-1 ring-slate-200 transition-all duration-200 hover:shadow-md focus:outline-none focus-visible:outline-none',
           isDragging ? 'opacity-60 ring-2 ring-slate-300' : '',
           isOverInside && canDropInside ? 'ring-2 ring-emerald-400/80 bg-emerald-50/50' : '',
           overPosition === 'above' ? 'shadow-[inset_0_2px_0_0_rgba(16,185,129,0.7)]' : '',
           overPosition === 'below' ? 'shadow-[inset_0_-2px_0_0_rgba(16,185,129,0.7)]' : '',
+          isFocused && !(isOverInside && canDropInside) && !isDragging
+            ? 'ring-2 ring-emerald-400 ring-offset-2 ring-offset-white shadow-md'
+            : '',
         ].join(' ')}
+        aria-selected={isFocused}
         draggable={!isEditing && !isAddingChild}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
@@ -309,6 +360,22 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                       if (event.key === 'Escape') {
                         setTitleDraft(todo.title)
                         setIsEditing(false)
+                        return
+                      }
+                      if ((event.key === 'Enter' && (event.ctrlKey || event.metaKey))) {
+                        event.preventDefault()
+                        void commitEdit()
+                        return
+                      }
+                      if (
+                        event.key === 'Enter'
+                        && !event.shiftKey
+                        && !event.ctrlKey
+                        && !event.metaKey
+                        && editRows <= 1
+                      ) {
+                        event.preventDefault()
+                        void commitEdit()
                       }
                     }}
                     placeholder="Название задачи"
@@ -481,6 +548,13 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
               className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-inner focus:border-slate-400 focus:outline-none"
               value={childTitle}
               onChange={(event) => setChildTitle(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                  event.preventDefault()
+                  setChildTitle('')
+                  setIsAddingChild(false)
+                }
+              }}
               placeholder="Новая подзадача"
             />
             <div className="flex items-center gap-1">

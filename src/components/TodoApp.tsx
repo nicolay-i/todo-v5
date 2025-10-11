@@ -1,7 +1,7 @@
 'use client'
 
 import type { ChangeEventHandler, FormEventHandler } from 'react'
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { observer } from 'mobx-react-lite'
 import { FiPlus } from 'react-icons/fi'
 import type { TodoState } from '@/lib/types'
@@ -40,14 +40,25 @@ const TodoAppContent = () => {
   const [newPinnedListTitle, setNewPinnedListTitle] = useState('')
   const pinnedListInputRef = useRef<HTMLInputElement>(null)
 
-  const handleAdd = async () => {
+  const closeAddModal = useCallback(() => {
+    setIsAddModalOpen(false)
+    setTimeout(() => setIsAddModalMounted(false), 200)
+  }, [])
+
+  const openAddModal = useCallback(() => {
+    setIsAddModalMounted(true)
+    setSelectedTagIds([])
+    requestAnimationFrame(() => setIsAddModalOpen(true))
+  }, [])
+
+  const handleAdd = useCallback(async () => {
     const trimmed = newTitle.trim()
     if (!trimmed) return
     await store.addTodo(null, trimmed, selectedTagIds)
     setNewTitle('')
     setSelectedTagIds([])
     closeAddModal()
-  }
+  }, [closeAddModal, newTitle, selectedTagIds, store])
 
   const handlePinnedListSubmit: FormEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault()
@@ -86,19 +97,7 @@ const TodoAppContent = () => {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [isAddModalOpen, newTitle])
-
-  const openAddModal = () => {
-    setIsAddModalMounted(true)
-    setSelectedTagIds([])
-    // next tick to trigger transition
-    requestAnimationFrame(() => setIsAddModalOpen(true))
-  }
-
-  const closeAddModal = () => {
-    setIsAddModalOpen(false)
-    setTimeout(() => setIsAddModalMounted(false), 200)
-  }
+  }, [closeAddModal, handleAdd, isAddModalOpen])
 
   const tabs: { key: 'pinned' | 'all' | 'settings'; label: string }[] = useMemo(
     () => [
@@ -110,21 +109,37 @@ const TodoAppContent = () => {
   )
 
   // Синхронизация URL при смене вкладки пользователем
-  const applyTabToUrl = (tab: 'pinned' | 'all' | 'settings') => {
+  const applyTabToUrl = useCallback((tab: 'pinned' | 'all' | 'settings') => {
     const params = new URLSearchParams(searchParams)
     params.set('tab', tab)
     const next = `${pathname}?${params.toString()}`
     router.replace(next, { scroll: false })
-  }
+  }, [pathname, router, searchParams])
 
-  const handleSwitchTab = (tab: 'pinned' | 'all' | 'settings') => {
+  const handleSwitchTab = useCallback((tab: 'pinned' | 'all' | 'settings') => {
     if (tab === activeTab) return
     setActiveTab(tab)
     if (tab !== 'pinned') {
       setIsTextViewOpen(false)
     }
+    if (tab === 'settings') {
+      store.setFocusedTodoId(null)
+    } else if (tab === 'pinned') {
+      if (!store.isTodoVisibleInScope(store.focusedTodoId, 'pinned')) {
+        store.focusFirstTodo('pinned')
+      } else if (store.focusedTodoId) {
+        const listId = store.findPinnedListIdForTodo(store.focusedTodoId)
+        if (listId && !store.isActivePinnedList(listId)) {
+          void store.setActivePinnedList(listId)
+        }
+      }
+    } else {
+      if (!store.isTodoVisibleInScope(store.focusedTodoId, 'list')) {
+        store.focusFirstTodo('list')
+      }
+    }
     applyTabToUrl(tab)
-  }
+  }, [activeTab, applyTabToUrl, store])
 
   // Обратная синхронизация: если URL поменялся (например, навигация назад/вперёд), обновим стейт
   useEffect(() => {
@@ -140,6 +155,151 @@ const TodoAppContent = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
+
+  useEffect(() => {
+    const isEditableTarget = (target: EventTarget | null) => {
+      if (!(target instanceof HTMLElement)) return false
+      if (target.isContentEditable) return true
+      const tagName = target.tagName
+      return tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT'
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return
+
+      if ((event.ctrlKey || event.metaKey) && !event.shiftKey && !event.altKey) {
+        if (event.key === '1') {
+          event.preventDefault()
+          handleSwitchTab('pinned')
+          return
+        }
+        if (event.key === '2') {
+          event.preventDefault()
+          handleSwitchTab('all')
+          return
+        }
+        if (event.key === '3') {
+          event.preventDefault()
+          handleSwitchTab('settings')
+          return
+        }
+      }
+
+      if (isEditableTarget(event.target)) return
+      if (isAddModalOpen) return
+      if (activeTab === 'settings') return
+
+      const scope = activeTab === 'pinned' ? 'pinned' : 'list'
+      const focusedId = store.focusedTodoId
+
+      switch (event.key) {
+        case 'ArrowDown': {
+          const moved = store.focusNextTodo(1, scope)
+          if (moved) event.preventDefault()
+          return
+        }
+        case 'ArrowUp': {
+          const moved = store.focusNextTodo(-1, scope)
+          if (moved) event.preventDefault()
+          return
+        }
+        case 'ArrowLeft': {
+          if (activeTab === 'pinned') {
+            const prevList = store.getAdjacentPinnedListId(-1)
+            if (prevList) {
+              event.preventDefault()
+              void store.setActivePinnedList(prevList)
+              store.focusFirstTodoInPinnedList(prevList)
+            }
+            return
+          }
+          if (!focusedId) return
+          const info = store.findTodo(focusedId)
+          if (!info) return
+          if (!store.isSearchActive && info.node.children.length > 0 && !store.isCollapsed(focusedId)) {
+            event.preventDefault()
+            store.setCollapsed(focusedId, true)
+            return
+          }
+          if (info.parent) {
+            event.preventDefault()
+            store.focusParentTodo(focusedId)
+          }
+          return
+        }
+        case 'ArrowRight': {
+          if (activeTab === 'pinned') {
+            const nextList = store.getAdjacentPinnedListId(1)
+            if (nextList) {
+              event.preventDefault()
+              void store.setActivePinnedList(nextList)
+              store.focusFirstTodoInPinnedList(nextList)
+            }
+            return
+          }
+          if (!focusedId) return
+          const info = store.findTodo(focusedId)
+          if (!info) return
+          if (!store.isSearchActive && info.node.children.length > 0 && store.isCollapsed(focusedId)) {
+            event.preventDefault()
+            store.setCollapsed(focusedId, false)
+            return
+          }
+          if (info.node.children.length > 0) {
+            event.preventDefault()
+            store.focusFirstChildTodo(focusedId)
+          }
+          return
+        }
+        case 'Delete': {
+          if (focusedId) {
+            event.preventDefault()
+            void store.deleteTodo(focusedId)
+          }
+          return
+        }
+        case 'F2': {
+          if (focusedId) {
+            event.preventDefault()
+            store.requestKeyboardAction('edit', focusedId)
+          }
+          return
+        }
+        default:
+          break
+      }
+
+      if (event.key === 'Backspace' && focusedId && event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.preventDefault()
+        void store.deleteTodo(focusedId)
+        return
+      }
+
+      if (event.key.toLowerCase() === 'a' && activeTab === 'all' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.preventDefault()
+        openAddModal()
+        return
+      }
+
+      if (event.key.toLowerCase() === 'e' && focusedId && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.preventDefault()
+        store.requestKeyboardAction('edit', focusedId)
+        return
+      }
+
+      if (event.key.toLowerCase() === 't' && focusedId && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.preventDefault()
+        if (event.shiftKey) {
+          void store.detachLastTag(focusedId)
+        } else {
+          store.requestKeyboardAction('openTags', focusedId)
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [activeTab, handleSwitchTab, isAddModalOpen, openAddModal, store])
 
   return (
     <div className="min-h-screen bg-canvas-light text-slate-900">
