@@ -43,12 +43,14 @@ const TodoAppContent = () => {
 
   const closeAddModal = useCallback(() => {
     setIsAddModalOpen(false)
+    // Используем window.setTimeout чтобы избежать коллизий с Jest/SSR окружением
     window.setTimeout(() => setIsAddModalMounted(false), 200)
   }, [])
 
   const openAddModal = useCallback(() => {
     setIsAddModalMounted(true)
     setSelectedTagIds([])
+    // next tick to триггер анимацию появления
     requestAnimationFrame(() => setIsAddModalOpen(true))
   }, [])
 
@@ -60,6 +62,28 @@ const TodoAppContent = () => {
     setSelectedTagIds([])
     closeAddModal()
   }, [closeAddModal, newTitle, selectedTagIds, store])
+  // Авто-обновление данных при возвращении во вкладку / фокусе окна
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    let isRefreshing = false
+
+    const refreshIfVisible = () => {
+      if (document.visibilityState !== 'visible' || isRefreshing) return
+      isRefreshing = true
+      void store.refresh().finally(() => {
+        isRefreshing = false
+      })
+    }
+
+    document.addEventListener('visibilitychange', refreshIfVisible)
+    window.addEventListener('focus', refreshIfVisible)
+
+    return () => {
+      document.removeEventListener('visibilitychange', refreshIfVisible)
+      window.removeEventListener('focus', refreshIfVisible)
+    }
+  }, [store])
 
   const handlePinnedListSubmit: FormEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault()
@@ -99,7 +123,6 @@ const TodoAppContent = () => {
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [closeAddModal, handleAdd, isAddModalOpen])
-
   const tabs: { key: 'pinned' | 'all' | 'settings'; label: string }[] = useMemo(
     () => [
       { key: 'pinned', label: 'Слоты' },
