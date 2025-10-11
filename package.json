@@ -15,7 +15,8 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
-    "task": "node scripts/task.js"
+    "task": "node scripts/task.js",
+    "task:clean": "node scripts/task-clean.js"
   },
   "dependencies": {
     "@prisma/client": "^6.16.3",
