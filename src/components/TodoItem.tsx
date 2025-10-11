@@ -694,7 +694,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                                       void store.attachTag(todo.id, t.id)
                                     }
                                   }}
-                                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-slate-100"
+                                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 focus:bg-slate-100"
                                   data-tag-option="true"
                                 >
                                   <span className={`inline-flex h-4 w-4 items-center justify-center rounded-sm border ${selected ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-slate-300 text-transparent'}`}>
