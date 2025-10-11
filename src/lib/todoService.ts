@@ -13,6 +13,7 @@ interface NormalizedTodoRecord {
   title: string
   completed: boolean
   pinned: boolean
+  alias: string | null
   parentId: string | null
   position: number
 }
@@ -278,12 +279,15 @@ function normalizeTodos(
     const title = typeof raw.title === 'string' && raw.title.trim().length > 0 ? raw.title.trim() : 'Без названия'
     const completed = typeof raw.completed === 'boolean' ? raw.completed : false
     const pinned = typeof raw.pinned === 'boolean' ? raw.pinned : false
+    const aliasValue = typeof raw.alias === 'string' ? raw.alias.trim() : null
+    const alias = aliasValue && aliasValue.length > 0 ? aliasValue : null
 
     result.push({
       id,
       title,
       completed,
       pinned,
+      alias,
       parentId,
       position: index,
     })
@@ -441,6 +445,7 @@ export async function replaceTodoState(state: unknown): Promise<TodoState> {
           title: todo.title,
           completed: todo.completed,
           pinned: todo.pinned,
+          alias: todo.alias,
           parentId: todo.parentId,
           position: todo.position,
         },
@@ -553,9 +558,31 @@ export async function addTodo(parentId: string | null, title: string, tagIds?: s
   return getTodoState()
 }
 
-export async function updateTodoTitle(id: string, title: string): Promise<TodoState> {
-  const trimmed = title.trim()
-  if (!trimmed) {
+export async function updateTodoDetails(
+  id: string,
+  details: { title?: string; alias?: string | null },
+): Promise<TodoState> {
+  const data: Prisma.TodoUpdateInput = {}
+
+  if (typeof details.title === 'string') {
+    const trimmed = details.title.trim()
+    if (!trimmed) {
+      return getTodoState()
+    }
+    data.title = trimmed
+  }
+
+  if (Object.prototype.hasOwnProperty.call(details, 'alias')) {
+    const aliasValue = details.alias
+    if (typeof aliasValue === 'string') {
+      const trimmedAlias = aliasValue.trim()
+      data.alias = trimmedAlias.length === 0 ? null : trimmedAlias
+    } else {
+      data.alias = null
+    }
+  }
+
+  if (Object.keys(data).length === 0) {
     return getTodoState()
   }
 
@@ -563,10 +590,14 @@ export async function updateTodoTitle(id: string, title: string): Promise<TodoSt
 
   await prisma.todo.update({
     where: { id },
-    data: { title: trimmed },
+    data,
   })
 
   return getTodoState()
+}
+
+export async function updateTodoTitle(id: string, title: string): Promise<TodoState> {
+  return updateTodoDetails(id, { title })
 }
 
 export async function toggleTodoCompleted(id: string): Promise<TodoState> {

@@ -10,6 +10,7 @@ export interface Tag {
 }
 
 export interface TodoNode extends Todo {
+  alias: string | null
   children: TodoNode[]
   tags?: Tag[]
 }
