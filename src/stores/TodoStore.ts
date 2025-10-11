@@ -27,6 +27,7 @@ export class TodoStore {
   todos: TodoNode[] = []
   pinnedLists: PinnedListState[] = []
   tags: Tag[] = []
+  user: TodoState['user'] | null = null
   draggedId: string | null = null
   // Set со свернутыми узлами дерева (хранит id задач)
   collapsedIds: Set<string> = new Set()
@@ -51,6 +52,7 @@ export class TodoStore {
     this.todos = initialState.todos
     this.pinnedLists = initialState.pinnedLists
     this.tags = initialState.tags ?? []
+    this.user = initialState.user ?? null
     this.loadCollapsed()
     this.loadPinnedCollapsed()
     this.loadFilters()
@@ -99,6 +101,10 @@ export class TodoStore {
   async refresh() {
     try {
       const response = await fetch('/api/state', { cache: 'no-store' })
+      if (response.status === 401) {
+        this.setState({ todos: [], pinnedLists: [], tags: [], user: null })
+        return
+      }
       if (!response.ok) {
         throw new Error('Failed to load state')
       }
@@ -150,6 +156,7 @@ export class TodoStore {
     this.todos = state.todos
     this.pinnedLists = state.pinnedLists
     this.tags = state.tags ?? []
+    this.user = state.user ?? null
   }
 
   // ---- Filters API ----
@@ -441,6 +448,10 @@ export class TodoStore {
         },
       })
 
+      if (response.status === 401) {
+        this.setState({ todos: [], pinnedLists: [], tags: [], user: null })
+        return
+      }
       if (!response.ok) {
         throw new Error(`Request failed: ${response.status}`)
       }

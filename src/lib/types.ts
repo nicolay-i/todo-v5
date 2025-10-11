@@ -23,8 +23,17 @@ export interface PinnedListState {
   isActive?: boolean
 }
 
+export interface TodoUser {
+  id: string
+  firstName: string
+  lastName?: string | null
+  username?: string | null
+  photoUrl?: string | null
+}
+
 export interface TodoState {
   todos: TodoNode[]
   pinnedLists: PinnedListState[]
   tags?: Tag[]
+  user: TodoUser | null
 }

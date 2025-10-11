@@ -1,25 +1,28 @@
 'use client'
 
 import type { ChangeEventHandler, FormEventHandler } from 'react'
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { observer } from 'mobx-react-lite'
-import { FiPlus } from 'react-icons/fi'
+import { FiLogOut, FiPlus } from 'react-icons/fi'
 import type { TodoState } from '@/lib/types'
 import { TodoStore } from '@/stores/TodoStore'
 import type { VisibilityMode } from '@/stores/TodoStore'
 import { TodoStoreProvider, useTodoStore } from '@/stores/TodoStoreContext'
+import type { TelegramAuthPayload } from '@/lib/auth/telegram'
 // мини-плейсхолдеры для сортировки больше не используются
 import { PinnedList } from './PinnedList'
 import { PinnedTextView } from './PinnedTextView'
 import { TodoItem } from './TodoItem'
 import { TodoSearchBar } from './TodoSearchBar'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { TelegramLoginButton } from './TelegramLoginButton'
+import Image from 'next/image'
 
 interface TodoAppProps {
   initialState: TodoState
 }
 
-const TodoAppContent = () => {
+const AuthenticatedTodoContent = observer(() => {
   const store = useTodoStore()
   const [newTitle, setNewTitle] = useState('')
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -40,14 +43,25 @@ const TodoAppContent = () => {
   const [newPinnedListTitle, setNewPinnedListTitle] = useState('')
   const pinnedListInputRef = useRef<HTMLInputElement>(null)
 
-  const handleAdd = async () => {
+  const closeAddModal = useCallback(() => {
+    setIsAddModalOpen(false)
+    setTimeout(() => setIsAddModalMounted(false), 200)
+  }, [])
+
+  const openAddModal = useCallback(() => {
+    setIsAddModalMounted(true)
+    setSelectedTagIds([])
+    requestAnimationFrame(() => setIsAddModalOpen(true))
+  }, [])
+
+  const handleAdd = useCallback(async () => {
     const trimmed = newTitle.trim()
     if (!trimmed) return
     await store.addTodo(null, trimmed, selectedTagIds)
     setNewTitle('')
     setSelectedTagIds([])
     closeAddModal()
-  }
+  }, [closeAddModal, newTitle, selectedTagIds, store])
 
   const handlePinnedListSubmit: FormEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault()
@@ -86,19 +100,7 @@ const TodoAppContent = () => {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [isAddModalOpen, newTitle])
-
-  const openAddModal = () => {
-    setIsAddModalMounted(true)
-    setSelectedTagIds([])
-    // next tick to trigger transition
-    requestAnimationFrame(() => setIsAddModalOpen(true))
-  }
-
-  const closeAddModal = () => {
-    setIsAddModalOpen(false)
-    setTimeout(() => setIsAddModalMounted(false), 200)
-  }
+  }, [closeAddModal, handleAdd, isAddModalOpen])
 
   const tabs: { key: 'pinned' | 'all' | 'settings'; label: string }[] = useMemo(
     () => [
@@ -145,35 +147,40 @@ const TodoAppContent = () => {
     <div className="min-h-screen bg-canvas-light text-slate-900">
       <div className="mx-auto flex min-h-screen max-w-4xl flex-col px-4 py-10 sm:px-6 lg:px-8">
         <section className="flex-1 rounded-3xl bg-white/60 p-5 shadow-inner ring-1 ring-white/40">
-          <div className="mb-6 flex items-center justify-between gap-3">
-            <div className="flex rounded-2xl bg-white/70 p-1 text-sm font-medium text-slate-500 shadow-sm ring-1 ring-slate-200/70">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => handleSwitchTab(tab.key)}
-                  className={[
-                    'rounded-xl px-4 py-2 transition focus-visible:outline-none',
-                    activeTab === tab.key
-                      ? 'bg-slate-900 text-white shadow-sm'
-                      : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700',
-                  ].join(' ')}
-                >
-                  {tab.label}
-                </button>
-              ))}
+          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex rounded-2xl bg-white/70 p-1 text-sm font-medium text-slate-500 shadow-sm ring-1 ring-slate-200/70">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => handleSwitchTab(tab.key)}
+                    className={[
+                      'rounded-xl px-4 py-2 transition focus-visible:outline-none',
+                      activeTab === tab.key
+                        ? 'bg-slate-900 text-white shadow-sm'
+                        : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700',
+                    ].join(' ')}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
             </div>
-            {activeTab === 'all' && (
-              <button
-                type="button"
-                onClick={openAddModal}
-                className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
-                aria-label="Добавить задачу"
-              >
-                <FiPlus />
-                Добавить
-              </button>
-            )}
+            <div className="flex flex-wrap items-center justify-end gap-3">
+              {activeTab === 'all' && (
+                <button
+                  type="button"
+                  onClick={openAddModal}
+                  className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
+                  aria-label="Добавить задачу"
+                >
+                  <FiPlus />
+                  Добавить
+                </button>
+              )}
+              <AuthControls />
+            </div>
           </div>
 
           {activeTab === 'pinned' ? (
@@ -368,19 +375,143 @@ const TodoAppContent = () => {
       </div>
     </div>
   )
-}
+})
 
-const ObservedContent = observer(TodoAppContent)
+const TodoAppContent = observer(() => {
+  const store = useTodoStore()
+
+  if (!store.user) {
+    return <LoginPanel />
+  }
+
+  return <AuthenticatedTodoContent />
+})
 
 export const TodoApp = ({ initialState }: TodoAppProps) => {
   const [store] = useState(() => new TodoStore(initialState))
 
   return (
     <TodoStoreProvider store={store}>
-      <ObservedContent />
+      <TodoAppContent />
     </TodoStoreProvider>
   )
 }
+
+const LoginPanel = () => {
+  const store = useTodoStore()
+  const [error, setError] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const botUsername = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME
+
+  const handleAuth = useCallback(
+    async (payload: TelegramAuthPayload) => {
+      if (isLoading) return
+      setIsLoading(true)
+      setError(null)
+      try {
+        const response = await fetch('/api/auth/telegram', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+        if (!response.ok) {
+          const data = await response.json().catch(() => null)
+          throw new Error((data as { message?: string } | null)?.message ?? 'Не удалось авторизоваться')
+        }
+        const state = (await response.json()) as TodoState
+        store.setState(state)
+      } catch (authError) {
+        console.error('Failed to authorize via Telegram', authError)
+        setError(authError instanceof Error ? authError.message : 'Не удалось авторизоваться')
+        setIsLoading(false)
+      }
+    },
+    [isLoading, store],
+  )
+
+  return (
+    <div className="min-h-screen bg-canvas-light text-slate-900">
+      <div className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-4 py-10 sm:px-6 lg:px-8">
+        <div className="rounded-3xl bg-white/70 p-8 shadow-inner ring-1 ring-white/60">
+          <h1 className="text-2xl font-semibold text-slate-800">Вход в приложение</h1>
+          <p className="mt-2 text-sm text-slate-500">
+            Войдите через Telegram, чтобы сохранять свои задачи и закреплённые списки в личном пространстве.
+          </p>
+          <div className="mt-6 flex flex-col items-center gap-4">
+            <TelegramLoginButton botUsername={botUsername} onAuth={handleAuth} disabled={isLoading} />
+            {isLoading && <p className="text-xs text-slate-500">Проверяем данные…</p>}
+            {error && <p className="text-sm text-rose-600">{error}</p>}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const AuthControls = observer(() => {
+  const store = useTodoStore()
+  const user = store.user
+  const [isLoading, setIsLoading] = useState(false)
+
+  const handleLogout = useCallback(async () => {
+    if (isLoading) return
+    setIsLoading(true)
+    try {
+      const response = await fetch('/api/auth/logout', { method: 'POST' })
+      if (!response.ok) {
+        const data = await response.json().catch(() => null)
+        throw new Error((data as { message?: string } | null)?.message ?? 'Не удалось выйти из аккаунта')
+      }
+      const state = (await response.json()) as TodoState
+      store.setState(state)
+    } catch (logoutError) {
+      console.error('Failed to logout', logoutError)
+      setIsLoading(false)
+    }
+  }, [isLoading, store])
+
+  if (!user) return null
+
+  const displayName = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.username || 'Пользователь'
+  const initials = [user.firstName, user.lastName]
+    .filter((value): value is string => Boolean(value && value.trim()))
+    .map((value) => value.trim()[0]?.toUpperCase())
+    .join('') || user.username?.[0]?.toUpperCase() || 'T'
+
+  return (
+    <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 rounded-2xl bg-white/80 px-3 py-1.5 text-xs font-medium text-slate-600 shadow-inner ring-1 ring-slate-200/70">
+        {user.photoUrl ? (
+          <Image
+            src={user.photoUrl}
+            alt={displayName}
+            width={32}
+            height={32}
+            className="h-8 w-8 rounded-full object-cover shadow"
+            unoptimized
+          />
+        ) : (
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-sm font-semibold text-slate-600">
+            {initials}
+          </span>
+        )}
+        <div className="flex flex-col leading-tight">
+          <span className="text-sm font-semibold text-slate-700">{displayName}</span>
+          {user.username && <span className="text-xs text-slate-500">@{user.username}</span>}
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={handleLogout}
+        disabled={isLoading}
+        className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <FiLogOut />
+        {isLoading ? 'Выходим…' : 'Выйти'}
+      </button>
+    </div>
+  )
+})
 
 const filterOptions: { value: VisibilityMode; label: string }[] = [
   { value: 'activeOnly', label: 'Только активные' },
