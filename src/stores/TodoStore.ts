@@ -119,11 +119,15 @@ export class TodoStore {
     })
   }
 
-  async updateTitle(id: string, title: string) {
+  async updateTitle(id: string, title: string, alias?: string | null) {
     if (!title.trim()) return
+    const payload: Record<string, unknown> = { action: 'rename', title }
+    if (alias !== undefined) {
+      payload.alias = alias
+    }
     await this.mutate(`/api/todos/${id}`, {
       method: 'PATCH',
-      body: JSON.stringify({ action: 'rename', title }),
+      body: JSON.stringify(payload),
     })
   }
 

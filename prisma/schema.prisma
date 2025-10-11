@@ -21,6 +21,7 @@ datasource db {
 model Todo {
   id        String   @id @default(cuid())
   title     String
+  alias     String?
   completed Boolean  @default(false)
   completedAt DateTime?
   pinned    Boolean  @default(false)

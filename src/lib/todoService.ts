@@ -11,6 +11,7 @@ let seedInitialized = false
 interface NormalizedTodoRecord {
   id: string
   title: string
+  alias: string | null
   completed: boolean
   pinned: boolean
   parentId: string | null
@@ -276,12 +277,20 @@ function normalizeTodos(
     idSet.add(id)
 
     const title = typeof raw.title === 'string' && raw.title.trim().length > 0 ? raw.title.trim() : 'Без названия'
+    const aliasValue =
+      typeof raw.alias === 'string'
+        ? raw.alias.trim()
+        : raw.alias === null
+          ? null
+          : undefined
+    const alias = aliasValue === undefined ? null : aliasValue === '' ? null : aliasValue
     const completed = typeof raw.completed === 'boolean' ? raw.completed : false
     const pinned = typeof raw.pinned === 'boolean' ? raw.pinned : false
 
     result.push({
       id,
       title,
+      alias,
       completed,
       pinned,
       parentId,
@@ -439,6 +448,7 @@ export async function replaceTodoState(state: unknown): Promise<TodoState> {
         data: {
           id: todo.id,
           title: todo.title,
+          alias: todo.alias,
           completed: todo.completed,
           pinned: todo.pinned,
           parentId: todo.parentId,
@@ -553,18 +563,35 @@ export async function addTodo(parentId: string | null, title: string, tagIds?: s
   return getTodoState()
 }
 
-export async function updateTodoTitle(id: string, title: string): Promise<TodoState> {
-  const trimmed = title.trim()
-  if (!trimmed) {
+export async function updateTodoTitle(
+  id: string,
+  title: string,
+  aliasInput?: string | null,
+): Promise<TodoState> {
+  const trimmedTitle = title.trim()
+  if (!trimmedTitle) {
     return getTodoState()
   }
 
   await ensureSeedData()
 
-  await prisma.todo.update({
-    where: { id },
-    data: { title: trimmed },
-  })
+  const todo = await prisma.todo.findUnique({ where: { id }, include: { tags: true } })
+  if (!todo) {
+    return getTodoState()
+  }
+
+  const data: Prisma.TodoUpdateInput = { title: trimmedTitle }
+
+  if (aliasInput !== undefined) {
+    const normalized = aliasInput === null ? null : aliasInput.trim()
+    const nextAlias = normalized && normalized.length > 0 ? normalized : null
+    const hasSystemTag = todo.tags.some((tag) => tag.name === 'Проект' || tag.name === 'Раздел')
+    if (hasSystemTag) {
+      data.alias = nextAlias
+    }
+  }
+
+  await prisma.todo.update({ where: { id }, data })
 
   return getTodoState()
 }
