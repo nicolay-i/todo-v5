@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type { Todo, Tag } from '@prisma/client'
-import { Prisma } from '@prisma/client'
+import type { Todo, Tag, Prisma } from '@prisma/client'
 import { MAX_DEPTH } from './constants'
 import { prisma } from './prisma'
 import type { PinnedListState, TodoNode, TodoState } from './types'
@@ -11,6 +10,7 @@ let seedInitialized = false
 interface NormalizedTodoRecord {
   id: string
   title: string
+  alias: string | null
   completed: boolean
   pinned: boolean
   parentId: string | null
@@ -276,12 +276,20 @@ function normalizeTodos(
     idSet.add(id)
 
     const title = typeof raw.title === 'string' && raw.title.trim().length > 0 ? raw.title.trim() : 'Без названия'
+    const aliasValue =
+      typeof raw.alias === 'string'
+        ? raw.alias.trim()
+        : raw.alias === null
+          ? null
+          : undefined
+    const alias = aliasValue === undefined ? null : aliasValue === '' ? null : aliasValue
     const completed = typeof raw.completed === 'boolean' ? raw.completed : false
     const pinned = typeof raw.pinned === 'boolean' ? raw.pinned : false
 
     result.push({
       id,
       title,
+      alias,
       completed,
       pinned,
       parentId,
@@ -439,6 +447,7 @@ export async function replaceTodoState(state: unknown): Promise<TodoState> {
         data: {
           id: todo.id,
           title: todo.title,
+          alias: todo.alias,
           completed: todo.completed,
           pinned: todo.pinned,
           parentId: todo.parentId,
@@ -486,7 +495,7 @@ async function getTodoDepth(id: string): Promise<number> {
   await ensureSeedData()
   const rows = await prisma.$queryRaw<{ depth: number | null }[]>`
     WITH RECURSIVE ancestors AS (
-      SELECT "parentId", 0::int AS depth FROM "Todo" WHERE "id" = ${id}
+      SELECT "parentId", 0 AS depth FROM "Todo" WHERE "id" = ${id}
       UNION ALL
       SELECT t."parentId", ancestors.depth + 1
       FROM "Todo" t
@@ -494,14 +503,15 @@ async function getTodoDepth(id: string): Promise<number> {
     )
     SELECT COALESCE(MAX(depth), 0) AS depth FROM ancestors;
   `
-  return rows[0]?.depth ?? 0
+  const value = rows[0]?.depth ?? 0
+  return typeof value === 'bigint' ? Number(value) : value
 }
 
 async function getSubtreeDepth(id: string): Promise<number> {
   await ensureSeedData()
   const rows = await prisma.$queryRaw<{ maxDepth: number | null }[]>`
     WITH RECURSIVE tree AS (
-      SELECT "id", "parentId", 0::int AS depth FROM "Todo" WHERE "id" = ${id}
+      SELECT "id", "parentId", 0 AS depth FROM "Todo" WHERE "id" = ${id}
       UNION ALL
       SELECT t."id", t."parentId", tree.depth + 1
       FROM "Todo" t
@@ -509,7 +519,8 @@ async function getSubtreeDepth(id: string): Promise<number> {
     )
     SELECT COALESCE(MAX(depth), 0) AS "maxDepth" FROM tree;
   `
-  return rows[0]?.maxDepth ?? 0
+  const value = rows[0]?.maxDepth ?? 0
+  return typeof value === 'bigint' ? Number(value) : value
 }
 
 export async function addTodo(parentId: string | null, title: string, tagIds?: string[]): Promise<TodoState> {
@@ -553,18 +564,35 @@ export async function addTodo(parentId: string | null, title: string, tagIds?: s
   return getTodoState()
 }
 
-export async function updateTodoTitle(id: string, title: string): Promise<TodoState> {
-  const trimmed = title.trim()
-  if (!trimmed) {
+export async function updateTodoTitle(
+  id: string,
+  title: string,
+  aliasInput?: string | null,
+): Promise<TodoState> {
+  const trimmedTitle = title.trim()
+  if (!trimmedTitle) {
     return getTodoState()
   }
 
   await ensureSeedData()
 
-  await prisma.todo.update({
-    where: { id },
-    data: { title: trimmed },
-  })
+  const todo = await prisma.todo.findUnique({ where: { id }, include: { tags: true } })
+  if (!todo) {
+    return getTodoState()
+  }
+
+  const data: Prisma.TodoUpdateInput = { title: trimmedTitle }
+
+  if (aliasInput !== undefined) {
+    const normalized = aliasInput === null ? null : aliasInput.trim()
+    const nextAlias = normalized && normalized.length > 0 ? normalized : null
+    const hasSystemTag = todo.tags.some((tag) => tag.name === 'Проект' || tag.name === 'Раздел')
+    if (hasSystemTag) {
+      data.alias = nextAlias
+    }
+  }
+
+  await prisma.todo.update({ where: { id }, data })
 
   return getTodoState()
 }
@@ -643,7 +671,7 @@ export async function attachTagToTodo(todoId: string, tagId: string): Promise<To
 
   if (tag.name === 'Проект') {
     // Нельзя если на этом узле или у потомков есть "Раздел"
-    const rows = await prisma.$queryRaw<{ exists: boolean }[]>`
+    const rows = await prisma.$queryRaw<{ hasSectionInSubtree: number }[]>`
       WITH RECURSIVE subtree AS (
         SELECT "id" FROM "Todo" WHERE "id" = ${todoId}
         UNION ALL
@@ -655,9 +683,9 @@ export async function attachTagToTodo(todoId: string, tagId: string): Promise<To
         JOIN "_TagToTodo" j ON j."B" = tt."id"
         JOIN "Tag" tg ON tg."id" = j."A"
         WHERE tg."name" = 'Раздел' AND tt."id" IN (SELECT "id" FROM subtree)
-      ) AS exists;
+      ) AS "hasSectionInSubtree";
     `
-    if (rows[0]?.exists) return getTodoState()
+    if (Boolean(rows[0]?.hasSectionInSubtree)) return getTodoState()
   }
 
   if (tag.name === 'Раздел') {
@@ -717,16 +745,16 @@ export async function moveTodo(
     }
 
     // ensure not moving into descendant (single query via recursive CTE)
-    const descendantRows = await prisma.$queryRaw<{ exists: boolean }[]>`
+    const descendantRows = await prisma.$queryRaw<{ isForbiddenTarget: number }[]>`
       WITH RECURSIVE subtree AS (
         SELECT "id" FROM "Todo" WHERE "id" = ${id}
         UNION ALL
         SELECT t."id" FROM "Todo" t
         JOIN subtree ON t."parentId" = subtree."id"
       )
-      SELECT EXISTS(SELECT 1 FROM subtree WHERE "id" = ${targetParentId}) AS exists;
+      SELECT EXISTS(SELECT 1 FROM subtree WHERE "id" = ${targetParentId}) AS "isForbiddenTarget";
     `
-    if (descendantRows[0]?.exists) {
+    if (Boolean(descendantRows[0]?.isForbiddenTarget)) {
       return getTodoState()
     }
   } else {
@@ -765,18 +793,15 @@ export async function moveTodo(
     order.splice(currentIndex, 1)
     const bounded = Math.min(Math.max(nextIndex, 0), order.length)
     order.splice(bounded, 0, id)
-
-    // Single SQL UPDATE for all affected rows (same parent)
-    const rows = order.map((todoId, index) =>
-      Prisma.sql`(${todoId}, ${sourceParentId}, ${index})`,
+    // Выполняем пакет перестановок через транзакцию (совместимо с SQLite)
+    await prisma.$transaction(
+      order.map((todoId, index) =>
+        prisma.todo.update({
+          where: { id: todoId },
+          data: { parentId: sourceParentId, position: index },
+        }),
+      ),
     )
-
-    await prisma.$executeRaw`UPDATE "Todo" AS t
-      SET "parentId" = v.parent_id,
-          "position" = v.position
-      FROM (VALUES ${Prisma.join(rows)}) AS v(id, parent_id, position)
-      WHERE t."id" = v.id;`
-
     return getTodoState()
   }
 
@@ -785,23 +810,16 @@ export async function moveTodo(
   const bounded = Math.min(Math.max(nextIndex, 0), targetOrder.length)
   targetOrder.splice(bounded, 0, id)
 
-  // Single SQL UPDATE for both source and target lists (cross-parent move)
-  const rows = [
+  // Обновляем две группы отдельно в транзакции
+  const ops = [
     ...sourceOrder.map((todoId, index) =>
-      Prisma.sql`(${todoId}, ${sourceParentId}, ${index})`,
+      prisma.todo.update({ where: { id: todoId }, data: { parentId: sourceParentId, position: index } }),
     ),
     ...targetOrder.map((todoId, index) =>
-      Prisma.sql`(${todoId}, ${targetParentId}, ${index})`,
+      prisma.todo.update({ where: { id: todoId }, data: { parentId: targetParentId, position: index } }),
     ),
   ]
-
-  if (rows.length > 0) {
-    await prisma.$executeRaw`UPDATE "Todo" AS t
-      SET "parentId" = v.parent_id,
-          "position" = v.position
-      FROM (VALUES ${Prisma.join(rows)}) AS v(id, parent_id, position)
-      WHERE t."id" = v.id;`
-  }
+  await prisma.$transaction(ops)
 
   return getTodoState()
 }

@@ -40,6 +40,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
   const [isEditing, setIsEditing] = useState(false)
   const [isAddingChild, setIsAddingChild] = useState(false)
   const [titleDraft, setTitleDraft] = useState(todo.title)
+  const [aliasDraft, setAliasDraft] = useState(todo.alias ?? '')
   const [childTitle, setChildTitle] = useState('')
   const [isOverInside, setIsOverInside] = useState(false)
   const [overPosition, setOverPosition] = useState<null | 'above' | 'below' | 'inside'>(null)
@@ -87,6 +88,10 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
     setTitleDraft(todo.title)
   }, [todo.title])
 
+  useEffect(() => {
+    setAliasDraft(todo.alias ?? '')
+  }, [todo.alias])
+
   // При входе в режим редактирования определяем число строк на основе ширины поля и текущего текста
   useEffect(() => {
     if (!isEditing) return
@@ -113,9 +118,47 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
     void store.toggleTodo(todo.id)
   }
 
+  const canEditAlias = useMemo(
+    () => (todo.tags ?? []).some((tag) => tag.name === 'Проект' || tag.name === 'Раздел'),
+    [todo.tags],
+  )
+
+  const nearestAliasTag = (() => {
+    let currentParentId = todo.parentId
+    while (currentParentId) {
+      const info = store.findTodo(currentParentId)
+      if (!info) break
+      const aliasText = typeof info.node.alias === 'string' ? info.node.alias.trim() : ''
+      const hasSystemTag = (info.node.tags ?? []).some(
+        (tag) => tag.name === 'Проект' || tag.name === 'Раздел',
+      )
+      if (hasSystemTag && aliasText) {
+        return { key: `alias-${info.node.id}`, label: aliasText }
+      }
+      currentParentId = info.node.parentId ?? null
+    }
+    return null
+  })()
+
+  const aliasItems: Array<{ key: string; name: string; removable: boolean; tagId?: string }> = nearestAliasTag
+    ? [{ key: nearestAliasTag.key, name: nearestAliasTag.label, removable: false }]
+    : []
+  const tagItems: Array<{ key: string; name: string; removable: boolean; tagId?: string }> = (todo.tags ?? []).map((tag) => ({
+    key: tag.id,
+    name: tag.name,
+    removable: true,
+    tagId: tag.id,
+  }))
+  const displayedTags: Array<{ key: string; name: string; removable: boolean; tagId?: string }> = [
+    ...aliasItems,
+    ...tagItems,
+  ]
+
+  const hasDisplayedTags = displayedTags.length > 0
+
   const handleEditSubmit: React.FormEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault()
-    await store.updateTitle(todo.id, titleDraft)
+    await store.updateTitle(todo.id, titleDraft, canEditAlias ? aliasDraft : undefined)
     setIsEditing(false)
   }
 
@@ -297,7 +340,10 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
           {/* Заголовок и теги в одной строке: теги перед текстом, чтобы перенос был под тегами */}
           <div className="flex-1 todo-main">
             {isEditing ? (
-              <form onSubmit={handleEditSubmit} className="flex flex-col gap-3 sm:flex-row sm:items-center form-title">
+              <form
+                onSubmit={handleEditSubmit}
+                className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center form-title"
+              >
                 <div ref={editWrapRef} className="w-full">
                   <textarea
                     className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm leading-snug text-slate-700 shadow-sm focus:border-slate-400 focus:outline-none resize-none"
@@ -327,6 +373,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                     type="button"
                     onClick={() => {
                       setTitleDraft(todo.title)
+                      setAliasDraft(todo.alias ?? '')
                       setIsEditing(false)
                     }}
                     className={`${actionButtonStyles} hover:bg-slate-200`}
@@ -343,30 +390,41 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                   className="pointer-events-none absolute -z-10 whitespace-pre-wrap break-words rounded-lg border border-transparent px-3 py-2 text-sm leading-snug"
                   style={{ visibility: 'hidden' }}
                 />
+                {canEditAlias && (
+                  <label className="mt-3 flex flex-col gap-1 text-xs font-medium text-slate-500 sm:basis-full sm:mt-0">
+                    Алиас
+                    <input
+                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-inner focus:border-slate-400 focus:outline-none"
+                      placeholder="Введите алиас"
+                      value={aliasDraft}
+                      onChange={(event) => setAliasDraft(event.target.value)}
+                    />
+                  </label>
+                )}
               </form>
-             ) : (
-               <div className="flex flex-wrap items-start gap-2 tags-span" onDoubleClick={() => setIsEditing(true)}>
-                 <p className={`${titleStyles} text-sm`}>
-                  {(todo.tags ?? []).map((tag) => (<>
-                    <span
-                      key={tag.id}
-                      className="group/tag inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-700"
-                    >
-                      {tag.name}
-                      <button
-                        type="button"
-                        onClick={() => store.detachTag(todo.id, tag.id)}
-                        className="hidden h-4 w-4 shrink-0 items-center justify-center rounded text-slate-400 hover:bg-slate-200 hover:text-slate-700 group-hover/tag:flex focus-visible:flex"
-                        aria-label="Удалить тег"
-                      >
-                        <FiX />
-                      </button>
-                    </span>
-                    &nbsp;
-                    </>
+            ) : (
+              <div className="flex flex-wrap items-start gap-2 tags-span" onDoubleClick={() => setIsEditing(true)}>
+                <p className={`${titleStyles} text-sm`}>
+                  {displayedTags.map((item) => (
+                    <Fragment key={item.key}>
+                      <span className="group/tag inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-700">
+                        {item.name}
+                        {item.removable && item.tagId ? (
+                          <button
+                            type="button"
+                            onClick={() => store.detachTag(todo.id, item.tagId!)}
+                            className="hidden h-4 w-4 shrink-0 items-center justify-center rounded text-slate-400 hover:bg-slate-200 hover:text-slate-700 group-hover/tag:flex focus-visible:flex"
+                            aria-label="Удалить тег"
+                          >
+                            <FiX />
+                          </button>
+                        ) : null}
+                      </span>
+                      &nbsp;
+                    </Fragment>
                   ))}
 
-                  {todo.tags?.length ? <>&nbsp;</> : null}
+                  {hasDisplayedTags ? <>&nbsp;</> : null}
 
                   <HighlightedText text={todo.title} ranges={store.getSearchHighlight(todo.id)} />
                 </p>

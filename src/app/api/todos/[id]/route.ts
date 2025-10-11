@@ -12,6 +12,7 @@ interface PatchBody {
   title?: string
   targetParentId?: string | null
   targetIndex?: number
+  alias?: string | null
 }
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
@@ -20,7 +21,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
   switch (body.action) {
     case 'rename': {
-      const state = await updateTodoTitle(id, body.title ?? '')
+      const aliasProvided = Object.prototype.hasOwnProperty.call(body, 'alias')
+      const state = await updateTodoTitle(id, body.title ?? '', aliasProvided ? body.alias ?? null : undefined)
       return NextResponse.json(state)
     }
     case 'toggleCompleted': {
