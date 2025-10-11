@@ -413,6 +413,22 @@ export class TodoStore {
     })
   }
 
+  stepActivePinnedList(offset: number) {
+    if (offset === 0 || this.pinnedLists.length === 0) return
+    const currentIndex = this.pinnedLists.findIndex((list) => list.isActive)
+    let nextIndex = currentIndex
+    if (currentIndex === -1) {
+      nextIndex = offset > 0 ? 0 : this.pinnedLists.length - 1
+    } else {
+      nextIndex = currentIndex + offset
+      if (nextIndex < 0) nextIndex = 0
+      if (nextIndex >= this.pinnedLists.length) nextIndex = this.pinnedLists.length - 1
+    }
+    if (nextIndex === currentIndex || nextIndex < 0 || nextIndex >= this.pinnedLists.length) return
+    const nextId = this.pinnedLists[nextIndex].id
+    void this.setActivePinnedList(nextId)
+  }
+
   canDrop(id: string, parentId: string | null): boolean {
     const itemInfo = this.findTodo(id)
     if (!itemInfo) return false
