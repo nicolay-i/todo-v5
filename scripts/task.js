@@ -159,7 +159,7 @@ function tryLaunchCopilot({ prompt, worktreePath }) {
         try {
             // Корректный список аргументов (исправлено объединение '--log-level all' в один аргумент)
             const args = ['--model', 'gpt-5', '-p', prompt, '--allow-all-tools', '--add-dir', worktreePath, '--log-level', 'all'];
-            log(COLORS.magenta('Запуск Copilot...'));
+            log(COLORS.magenta('Запуск Copilot с рабочей директорией: ' + worktreePath));
             // Подготовим лог-файл
             let logFile = null;
             let logStream = null;
