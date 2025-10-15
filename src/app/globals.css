@@ -35,3 +35,55 @@ button {
 .is-first {
   @apply bg-emerald-50/60 ring-emerald-300;
 }
+
+/* Анимации для уведомлений */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slideIn {
+  animation: slideIn 0.3s ease-out;
+}
+
+/* Анимация для появления/исчезновения тегов */
+.tag-enter {
+  animation: fadeIn 0.2s ease-in;
+}
+
+.tag-exit {
+  animation: fadeOut 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { 
+    opacity: 0; 
+    transform: scale(0.9); 
+  }
+  to { 
+    opacity: 1; 
+    transform: scale(1); 
+  }
+}
+
+@keyframes fadeOut {
+  from { 
+    opacity: 1; 
+    transform: scale(1); 
+  }
+  to { 
+    opacity: 0; 
+    transform: scale(0.9); 
+  }
+}
+
+/* Анимация для статуса выполненной задачи */
+.todo-completed {
+  transition: opacity 0.3s ease-in-out;
+}

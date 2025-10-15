@@ -1,7 +1,8 @@
-import { makeAutoObservable } from 'mobx'
+import { makeAutoObservable, runInAction } from 'mobx'
 import { MAX_DEPTH } from '@/lib/constants'
 import type { TodoNode, TodoState, PinnedListState, Tag } from '@/lib/types'
 import { fuzzyMatch } from '@/lib/search/fuzzyMatch'
+import { NotificationStore } from './NotificationStore'
 
 export interface PinnedListView extends PinnedListState {
   todos: TodoNode[]
@@ -44,14 +45,20 @@ export class TodoStore {
   // Флаг включения выделения первых todo на максимальной глубине
   highlightFirstAtMaxDepth = true
 
+  // Оптимистичные обновления
+  private stateSnapshot: TodoState | null = null
+  pendingOperations = 0
+  notifications: NotificationStore
+
   private static readonly COLLAPSE_STORAGE_KEY = 'todoCollapsedIds_v1'
   private static readonly PINNED_COLLAPSE_STORAGE_KEY = 'pinnedCollapsedIds_v1'
   private static readonly LIST_FILTER_STORAGE_KEY = 'listFilterMode_v1'
   private static readonly PINNED_FILTER_STORAGE_KEY = 'pinnedFilterMode_v1'
   private static readonly HIGHLIGHT_FIRST_STORAGE_KEY = 'highlightFirstAtMaxDepth_v1'
 
-  constructor(initialState: TodoState) {
+  constructor(initialState: TodoState, notifications: NotificationStore) {
     makeAutoObservable(this, {}, { autoBind: true })
+    this.notifications = notifications
     this.todos = initialState.todos
     this.pinnedLists = initialState.pinnedLists
     this.tags = initialState.tags ?? []
@@ -115,12 +122,67 @@ export class TodoStore {
 
   async addTodo(parentId: string | null, title: string, tagIds?: string[]) {
     if (!title.trim()) return
-    const payload: any = { parentId, title }
-    if (Array.isArray(tagIds) && tagIds.length > 0) payload.tagIds = Array.from(new Set(tagIds))
-    await this.mutate('/api/todos', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    })
+    
+    const tempId = `temp_${Date.now()}_${Math.random()}`
+    const now = new Date()
+
+    await this.optimisticMutate(
+      // Оптимистичное обновление
+      () => {
+        const newTodo: TodoNode = {
+          id: tempId,
+          title: title.trim(),
+          completed: false,
+          completedAt: null,
+          pinned: false,
+          alias: null,
+          parentId,
+          position: 0,
+          createdAt: now,
+          updatedAt: now,
+          children: [],
+          tags: [],
+        }
+
+        // Добавляем теги если указаны
+        if (Array.isArray(tagIds) && tagIds.length > 0) {
+          const uniqueTagIds = Array.from(new Set(tagIds))
+          newTodo.tags = this.tags.filter((tag) => uniqueTagIds.includes(tag.id))
+        }
+
+        if (parentId) {
+          const parent = this.findTodo(parentId)
+          if (parent) {
+            // Добавляем в начало списка детей
+            parent.node.children = [newTodo, ...parent.node.children]
+            // Обновляем позиции остальных
+            parent.node.children.forEach((child, idx) => {
+              child.position = idx
+            })
+          }
+        } else {
+          // Добавляем в корень
+          this.todos = [newTodo, ...this.todos]
+          this.todos.forEach((todo, idx) => {
+            todo.position = idx
+          })
+        }
+      },
+      // Запрос на сервер
+      async () => {
+        const payload: any = { parentId, title: title.trim() }
+        if (Array.isArray(tagIds) && tagIds.length > 0) {
+          payload.tagIds = Array.from(new Set(tagIds))
+        }
+        
+        const data = await this.serverMutate('/api/todos', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        })
+        this.setState(data)
+      },
+      'Не удалось создать задачу'
+    )
   }
 
   async updateTodoDetails(id: string, details: { title?: string; alias?: string | null }) {
@@ -141,16 +203,64 @@ export class TodoStore {
 
     if (!hasChanges) return
 
-    await this.mutate(`/api/todos/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify(payload),
-    })
+    await this.optimisticMutate(
+      // Оптимистичное обновление
+      () => {
+        const info = this.findTodo(id)
+        if (info) {
+          if (typeof details.title === 'string') {
+            info.node.title = details.title.trim()
+          }
+          if (Object.prototype.hasOwnProperty.call(details, 'alias')) {
+            info.node.alias = details.alias ?? null
+          }
+          info.node.updatedAt = new Date()
+        }
+      },
+      // Запрос на сервер
+      async () => {
+        const data = await this.serverMutate(`/api/todos/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify(payload),
+        })
+        this.setState(data)
+      },
+      'Не удалось обновить задачу'
+    )
   }
 
   async toggleTodo(id: string) {
-    await this.mutate(`/api/todos/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ action: 'toggleCompleted' }),
+    await this.optimisticMutate(
+      // Оптимистичное обновление
+      () => {
+        const info = this.findTodo(id)
+        if (info) {
+          info.node.completed = !info.node.completed
+          info.node.completedAt = info.node.completed ? new Date() : null
+          info.node.updatedAt = new Date()
+
+          // Рекурсивно обновляем детей
+          this.updateChildrenCompleted(info.node, info.node.completed)
+        }
+      },
+      // Запрос на сервер
+      async () => {
+        const data = await this.serverMutate(`/api/todos/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ action: 'toggleCompleted' }),
+        })
+        this.setState(data)
+      },
+      'Не удалось изменить статус задачи'
+    )
+  }
+
+  private updateChildrenCompleted(node: TodoNode, completed: boolean) {
+    node.children.forEach((child) => {
+      child.completed = completed
+      child.completedAt = completed ? new Date() : null
+      child.updatedAt = new Date()
+      this.updateChildrenCompleted(child, completed)
     })
   }
 
@@ -342,10 +452,39 @@ export class TodoStore {
   }
 
   async togglePinned(id: string) {
-    await this.mutate(`/api/todos/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ action: 'togglePinned' }),
-    })
+    await this.optimisticMutate(
+      // Оптимистичное обновление
+      () => {
+        const info = this.findTodo(id)
+        if (!info) return
+
+        info.node.pinned = !info.node.pinned
+
+        if (info.node.pinned) {
+          // Закрепляем - добавляем в активный список
+          const activeList = this.pinnedLists.find((list) => list.isActive)
+          if (activeList) {
+            activeList.order = [id, ...activeList.order]
+          }
+        } else {
+          // Открепляем - удаляем из всех списков
+          this.pinnedLists.forEach((list) => {
+            if (list.order.includes(id)) {
+              list.order = list.order.filter((todoId) => todoId !== id)
+            }
+          })
+        }
+      },
+      // Запрос на сервер
+      async () => {
+        const data = await this.serverMutate(`/api/todos/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ action: 'togglePinned' }),
+        })
+        this.setState(data)
+      },
+      'Не удалось изменить закрепление задачи'
+    )
   }
 
   async movePinnedTodo(id: string, targetListId: string, targetIndex: number) {
@@ -400,17 +539,53 @@ export class TodoStore {
   }
 
   async attachTag(todoId: string, tagId: string) {
-    await this.mutate(`/api/todos/${todoId}/tags`, {
-      method: 'POST',
-      body: JSON.stringify({ tagId }),
-    })
+    await this.optimisticMutate(
+      // Оптимистичное обновление
+      () => {
+        const todoInfo = this.findTodo(todoId)
+        const tag = this.tags.find((t) => t.id === tagId)
+
+        if (todoInfo && tag) {
+          if (!todoInfo.node.tags) {
+            todoInfo.node.tags = []
+          }
+          // Проверяем, что тег еще не добавлен
+          if (!todoInfo.node.tags.some((t) => t.id === tagId)) {
+            todoInfo.node.tags.push(tag)
+          }
+        }
+      },
+      // Запрос на сервер
+      async () => {
+        const data = await this.serverMutate(`/api/todos/${todoId}/tags`, {
+          method: 'POST',
+          body: JSON.stringify({ tagId }),
+        })
+        this.setState(data)
+      },
+      'Не удалось добавить тег'
+    )
   }
 
   async detachTag(todoId: string, tagId: string) {
-    await this.mutate(`/api/todos/${todoId}/tags`, {
-      method: 'DELETE',
-      body: JSON.stringify({ tagId }),
-    })
+    await this.optimisticMutate(
+      // Оптимистичное обновление
+      () => {
+        const todoInfo = this.findTodo(todoId)
+        if (todoInfo && todoInfo.node.tags) {
+          todoInfo.node.tags = todoInfo.node.tags.filter((t) => t.id !== tagId)
+        }
+      },
+      // Запрос на сервер
+      async () => {
+        const data = await this.serverMutate(`/api/todos/${todoId}/tags`, {
+          method: 'DELETE',
+          body: JSON.stringify({ tagId }),
+        })
+        this.setState(data)
+      },
+      'Не удалось удалить тег'
+    )
   }
 
   getNearestAlias(todoId: string): { todoId: string; alias: string } | null {
@@ -515,6 +690,97 @@ export class TodoStore {
     } catch (error) {
       console.error('Failed to update state', error)
       await this.refresh()
+    }
+  }
+
+  /**
+   * Выполняет запрос к серверу и возвращает новое состояние
+   */
+  private async serverMutate(url: string, init: RequestInit): Promise<TodoState> {
+    const response = await fetch(url, {
+      ...init,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(init.headers ?? {}),
+      },
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.error || `Request failed: ${response.status}`)
+    }
+
+    return (await response.json()) as TodoState
+  }
+
+  /**
+   * Создает снэпшот текущего состояния перед оптимистичным обновлением
+   */
+  private createSnapshot() {
+    this.stateSnapshot = {
+      todos: JSON.parse(JSON.stringify(this.todos)),
+      pinnedLists: JSON.parse(JSON.stringify(this.pinnedLists)),
+      tags: JSON.parse(JSON.stringify(this.tags)),
+    }
+  }
+
+  /**
+   * Откатывает состояние к предыдущему снэпшоту
+   */
+  private rollbackToSnapshot() {
+    if (this.stateSnapshot) {
+      runInAction(() => {
+        this.todos = this.stateSnapshot!.todos
+        this.pinnedLists = this.stateSnapshot!.pinnedLists
+        this.tags = this.stateSnapshot!.tags ?? []
+        this.stateSnapshot = null
+      })
+    }
+  }
+
+  /**
+   * Очищает снэпшот после успешной операции
+   */
+  private clearSnapshot() {
+    this.stateSnapshot = null
+  }
+
+  /**
+   * Обертка для оптимистичных мутаций
+   * @param optimisticUpdate - функция для немедленного обновления UI
+   * @param serverUpdate - промис с запросом на сервер
+   * @param errorMessage - сообщение об ошибке для пользователя
+   */
+  private async optimisticMutate(
+    optimisticUpdate: () => void,
+    serverUpdate: () => Promise<void>,
+    errorMessage: string
+  ) {
+    this.createSnapshot()
+    this.pendingOperations++
+
+    try {
+      // Немедленно обновляем UI
+      runInAction(optimisticUpdate)
+
+      // Отправляем запрос на сервер
+      await serverUpdate()
+
+      // Успех - очищаем снэпшот
+      this.clearSnapshot()
+    } catch (error) {
+      // Ошибка - откатываем изменения
+      this.rollbackToSnapshot()
+
+      // Показываем уведомление
+      this.notifications.show('error', errorMessage)
+
+      // Перезагружаем актуальное состояние с сервера
+      await this.refresh()
+    } finally {
+      runInAction(() => {
+        this.pendingOperations--
+      })
     }
   }
 

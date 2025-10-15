@@ -9,6 +9,9 @@ import { TodoStore } from '@/stores/TodoStore'
 import type { VisibilityMode } from '@/stores/TodoStore'
 import { TodoStoreProvider, useTodoStore } from '@/stores/TodoStoreContext'
 import { focusEdgeTodo, isInputLike } from '@/lib/dom/todoFocus'
+import { NotificationStore } from '@/stores/NotificationStore'
+import { NotificationContainer } from './NotificationContainer'
+import { LoadingIndicator } from './LoadingIndicator'
 // мини-плейсхолдеры для сортировки больше не используются
 import { PinnedList } from './PinnedList'
 import { PinnedTextView } from './PinnedTextView'
@@ -452,10 +455,13 @@ const TodoAppContent = () => {
 const ObservedContent = observer(TodoAppContent)
 
 export const TodoApp = ({ initialState }: TodoAppProps) => {
-  const [store] = useState(() => new TodoStore(initialState))
+  const [notificationStore] = useState(() => new NotificationStore())
+  const [store] = useState(() => new TodoStore(initialState, notificationStore))
 
   return (
     <TodoStoreProvider store={store}>
+      <LoadingIndicator />
+      <NotificationContainer />
       <ObservedContent />
     </TodoStoreProvider>
   )

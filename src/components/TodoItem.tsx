@@ -213,6 +213,26 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
   const aliasInputId = `todo-alias-${todo.id}`
   const hasVisualTags = Boolean(aliasBadge) || (todo.tags?.length ?? 0) > 0
 
+  // Автосохранение с дебаунсингом при изменении текста
+  useEffect(() => {
+    if (!isEditing) return
+    
+    const trimmed = titleDraft.trim()
+    // Не сохраняем если текст не изменился или пустой
+    if (trimmed === todo.title || !trimmed) return
+
+    const timer = setTimeout(() => {
+      const details: { title: string; alias?: string | null } = { title: trimmed }
+      if (canEditAlias) {
+        const aliasTrimmed = aliasDraft.trim()
+        details.alias = aliasTrimmed ? aliasTrimmed : null
+      }
+      void store.updateTodoDetails(todo.id, details)
+    }, 500) // дебаунс 500мс
+
+    return () => clearTimeout(timer)
+  }, [titleDraft, aliasDraft, isEditing, todo.title, todo.id, canEditAlias, store])
+
   const commitEdit = useCallback(async () => {
     const trimmed = titleDraft.trim()
     const aliasTrimmed = aliasDraft.trim()
@@ -476,6 +496,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
           overPosition === 'above' ? 'shadow-[inset_0_2px_0_0_rgba(16,185,129,0.7)]' : '',
           overPosition === 'below' ? 'shadow-[inset_0_-2px_0_0_rgba(16,185,129,0.7)]' : '',
           isFirstChildAtMaxDepth ? 'is-first' : '',
+          todo.id.startsWith('temp_') ? 'opacity-50' : '',
         ].join(' ')}
         draggable={!isEditing && !isAddingChild}
         onDragStart={handleDragStart}
