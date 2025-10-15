@@ -30,3 +30,8 @@ body {
 button {
   @apply focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400;
 }
+
+
+.is-first {
+  @apply bg-emerald-50/60 ring-emerald-300;
+}

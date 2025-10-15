@@ -86,6 +86,8 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
   const canReorderInTree = draggedId !== null && store.canDrop(draggedId, parentId)
   const isPinnedContext = Boolean(pinnedListId)
   const canReorderInPinned = draggedId !== null && isPinnedContext && store.isPinned(draggedId!)
+  // Проверяем, является ли задача первым ребенком узла на максимальной глубине
+  const isFirstChildAtMaxDepth = !isPinnedContext && store.highlightFirstAtMaxDepth && store.isFirstChildAtMaxDepth(todo.id)
 
   useEffect(() => {
     setTitleDraft(todo.title)
@@ -473,6 +475,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
           isOverInside && canDropInside ? 'ring-2 ring-emerald-400/80 bg-emerald-50/50' : '',
           overPosition === 'above' ? 'shadow-[inset_0_2px_0_0_rgba(16,185,129,0.7)]' : '',
           overPosition === 'below' ? 'shadow-[inset_0_-2px_0_0_rgba(16,185,129,0.7)]' : '',
+          isFirstChildAtMaxDepth ? 'is-first' : '',
         ].join(' ')}
         draggable={!isEditing && !isAddingChild}
         onDragStart={handleDragStart}

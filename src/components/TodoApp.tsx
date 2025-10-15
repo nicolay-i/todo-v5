@@ -334,7 +334,16 @@ const TodoAppContent = () => {
             <>
               {/* Добавление задачи теперь через модал */}
               <TodoSearchBar />
-              <div className="mb-3 flex items-center justify-end">
+              <div className="mb-3 flex items-center justify-between gap-3 pl-3">
+                <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={store.highlightFirstAtMaxDepth}
+                    onChange={() => store.toggleHighlightFirstAtMaxDepth()}
+                    className="h-4 w-4 cursor-pointer rounded border-slate-300 text-emerald-600 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-0"
+                  />
+                  <span>Выделение первого todo</span>
+                </label>
                 <FilterSelect value={store.listFilterMode} onChange={(v) => store.setListFilterMode(v)} />
               </div>
               <ListContainer />

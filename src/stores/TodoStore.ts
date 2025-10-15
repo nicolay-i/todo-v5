@@ -41,10 +41,14 @@ export class TodoStore {
   searchQuery = ''
   searchTagIds: string[] = []
 
+  // Флаг включения выделения первых todo на максимальной глубине
+  highlightFirstAtMaxDepth = true
+
   private static readonly COLLAPSE_STORAGE_KEY = 'todoCollapsedIds_v1'
   private static readonly PINNED_COLLAPSE_STORAGE_KEY = 'pinnedCollapsedIds_v1'
   private static readonly LIST_FILTER_STORAGE_KEY = 'listFilterMode_v1'
   private static readonly PINNED_FILTER_STORAGE_KEY = 'pinnedFilterMode_v1'
+  private static readonly HIGHLIGHT_FIRST_STORAGE_KEY = 'highlightFirstAtMaxDepth_v1'
 
   constructor(initialState: TodoState) {
     makeAutoObservable(this, {}, { autoBind: true })
@@ -179,6 +183,11 @@ export class TodoStore {
     this.saveFilters()
   }
 
+  toggleHighlightFirstAtMaxDepth() {
+    this.highlightFirstAtMaxDepth = !this.highlightFirstAtMaxDepth
+    this.saveFilters()
+  }
+
   // ---- Search API ----
   setSearchQuery(query: string) {
     this.searchQuery = query
@@ -306,8 +315,10 @@ export class TodoStore {
     try {
       const listRaw = window.localStorage.getItem(TodoStore.LIST_FILTER_STORAGE_KEY)
       const pinnedRaw = window.localStorage.getItem(TodoStore.PINNED_FILTER_STORAGE_KEY)
+      const highlightRaw = window.localStorage.getItem(TodoStore.HIGHLIGHT_FIRST_STORAGE_KEY)
       if (listRaw && isVisibilityMode(listRaw)) this.listFilterMode = listRaw
       if (pinnedRaw && isVisibilityMode(pinnedRaw)) this.pinnedFilterMode = pinnedRaw
+      if (highlightRaw !== null) this.highlightFirstAtMaxDepth = highlightRaw === 'true'
     } catch (e) {
       // ignore
     }
@@ -318,6 +329,7 @@ export class TodoStore {
     try {
       window.localStorage.setItem(TodoStore.LIST_FILTER_STORAGE_KEY, this.listFilterMode)
       window.localStorage.setItem(TodoStore.PINNED_FILTER_STORAGE_KEY, this.pinnedFilterMode)
+      window.localStorage.setItem(TodoStore.HIGHLIGHT_FIRST_STORAGE_KEY, String(this.highlightFirstAtMaxDepth))
     } catch (e) {}
   }
 
@@ -629,6 +641,76 @@ export class TodoStore {
   private containsNode(node: TodoNode, id: string): boolean {
     if (node.id === id) return true
     return node.children.some((child) => this.containsNode(child, id))
+  }
+
+  /**
+   * Проверяет, является ли задача первым ребенком узла на максимальной глубине.
+   * Проверяет для каждого узла-предка, является ли данная задача первым потомком
+   * на максимальной глубине поддерева этого предка.
+   */
+  isFirstChildAtMaxDepth(todoId: string): boolean {
+    // Проверяем для всех узлов в дереве, является ли данный todoId
+    // первым ребенком на максимальной глубине
+
+    // Рекурсивная функция для проверки каждого узла
+    const checkNode = (node: TodoNode): boolean => {
+      // Для текущего узла находим первого ребенка на максимальной глубине
+      const firstAtMax = this.findFirstChildAtMaxDepthInSubtree(node)
+      if (firstAtMax?.id === todoId) {
+        return true
+      }
+
+      // Проверяем рекурсивно для всех детей
+      for (const child of node.children) {
+        if (checkNode(child)) {
+          return true
+        }
+      }
+
+      return false
+    }
+
+    // Проверяем для всех корневых узлов
+    for (const root of this.todos) {
+      if (checkNode(root)) {
+        return true
+      }
+    }
+
+    return false
+  }
+
+  /**
+   * Находит первого ребенка на максимальной глубине в поддереве узла
+   */
+  private findFirstChildAtMaxDepthInSubtree(node: TodoNode): TodoNode | null {
+    const maxDepth = this.getMaxDepth(node)
+    
+    if (maxDepth === 0) {
+      // Нет детей
+      return null
+    }
+
+    // Ищем первого ребенка на глубине maxDepth
+    return this.findFirstAtDepth(node, maxDepth, 0)
+  }
+
+  /**
+   * Рекурсивно ищет первого ребенка на заданной глубине
+   */
+  private findFirstAtDepth(node: TodoNode, targetDepth: number, currentDepth: number): TodoNode | null {
+    if (currentDepth === targetDepth) {
+      return node
+    }
+
+    for (const child of node.children) {
+      const result = this.findFirstAtDepth(child, targetDepth, currentDepth + 1)
+      if (result) {
+        return result
+      }
+    }
+
+    return null
   }
 }
 
