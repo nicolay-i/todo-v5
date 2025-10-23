@@ -15,6 +15,7 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
+    "mindmap:api": "uvicorn mindmap_api.main:app --reload",
     "task": "node scripts/task.js",
     "task:clean": "node scripts/task-clean.js"
   },
