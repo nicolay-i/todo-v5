@@ -1,5 +1,3 @@
-import type { PinnedList, Todo } from '@prisma/client'
-
 export interface Tag {
   id: string
   name: string
@@ -9,17 +7,30 @@ export interface Tag {
   updatedAt: Date
 }
 
-export interface TodoNode extends Todo {
+export interface TodoRecord {
+  id: string
+  title: string
+  completed: boolean
+  completedAt: Date | null
+  pinned: boolean
+  position: number
+  parentId: string | null
+  userId: string
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface TodoNode extends TodoRecord {
   children: TodoNode[]
   tags?: Tag[]
 }
 
 export interface PinnedListState {
-  id: PinnedList['id']
-  title: PinnedList['title']
+  id: string
+  title: string
   order: string[]
-  isPrimary: PinnedList['isPrimary']
-  position: PinnedList['position']
+  isPrimary: boolean
+  position: number
   isActive?: boolean
 }
 
@@ -27,4 +38,12 @@ export interface TodoState {
   todos: TodoNode[]
   pinnedLists: PinnedListState[]
   tags?: Tag[]
+}
+
+export interface SessionUser {
+  id: string
+  firstName: string
+  lastName?: string | null
+  username?: string | null
+  photoUrl?: string | null
 }
