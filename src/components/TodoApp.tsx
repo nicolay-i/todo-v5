@@ -4,6 +4,7 @@ import type { ChangeEventHandler, FormEventHandler } from 'react'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { observer } from 'mobx-react-lite'
 import { FiPlus } from 'react-icons/fi'
+import type { AuthenticatedUser } from '@/lib/auth/session'
 import type { TodoState } from '@/lib/types'
 import { TodoStore } from '@/stores/TodoStore'
 import type { VisibilityMode } from '@/stores/TodoStore'
@@ -17,9 +18,10 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 interface TodoAppProps {
   initialState: TodoState
+  currentUser: AuthenticatedUser
 }
 
-const TodoAppContent = () => {
+const TodoAppContent = ({ currentUser }: { currentUser: AuthenticatedUser }) => {
   const store = useTodoStore()
   const [newTitle, setNewTitle] = useState('')
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -28,6 +30,16 @@ const TodoAppContent = () => {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' })
+    } catch (error) {
+      console.error('Failed to logout', error)
+    } finally {
+      router.replace('/login')
+    }
+  }
 
   // Инициализируем вкладку из URL (?tab=...)
   const tabFromUrl = searchParams.get('tab')
@@ -276,7 +288,7 @@ const TodoAppContent = () => {
               )}
             </>
           ) : (
-            <SettingsTab />
+            <SettingsTab currentUser={currentUser} onLogout={handleLogout} />
           )}
         </section>
         {/* Modal for adding new todo with animation and tag selection */}
@@ -372,12 +384,12 @@ const TodoAppContent = () => {
 
 const ObservedContent = observer(TodoAppContent)
 
-export const TodoApp = ({ initialState }: TodoAppProps) => {
+export const TodoApp = ({ initialState, currentUser }: TodoAppProps) => {
   const [store] = useState(() => new TodoStore(initialState))
 
   return (
     <TodoStoreProvider store={store}>
-      <ObservedContent />
+      <ObservedContent currentUser={currentUser} />
     </TodoStoreProvider>
   )
 }
@@ -473,7 +485,13 @@ const ListContainer = observer(() => {
   )
 })
 
-const SettingsTab = () => {
+const SettingsTab = ({
+  currentUser,
+  onLogout,
+}: {
+  currentUser: AuthenticatedUser
+  onLogout: () => void | Promise<void>
+}) => {
   const store = useTodoStore()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isExporting, setIsExporting] = useState(false)
@@ -548,6 +566,40 @@ const SettingsTab = () => {
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
+        <div className="flex items-center gap-4">
+          {currentUser.photoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={currentUser.photoUrl}
+              alt={currentUser.firstName}
+              className="h-14 w-14 rounded-full border border-slate-200 object-cover"
+            />
+          ) : (
+            <div className="flex h-14 w-14 items-center justify-center rounded-full border border-slate-200 bg-slate-100 text-lg font-semibold text-slate-600">
+              {currentUser.firstName.charAt(0)}
+            </div>
+          )}
+          <div className="text-left">
+            <p className="text-base font-semibold text-slate-700">
+              {currentUser.firstName}
+              {currentUser.lastName ? ` ${currentUser.lastName}` : ''}
+            </p>
+            {currentUser.username && (
+              <p className="text-sm text-slate-500">@{currentUser.username}</p>
+            )}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            void onLogout()
+          }}
+          className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
+        >
+          Выйти
+        </button>
+      </div>
       {/* Tags management */}
       <div className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
         <h3 className="text-base font-semibold text-slate-700">Теги</h3>

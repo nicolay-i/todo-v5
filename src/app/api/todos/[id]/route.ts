@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { getCurrentUser } from '@/lib/auth/session'
 import {
   deleteTodo,
   moveTodo,
@@ -15,24 +16,28 @@ interface PatchBody {
 }
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+  const user = await getCurrentUser()
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   const body = (await request.json()) as PatchBody
   const { id } = params
 
   switch (body.action) {
     case 'rename': {
-      const state = await updateTodoTitle(id, body.title ?? '')
+      const state = await updateTodoTitle(user.id, id, body.title ?? '')
       return NextResponse.json(state)
     }
     case 'toggleCompleted': {
-      const state = await toggleTodoCompleted(id)
+      const state = await toggleTodoCompleted(user.id, id)
       return NextResponse.json(state)
     }
     case 'move': {
-      const state = await moveTodo(id, body.targetParentId ?? null, body.targetIndex ?? 0)
+      const state = await moveTodo(user.id, id, body.targetParentId ?? null, body.targetIndex ?? 0)
       return NextResponse.json(state)
     }
     case 'togglePinned': {
-      const state = await togglePinned(id)
+      const state = await togglePinned(user.id, id)
       return NextResponse.json(state)
     }
     default:
@@ -41,6 +46,10 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 }
 
 export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
-  const state = await deleteTodo(params.id)
+  const user = await getCurrentUser()
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  const state = await deleteTodo(user.id, params.id)
   return NextResponse.json(state)
 }

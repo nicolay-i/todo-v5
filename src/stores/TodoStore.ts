@@ -99,6 +99,10 @@ export class TodoStore {
   async refresh() {
     try {
       const response = await fetch('/api/state', { cache: 'no-store' })
+      if (response.status === 401) {
+        window.location.href = '/login'
+        return
+      }
       if (!response.ok) {
         throw new Error('Failed to load state')
       }
@@ -440,6 +444,11 @@ export class TodoStore {
           ...(init.headers ?? {}),
         },
       })
+
+      if (response.status === 401) {
+        window.location.href = '/login'
+        return
+      }
 
       if (!response.ok) {
         throw new Error(`Request failed: ${response.status}`)
