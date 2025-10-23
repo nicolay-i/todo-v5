@@ -13,6 +13,7 @@ import { PinnedList } from './PinnedList'
 import { PinnedTextView } from './PinnedTextView'
 import { TodoItem } from './TodoItem'
 import { TodoSearchBar } from './TodoSearchBar'
+import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 interface TodoAppProps {
@@ -145,7 +146,7 @@ const TodoAppContent = () => {
     <div className="min-h-screen bg-canvas-light text-slate-900">
       <div className="mx-auto flex min-h-screen max-w-4xl flex-col px-4 py-10 sm:px-6 lg:px-8">
         <section className="flex-1 rounded-3xl bg-white/60 p-5 shadow-inner ring-1 ring-white/40">
-          <div className="mb-6 flex items-center justify-between gap-3">
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
             <div className="flex rounded-2xl bg-white/70 p-1 text-sm font-medium text-slate-500 shadow-sm ring-1 ring-slate-200/70">
               {tabs.map((tab) => (
                 <button
@@ -163,17 +164,25 @@ const TodoAppContent = () => {
                 </button>
               ))}
             </div>
-            {activeTab === 'all' && (
-              <button
-                type="button"
-                onClick={openAddModal}
-                className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
-                aria-label="Добавить задачу"
+            <div className="flex items-center gap-3">
+              <Link
+                href="/mind-map"
+                className="inline-flex items-center gap-2 rounded-xl border border-transparent bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-white"
               >
-                <FiPlus />
-                Добавить
-              </button>
-            )}
+                Mind Map
+              </Link>
+              {activeTab === 'all' && (
+                <button
+                  type="button"
+                  onClick={openAddModal}
+                  className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
+                  aria-label="Добавить задачу"
+                >
+                  <FiPlus />
+                  Добавить
+                </button>
+              )}
+            </div>
           </div>
 
           {activeTab === 'pinned' ? (

@@ -8,14 +8,16 @@
 - добавление, редактирование, удаление элементов;
 - отметка задач как выполненных и снятие отметки;
 - минималистичный светлый дизайн с иконками вместо текстовых кнопок;
-- закреплённые слоты (например, на дни) с возможностью сворачивания/разворачивания.
+- закреплённые слоты (например, на дни) с возможностью сворачивания/разворачивания;
+- просмотр майнд-карт, хранящихся в PostgreSQL с pgvector, через отдельный FastAPI сервис.
 
 ## Технологии
 - Next.js 14 + TypeScript;
 - Prisma ORM с SQLite;
 - MobX для клиентского состояния;
 - Tailwind CSS для стилизации;
-- HTML5 drag-and-drop.
+- HTML5 drag-and-drop;
+- FastAPI + SQLAlchemy + PostgreSQL (pgvector) для сервиса майнд-карт.
 
 ## Быстрый старт
 
@@ -33,6 +35,33 @@ pnpm dev
 ```
 
 Приложение будет доступно на `http://localhost:3000`.
+
+## Mind map: FastAPI + PostgreSQL (pgvector)
+
+Для визуализации майнд-карт используется отдельный Python-сервис на FastAPI. Данные хранятся в PostgreSQL с расширением `pgvector`.
+
+1. Запустите PostgreSQL и активируйте расширение:
+   ```sql
+   CREATE EXTENSION IF NOT EXISTS vector;
+   ```
+   Пример запуска в Docker:
+   ```bash
+   docker run --name mindmap-pg -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d pgvector/pgvector:pg16
+   ```
+2. Скопируйте переменные окружения и укажите строку подключения:
+   ```bash
+   cp mindmap_api/.env.example mindmap_api/.env  # при необходимости создайте файл
+   export MINDMAP_DATABASE_URL="postgresql+psycopg://postgres:postgres@localhost:5432/mindmap"
+   ```
+3. Установите зависимости и запустите сервер:
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate
+   pip install -r mindmap_api/requirements.txt
+   uvicorn mindmap_api.main:app --reload  # либо pnpm mindmap:api при активированном окружении
+   ```
+4. По умолчанию сервис создаёт демонстрационную майнд-карту. Swagger доступен по адресу `http://localhost:8000/docs`.
+5. Включите URL сервиса для фронтенда (`MINDMAP_API_URL`), чтобы страница `/mind-map` использовала актуальные данные из БД.
 
 ## Полезные скрипты
 
