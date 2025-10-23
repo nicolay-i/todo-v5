@@ -17,6 +17,37 @@
 - Tailwind CSS для стилизации;
 - HTML5 drag-and-drop.
 
+## FastAPI сервер mind map
+
+В репозитории добавлен отдельный Python-сервис на FastAPI для просмотра mind map с
+данными из PostgreSQL и расширением `pgvector`.
+
+### Быстрый старт
+
+```bash
+# Установите Python-зависимости
+python -m venv .venv
+source .venv/bin/activate
+pip install -r backend/requirements.txt
+
+# Настройте подключение к PostgreSQL (расширение pgvector должно быть доступно)
+export MINDMAP_DATABASE_URL="postgresql://user:pass@localhost:5432/mindmap"
+
+# Запустите сервер
+uvicorn backend.main:app --reload
+```
+
+Сервис автоматически создаёт расширение `vector` и необходимые таблицы (ноды,
+связи и журнал событий). Интерфейс доступен на `http://127.0.0.1:8000/` —
+страница использует TailwindCSS и визуализирует mind map в браузере на основе
+актуальных данных из БД.
+
+### API
+
+- `GET /api/mind-map` — получить список нод, связей и последних логов;
+- `POST /api/mind-map` — синхронизировать mind map в базе (ноды, связи, логи);
+- `GET /api/mind-map/logs` — получить последние записи журнала.
+
 ## Быстрый старт
 
 ```bash

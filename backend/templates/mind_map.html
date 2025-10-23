@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mind Map Viewer</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.14/dist/tailwind.min.css"
+      rel="stylesheet"
+    />
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+  </head>
+  <body class="bg-slate-950 text-slate-100 min-h-screen">
+    <div class="max-w-7xl mx-auto px-6 py-10 space-y-8">
+      <header class="space-y-2">
+        <p class="text-sky-400 font-semibold uppercase tracking-wide text-xs">
+          FastAPI · PostgreSQL · pgvector
+        </p>
+        <h1 class="text-3xl font-bold">Mind Map Viewer</h1>
+        <p class="text-slate-400 max-w-3xl">
+          Отображает актуальные данные mind map непосредственно из PostgreSQL с
+          расширением <span class="font-mono">pgvector</span>. На странице
+          используется TailwindCSS и визуализация обновляется в реальном времени.
+        </p>
+      </header>
+
+      <section class="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
+        <div class="lg:col-span-3">
+          <div
+            id="mind-map"
+            class="h-[600px] rounded-xl border border-slate-800 bg-slate-900/70 shadow-lg shadow-slate-900/40"
+          ></div>
+          <div
+            id="empty-state"
+            class="hidden mt-4 rounded-lg border border-dashed border-slate-700 bg-slate-900/50 p-6 text-center text-slate-300"
+          >
+            <h2 class="text-lg font-semibold text-slate-100">Нет данных</h2>
+            <p class="mt-2 text-sm">
+              Mind map пока пустая. Отправьте данные на <code class="font-mono">POST /api/mind-map</code>,
+              чтобы увидеть визуализацию.
+            </p>
+          </div>
+        </div>
+        <aside class="space-y-4">
+          <div class="rounded-xl border border-slate-800 bg-slate-900/70 p-5">
+            <div class="flex items-center justify-between">
+              <h2 class="text-xl font-semibold">Журнал событий</h2>
+              <span class="rounded-full bg-sky-500/10 px-3 py-1 text-xs font-medium text-sky-300">Live</span>
+            </div>
+            <p class="mt-2 text-sm text-slate-400">
+              История создания и обновления mind map. Список обновляется автоматически.
+            </p>
+            <ul id="log-list" class="mt-4 space-y-3 text-sm">
+              {% for log in logs %}
+              <li class="rounded-lg border border-slate-800 bg-slate-950/50 p-3">
+                <div class="flex items-center justify-between text-xs uppercase tracking-wider">
+                  <span class="font-semibold text-sky-400">{{ log.level }}</span>
+                  <time class="text-slate-500">{{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</time>
+                </div>
+                <p class="mt-2 text-slate-200">{{ log.message }}</p>
+                {% if log.metadata %}
+                <pre class="mt-2 overflow-x-auto rounded bg-slate-900/80 p-2 text-xs text-slate-400">{{ log.metadata | tojson(indent=2) }}</pre>
+                {% endif %}
+              </li>
+              {% endfor %}
+            </ul>
+          </div>
+          <div class="rounded-xl border border-slate-800 bg-slate-900/70 p-5 text-sm text-slate-300">
+            <h3 class="text-lg font-semibold text-slate-100">API</h3>
+            <p class="mt-2">
+              <span class="font-mono text-sky-300">GET /api/mind-map</span> — список нод, связей и журналов.
+            </p>
+            <p class="mt-2">
+              <span class="font-mono text-sky-300">POST /api/mind-map</span> — синхронизация данных mind map.
+            </p>
+            <p class="mt-2">
+              <span class="font-mono text-sky-300">GET /api/mind-map/logs</span> — последние события.
+            </p>
+          </div>
+        </aside>
+      </section>
+    </div>
+
+    <script>
+      const networkContainer = document.getElementById("mind-map");
+      const emptyState = document.getElementById("empty-state");
+      const logList = document.getElementById("log-list");
+      let networkInstance = null;
+
+      const networkOptions = {
+        physics: {
+          stabilization: true,
+          barnesHut: {
+            gravitationalConstant: -8000,
+            centralGravity: 0.3,
+            springLength: 120,
+            springConstant: 0.05,
+          },
+        },
+        edges: {
+          smooth: true,
+          color: { color: "#94a3b8" },
+          arrows: {
+            to: { enabled: true, scaleFactor: 0.7 },
+          },
+          font: { color: "#cbd5f5" },
+        },
+        nodes: {
+          shape: "dot",
+          size: 18,
+          font: { color: "#f8fafc", face: "Inter" },
+          borderWidth: 2,
+          color: {
+            border: "#38bdf8",
+            background: "#0f172a",
+            highlight: {
+              border: "#38bdf8",
+              background: "#082f49",
+            },
+          },
+        },
+        layout: {
+          improvedLayout: true,
+        },
+        interaction: {
+          hover: true,
+          tooltipDelay: 200,
+          zoomView: true,
+        },
+      };
+
+      function renderMindMap(data) {
+        if (!data.nodes.length) {
+          emptyState.classList.remove("hidden");
+          if (networkInstance) {
+            networkInstance.setData({ nodes: new vis.DataSet([]), edges: new vis.DataSet([]) });
+          }
+          return;
+        }
+
+        emptyState.classList.add("hidden");
+
+        const nodes = new vis.DataSet(
+          data.nodes.map((node) => ({
+            id: node.id,
+            label: node.title,
+            title:
+              (node.content || "") +
+              (node.embedding?.length ? `\nembedding: [${node.embedding.map((v) => v.toFixed(3)).join(", ")}]` : ""),
+            value: 1,
+          }))
+        );
+
+        const edges = new vis.DataSet(
+          data.edges.map((edge) => ({
+            id: edge.id,
+            from: edge.source_id,
+            to: edge.target_id,
+            label: edge.label || "",
+          }))
+        );
+
+        if (!networkInstance) {
+          networkInstance = new vis.Network(
+            networkContainer,
+            { nodes, edges },
+            networkOptions
+          );
+        } else {
+          networkInstance.setData({ nodes, edges });
+        }
+      }
+
+      async function refreshMindMap() {
+        try {
+          const response = await fetch("/api/mind-map");
+          if (!response.ok) {
+            throw new Error("Не удалось загрузить данные mind map");
+          }
+          const payload = await response.json();
+          renderMindMap(payload);
+          renderLogs(payload.logs);
+        } catch (error) {
+          console.error(error);
+        }
+      }
+
+      async function refreshLogs() {
+        try {
+          const response = await fetch("/api/mind-map/logs?limit=20");
+          if (!response.ok) {
+            throw new Error("Не удалось загрузить журнал");
+          }
+          const logs = await response.json();
+          renderLogs(logs);
+        } catch (error) {
+          console.error(error);
+        }
+      }
+
+      function renderLogs(logs) {
+        if (!Array.isArray(logs)) return;
+        logList.innerHTML = "";
+        logs.forEach((log) => {
+          const li = document.createElement("li");
+          li.className =
+            "rounded-lg border border-slate-800 bg-slate-950/50 p-3 transition hover:border-sky-700/40";
+          li.innerHTML = `
+            <div class="flex items-center justify-between text-xs uppercase tracking-wider">
+              <span class="font-semibold text-sky-400">${log.level}</span>
+              <time class="text-slate-500">${new Date(log.created_at).toLocaleString()}</time>
+            </div>
+            <p class="mt-2 text-slate-200">${log.message}</p>
+            ${log.metadata ? `<pre class="mt-2 overflow-x-auto rounded bg-slate-900/80 p-2 text-xs text-slate-400">${JSON.stringify(log.metadata, null, 2)}</pre>` : ""}
+          `;
+          logList.appendChild(li);
+        });
+      }
+
+      refreshMindMap();
+      setInterval(() => {
+        refreshMindMap();
+        refreshLogs();
+      }, 8000);
+    </script>
+  </body>
+</html>
