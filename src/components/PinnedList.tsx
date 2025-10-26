@@ -1,10 +1,12 @@
+'use client'
+
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { observer } from 'mobx-react-lite'
 import { FiCheck, FiEdit2, FiTrash2, FiX } from 'react-icons/fi'
-import { TodoItem } from './TodoItem'
+import type { PinnedListView } from '@/stores/TodoStore'
+import { useTodoStore } from '@/stores/TodoStoreContext'
 import { PinnedDropZone } from './PinnedDropZone'
-import { useTodoStore } from '../stores/TodoStoreContext'
-import type { PinnedListView } from '../stores/TodoStore'
+import { TodoItem } from './TodoItem'
 
 interface PinnedListProps {
   list: PinnedListView
@@ -35,11 +37,11 @@ const PinnedListComponent = ({ list }: PinnedListProps) => {
     return 'Перетащите закрепленные задачи, чтобы начать заполнять этот список.'
   }, [isPrimary])
 
-  const handleRenameSubmit: React.FormEventHandler<HTMLFormElement> = (event) => {
+  const handleRenameSubmit: React.FormEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault()
     const trimmed = titleDraft.trim()
     if (!trimmed) return
-    store.renamePinnedList(list.id, trimmed)
+    await store.renamePinnedList(list.id, trimmed)
     setIsEditingTitle(false)
   }
 
@@ -101,7 +103,9 @@ const PinnedListComponent = ({ list }: PinnedListProps) => {
               </button>
               <button
                 type="button"
-                onClick={() => store.deletePinnedList(list.id)}
+                onClick={() => {
+                  void store.deletePinnedList(list.id)
+                }}
                 className={`${headerButtonStyles} ${
                   isPrimary ? 'cursor-not-allowed opacity-40 hover:bg-transparent hover:text-slate-400' : 'text-rose-400 hover:text-rose-600'
                 }`}
