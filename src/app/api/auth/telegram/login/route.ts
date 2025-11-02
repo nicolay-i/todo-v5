@@ -10,8 +10,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Telegram OAuth is not configured' }, { status: 500 })
   }
 
+  // Use NEXT_PUBLIC_APP_URL if set, otherwise fall back to request origin
   const url = new URL(request.url)
-  const origin = url.origin
+  const origin = process.env.NEXT_PUBLIC_APP_URL || url.origin
   const state = randomBytes(16).toString('hex')
   const redirectUri = `${origin}/api/auth/telegram/callback?state=${state}`
 

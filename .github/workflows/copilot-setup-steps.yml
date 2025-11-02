@@ -47,7 +47,7 @@ jobs:
         run: pnpm db:push
 
       - name: Run linter
-        run: pnpm lint
+        run: pnpm check
 
       - name: Build application
         run: pnpm build

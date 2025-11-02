@@ -33,8 +33,8 @@ pnpm db:studio
 # Синхронизировать схему БД (без миграций)
 pnpm db:push:dev
 
-# Проверить линтер
-pnpm lint
+# Проверить типизацию
+pnpm check
 
 # Собрать для production
 pnpm build

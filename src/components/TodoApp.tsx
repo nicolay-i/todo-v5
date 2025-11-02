@@ -277,7 +277,6 @@ const TodoAppContent = ({ user }: { user: SessionUser }) => {
                   Другой
                 </button>
               )}
-              <UserBadge user={user} displayName={displayName} />
             </div>
           </div>
 
@@ -481,33 +480,6 @@ const TodoAppContent = ({ user }: { user: SessionUser }) => {
             </div>
           </div>
         )}
-      </div>
-    </div>
-  )
-}
-
-const UserBadge = ({ user, displayName }: { user: SessionUser; displayName: string }) => {
-  const usernameLabel = user.username ? `@${user.username}` : null
-  const showUsername = usernameLabel && usernameLabel !== displayName
-
-  return (
-    <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white/70 px-4 py-2 text-left shadow-sm">
-      {user.photoUrl ? (
-        <Image
-          src={user.photoUrl}
-          alt={displayName}
-          width={40}
-          height={40}
-          className="h-10 w-10 rounded-full object-cover shadow-inner"
-        />
-      ) : (
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white">
-          {displayName.charAt(0).toUpperCase()}
-        </div>
-      )}
-      <div className="flex flex-col">
-        <span className="text-sm font-medium text-slate-700">{displayName}</span>
-        {showUsername && <span className="text-xs text-slate-500">{usernameLabel}</span>}
       </div>
     </div>
   )

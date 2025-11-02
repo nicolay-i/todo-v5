@@ -1,5 +1,6 @@
 import { TodoApp } from '@/components/TodoApp'
 import { LoginScreen } from '@/components/LoginScreen'
+import { TelegramAuthHandler } from '@/components/TelegramAuthHandler'
 import { getCurrentUser } from '@/lib/auth/session'
 import { getTodoState } from '@/lib/todoService'
 
@@ -15,7 +16,12 @@ export default async function Page({ searchParams }: PageProps) {
   const authError = typeof searchParams?.authError === 'string' ? searchParams?.authError : null
 
   if (!user) {
-    return <LoginScreen errorCode={authError ?? undefined} />
+    return (
+      <>
+        <TelegramAuthHandler />
+        <LoginScreen errorCode={authError ?? undefined} />
+      </>
+    )
   }
 
   const initialState = await getTodoState(user.id)
