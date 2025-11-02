@@ -56,12 +56,15 @@ export class TodoStore {
   private static readonly PINNED_FILTER_STORAGE_KEY = 'pinnedFilterMode_v1'
   private static readonly HIGHLIGHT_FIRST_STORAGE_KEY = 'highlightFirstAtMaxDepth_v1'
 
-  constructor(initialState: TodoState, notifications: NotificationStore) {
+  private readonly currentUserId: string
+
+  constructor(initialState: TodoState, notifications: NotificationStore, currentUserId: string) {
     makeAutoObservable(this, {}, { autoBind: true })
     this.notifications = notifications
     this.todos = initialState.todos
     this.pinnedLists = initialState.pinnedLists
     this.tags = initialState.tags ?? []
+    this.currentUserId = currentUserId
     this.loadCollapsed()
     this.loadPinnedCollapsed()
     this.loadFilters()
@@ -110,6 +113,12 @@ export class TodoStore {
   async refresh() {
     try {
       const response = await fetch('/api/state', { cache: 'no-store' })
+      if (response.status === 401) {
+        if (typeof window !== 'undefined') {
+          window.location.reload()
+        }
+        return
+      }
       if (!response.ok) {
         throw new Error('Failed to load state')
       }
@@ -138,6 +147,7 @@ export class TodoStore {
           alias: null,
           parentId,
           position: 0,
+          userId: this.currentUserId,
           createdAt: now,
           updatedAt: now,
           children: [],
@@ -704,6 +714,13 @@ export class TodoStore {
         ...(init.headers ?? {}),
       },
     })
+
+    if (response.status === 401) {
+      if (typeof window !== 'undefined') {
+        window.location.reload()
+      }
+      throw new Error('Unauthorized')
+    }
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))

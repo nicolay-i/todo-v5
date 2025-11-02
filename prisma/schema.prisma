@@ -34,6 +34,8 @@ model Todo {
   tags      Tag[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model PinnedList {
@@ -45,6 +47,8 @@ model PinnedList {
   todos     PinnedTodo[]
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model PinnedTodo {
@@ -68,4 +72,22 @@ model Tag {
   todos     Todo[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id          String      @id @default(cuid())
+  telegramId  String      @unique
+  firstName   String
+  lastName    String?
+  username    String?
+  photoUrl    String?
+  languageCode String?
+  authDate    DateTime
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  todos       Todo[]
+  pinnedLists PinnedList[]
+  tags        Tag[]
 }

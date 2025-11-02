@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto'
 import type { Todo, Tag } from '@prisma/client'
 import { Prisma } from '@prisma/client'
+import { getUserIdOrThrow } from './auth/userContext'
 import { MAX_DEPTH } from './constants'
 import { prisma } from './prisma'
 import type { PinnedListState, TodoNode, TodoState } from './types'
 
 let schemaInitialized = false
-let seedInitialized = false
+const initializedUsers = new Set<string>()
 
 // Определение текущего типа БД (простая эвристика по DATABASE_URL)
 const isSQLite = process.env.DATABASE_URL?.startsWith('file:') ?? false
@@ -36,113 +37,55 @@ async function ensureDatabase() {
   schemaInitialized = true
 }
 
+async function prepareUser(): Promise<string> {
+  await ensureSeedData()
+  return getUserIdOrThrow()
+}
+
 async function ensureSeedData() {
   await ensureDatabase()
-  if (seedInitialized) return
+  const userId = getUserIdOrThrow()
+  if (initializedUsers.has(userId)) return
 
-  // Ensure primary pinned list exists once
-  let primary = await prisma.pinnedList.findFirst({ orderBy: { position: 'asc' } })
-  if (!primary) {
-    primary = await prisma.pinnedList.create({
-      data: { title: 'Главное', isPrimary: true, isActive: true, position: 0 },
+  await prisma.$transaction(async (tx) => {
+    let primary = await tx.pinnedList.findFirst({
+      where: { userId },
+      orderBy: { position: 'asc' },
     })
-  } else {
-    if (!primary.isPrimary) {
-      await prisma.pinnedList.update({ where: { id: primary.id }, data: { isPrimary: true } })
-    }
-    // Ensure there is exactly one active list; default to primary if none
-    const active = await prisma.pinnedList.findFirst({ where: { isActive: true } })
-    if (!active) {
-      await prisma.pinnedList.update({ where: { id: primary.id }, data: { isActive: true } })
-    }
-  }
 
-  // Seed demo todos only if DB is empty
-  const count = await prisma.todo.count()
-  if (count === 0) {
-    await prisma.$transaction(async (tx) => {
-      const qaChecklist = await tx.todo.create({
+    if (!primary) {
+      primary = await tx.pinnedList.create({
         data: {
-          title: 'Проверка перед релизом',
-          completed: false,
-          pinned: false,
+          userId,
+          title: 'Главное',
+          isPrimary: true,
+          isActive: true,
           position: 0,
         },
       })
+    } else {
+      if (!primary.isPrimary) {
+        await tx.pinnedList.update({ where: { id: primary.id }, data: { isPrimary: true } })
+      }
 
-      await tx.todo.createMany({
-        data: [
-          {
-            title: 'Прогнать авто-тесты',
-            completed: true,
-            completedAt: new Date(),
-            pinned: false,
-            parentId: qaChecklist.id,
-            position: 0,
-          },
-          {
-            title: 'Проверить ручные сценарии',
-            completed: false,
-            pinned: false,
-            parentId: qaChecklist.id,
-            position: 1,
-          },
-          {
-            title: 'Согласовать список изменений',
-            completed: false,
-            pinned: false,
-            parentId: qaChecklist.id,
-            position: 2,
-          },
-        ],
+      const active = await tx.pinnedList.findFirst({
+        where: { userId, isActive: true },
+        orderBy: { position: 'asc' },
       })
 
-      const designIteration = await tx.todo.create({
-        data: {
-          title: 'Прототип интерфейса',
-          completed: false,
-          pinned: false,
-          position: 1,
-        },
-      })
+      if (!active) {
+        await tx.pinnedList.update({ where: { id: primary.id }, data: { isActive: true } })
+      }
+    }
+  })
 
-      const feedback = await tx.todo.create({
-        data: {
-          title: 'Собрать обратную связь',
-          completed: false,
-          pinned: false,
-          parentId: designIteration.id,
-          position: 1,
-        },
-      })
-
-      await tx.todo.createMany({
-        data: [
-          {
-            title: 'Скетч основных экранов',
-            completed: false,
-            pinned: false,
-            parentId: designIteration.id,
-            position: 0,
-          },
-          {
-            title: 'Созвон с командой продукта',
-            completed: false,
-            pinned: false,
-            parentId: feedback.id,
-            position: 0,
-          },
-        ],
-      })
-    })
-  }
-
-  seedInitialized = true
+  initializedUsers.add(userId)
 }
 
 async function getPrimaryList() {
-  await ensureSeedData()
+  const userId = await prepareUser()
   const primary = await prisma.pinnedList.findFirst({
+    where: { userId },
     orderBy: { position: 'asc' },
   })
   if (!primary) {
@@ -158,8 +101,11 @@ async function getPrimaryList() {
 }
 
 async function getActiveList() {
-  await ensureSeedData()
-  let active = await prisma.pinnedList.findFirst({ where: { isActive: true }, orderBy: { position: 'asc' } })
+  const userId = await prepareUser()
+  let active = await prisma.pinnedList.findFirst({
+    where: { userId, isActive: true },
+    orderBy: { position: 'asc' },
+  })
   if (!active) {
     const primary = await getPrimaryList()
     active = await prisma.pinnedList.update({ where: { id: primary.id }, data: { isActive: true } })
@@ -168,26 +114,27 @@ async function getActiveList() {
 }
 
 async function getNextTodoPosition(parentId: string | null) {
-  await ensureSeedData()
+  const userId = await prepareUser()
   const lastTodo = await prisma.todo.findFirst({
-    where: { parentId },
+    where: { parentId, userId },
     orderBy: { position: 'desc' },
   })
   return (lastTodo?.position ?? -1) + 1
 }
 
 async function getNextPinnedListPosition() {
-  await ensureSeedData()
+  const userId = await prepareUser()
   const lastList = await prisma.pinnedList.findFirst({
+    where: { userId },
     orderBy: { position: 'desc' },
   })
   return (lastList?.position ?? -1) + 1
 }
 
 async function getNextPinnedTodoPosition(listId: string) {
-  await ensureSeedData()
+  const userId = await prepareUser()
   const lastEntry = await prisma.pinnedTodo.findFirst({
-    where: { pinnedListId: listId },
+    where: { pinnedListId: listId, pinnedList: { userId } },
     orderBy: { position: 'desc' },
   })
   return (lastEntry?.position ?? -1) + 1
@@ -226,9 +173,13 @@ function buildTree(todos: (Todo & { tags: Tag[] })[]): TodoNode[] {
 }
 
 async function composePinnedLists(): Promise<PinnedListState[]> {
+  const userId = getUserIdOrThrow()
   const [lists, entries] = await Promise.all([
-    prisma.pinnedList.findMany({ orderBy: { position: 'asc' } }),
-    prisma.pinnedTodo.findMany({ orderBy: [{ pinnedListId: 'asc' }, { position: 'asc' }] }),
+    prisma.pinnedList.findMany({ where: { userId }, orderBy: { position: 'asc' } }),
+    prisma.pinnedTodo.findMany({
+      where: { pinnedList: { userId } },
+      orderBy: [{ pinnedListId: 'asc' }, { position: 'asc' }],
+    }),
   ])
 
   return lists.map((list) => ({
@@ -242,11 +193,11 @@ async function composePinnedLists(): Promise<PinnedListState[]> {
 }
 
 export async function getTodoState(): Promise<TodoState> {
-  await ensureSeedData()
+  const userId = await prepareUser()
 
   const [todos, tags] = await Promise.all([
-    prisma.todo.findMany({ include: { tags: true } }),
-    prisma.tag.findMany({ orderBy: { position: 'asc' } }),
+    prisma.todo.findMany({ where: { userId }, include: { tags: true } }),
+    prisma.tag.findMany({ where: { userId }, orderBy: { position: 'asc' } }),
   ])
   const tree = buildTree(todos)
   const pinnedLists = await composePinnedLists()
@@ -369,6 +320,7 @@ function normalizePinnedLists(
 }
 
 export async function replaceTodoState(state: unknown): Promise<TodoState> {
+  const userId = await prepareUser()
   const todos: NormalizedTodoRecord[] = []
   const idSet = new Set<string>()
   const parsed = (state as Partial<TodoState>) ?? {}
@@ -432,13 +384,13 @@ export async function replaceTodoState(state: unknown): Promise<TodoState> {
   })
 
   await prisma.$transaction(async (tx) => {
-    await tx.pinnedTodo.deleteMany()
-    await tx.pinnedList.deleteMany()
-    await tx.tag.deleteMany()
-    await tx.todo.deleteMany()
+    await tx.pinnedTodo.deleteMany({ where: { pinnedList: { userId } } })
+    await tx.pinnedList.deleteMany({ where: { userId } })
+    await tx.tag.deleteMany({ where: { userId } })
+    await tx.todo.deleteMany({ where: { userId } })
 
     if (tagRecords.length > 0) {
-      await tx.tag.createMany({ data: tagRecords })
+      await tx.tag.createMany({ data: tagRecords.map((tag) => ({ ...tag, userId })) })
     }
 
     for (const todo of todos) {
@@ -451,6 +403,7 @@ export async function replaceTodoState(state: unknown): Promise<TodoState> {
           alias: todo.alias,
           parentId: todo.parentId,
           position: todo.position,
+          userId,
         },
       })
     }
@@ -472,6 +425,8 @@ export async function replaceTodoState(state: unknown): Promise<TodoState> {
           title: list.title,
           position: list.position,
           isPrimary: list.isPrimary,
+          isActive: Boolean(list.isActive),
+          userId,
         },
       })
 
@@ -490,31 +445,31 @@ export async function replaceTodoState(state: unknown): Promise<TodoState> {
   return getTodoState()
 }
 
-async function getTodoDepth(id: string): Promise<number> {
-  await ensureSeedData()
+async function getTodoDepth(id: string, userId: string): Promise<number> {
   // Унифицированный CTE без Postgres-специфичного кастинга (::int), работает и в SQLite
   const rows = await prisma.$queryRaw<{ depth: number | null }[]>`
     WITH RECURSIVE ancestors AS (
-      SELECT "parentId", 0 AS depth FROM "Todo" WHERE "id" = ${id}
+      SELECT "parentId", 0 AS depth FROM "Todo" WHERE "id" = ${id} AND "userId" = ${userId}
       UNION ALL
       SELECT t."parentId", ancestors.depth + 1
       FROM "Todo" t
       JOIN ancestors ON t."id" = ancestors."parentId"
+      WHERE t."userId" = ${userId}
     )
     SELECT COALESCE(MAX(depth), 0) AS depth FROM ancestors;
   `
   return Number(rows[0]?.depth ?? 0)
 }
 
-async function getSubtreeDepth(id: string): Promise<number> {
-  await ensureSeedData()
+async function getSubtreeDepth(id: string, userId: string): Promise<number> {
   const rows = await prisma.$queryRaw<{ maxDepth: number | null }[]>`
     WITH RECURSIVE tree AS (
-      SELECT "id", "parentId", 0 AS depth FROM "Todo" WHERE "id" = ${id}
+      SELECT "id", "parentId", 0 AS depth FROM "Todo" WHERE "id" = ${id} AND "userId" = ${userId}
       UNION ALL
       SELECT t."id", t."parentId", tree.depth + 1
       FROM "Todo" t
       JOIN tree ON t."parentId" = tree."id"
+      WHERE t."userId" = ${userId}
     )
     SELECT COALESCE(MAX(depth), 0) AS "maxDepth" FROM tree;
   `
@@ -527,10 +482,14 @@ export async function addTodo(parentId: string | null, title: string, tagIds?: s
     return getTodoState()
   }
 
-  await ensureSeedData()
+  const userId = await prepareUser()
 
   if (parentId) {
-    const parentDepth = await getTodoDepth(parentId)
+    const parent = await prisma.todo.findFirst({ where: { id: parentId, userId } })
+    if (!parent) {
+      return getTodoState()
+    }
+    const parentDepth = await getTodoDepth(parentId, userId)
     if (parentDepth >= MAX_DEPTH) {
       return getTodoState()
     }
@@ -540,7 +499,7 @@ export async function addTodo(parentId: string | null, title: string, tagIds?: s
   await prisma.$transaction(async (tx) => {
     // Shift positions of existing siblings (including roots when parentId is null)
     await tx.todo.updateMany({
-      where: { parentId },
+      where: { parentId, userId },
       data: { position: { increment: 1 } },
     })
 
@@ -550,8 +509,18 @@ export async function addTodo(parentId: string | null, title: string, tagIds?: s
         title: trimmed,
         parentId,
         position: 0,
+        userId,
         ...(Array.isArray(tagIds) && tagIds.length > 0
-          ? { tags: { connect: Array.from(new Set(tagIds)).map((id) => ({ id })) } }
+          ? {
+              tags: {
+                connect: (
+                  await tx.tag.findMany({
+                    where: { userId, id: { in: Array.from(new Set(tagIds)) } },
+                    select: { id: true },
+                  })
+                ).map((tag) => ({ id: tag.id })),
+              },
+            }
           : {}),
       },
     })
@@ -590,7 +559,12 @@ export async function updateTodoDetails(
     return getTodoState()
   }
 
-  await ensureSeedData()
+  const userId = await prepareUser()
+
+  const existing = await prisma.todo.findFirst({ where: { id, userId } })
+  if (!existing) {
+    return getTodoState()
+  }
 
   await prisma.todo.update({
     where: { id },
@@ -605,8 +579,8 @@ export async function updateTodoTitle(id: string, title: string): Promise<TodoSt
 }
 
 export async function toggleTodoCompleted(id: string): Promise<TodoState> {
-  await ensureSeedData()
-  const todo = await prisma.todo.findUnique({ where: { id } })
+  const userId = await prepareUser()
+  const todo = await prisma.todo.findFirst({ where: { id, userId } })
   if (!todo) {
     return getTodoState()
   }
@@ -620,60 +594,76 @@ export async function toggleTodoCompleted(id: string): Promise<TodoState> {
 }
 
 export async function deleteTodo(id: string): Promise<TodoState> {
-  await ensureSeedData()
-  await prisma.todo.delete({ where: { id } })
+  const userId = await prepareUser()
+  await prisma.todo.deleteMany({ where: { id, userId } })
   return getTodoState()
 }
 
 // ----- Tags API -----
 export async function listTags(): Promise<TodoState> {
-  await ensureSeedData()
+  await prepareUser()
   return getTodoState()
 }
 
 export async function addTag(name: string): Promise<TodoState> {
   const trimmed = name.trim()
   if (!trimmed) return getTodoState()
-  await ensureSeedData()
-  const maxPosition = await prisma.tag.findFirst({ orderBy: { position: 'desc' } })
+  const userId = await prepareUser()
+  const maxPosition = await prisma.tag.findFirst({ where: { userId }, orderBy: { position: 'desc' } })
   const position = (maxPosition?.position ?? -1) + 1
   const isSystem = trimmed === 'Проект' || trimmed === 'Раздел'
-  await prisma.tag.create({ data: { name: trimmed, position, isSystem } })
+  await prisma.tag.create({ data: { name: trimmed, position, isSystem, userId } })
   return getTodoState()
 }
 
 export async function renameTag(id: string, name: string): Promise<TodoState> {
   const trimmed = name.trim()
   if (!trimmed) return getTodoState()
-  await ensureSeedData()
+  const userId = await prepareUser()
+  const existing = await prisma.tag.findFirst({ where: { id, userId } })
+  if (!existing) return getTodoState()
   const isSystem = trimmed === 'Проект' || trimmed === 'Раздел'
   await prisma.tag.update({ where: { id }, data: { name: trimmed, isSystem } })
   return getTodoState()
 }
 
 export async function deleteTag(id: string): Promise<TodoState> {
-  await ensureSeedData()
-  await prisma.tag.delete({ where: { id } })
+  const userId = await prepareUser()
+  await prisma.tag.deleteMany({ where: { id, userId } })
   return getTodoState()
 }
 
 export async function reorderTags(tagIds: string[]): Promise<TodoState> {
-  await ensureSeedData()
+  const userId = await prepareUser()
+  const allowedIds = new Set(
+    (
+      await prisma.tag.findMany({
+        where: { userId, id: { in: tagIds } },
+        select: { id: true },
+      })
+    ).map((tag) => tag.id),
+  )
+
   await prisma.$transaction(
-    tagIds.map((id, index) =>
-      prisma.tag.update({
-        where: { id },
-        data: { position: index },
-      }),
-    ),
+    tagIds
+      .filter((id) => allowedIds.has(id))
+      .map((id, index) =>
+        prisma.tag.update({
+          where: { id },
+          data: { position: index },
+        }),
+      ),
   )
   return getTodoState()
 }
 
 export async function attachTagToTodo(todoId: string, tagId: string): Promise<TodoState> {
-  await ensureSeedData()
+  const userId = await prepareUser()
+  const todo = await prisma.todo.findFirst({ where: { id: todoId, userId } })
+  if (!todo) return getTodoState()
+
   // Ограничения системных тегов: "Проект" и "Раздел"
-  const tag = await prisma.tag.findUnique({ where: { id: tagId } })
+  const tag = await prisma.tag.findFirst({ where: { id: tagId, userId } })
   if (!tag) return getTodoState()
 
   if (tag.name === 'Проект') {
@@ -682,32 +672,36 @@ export async function attachTagToTodo(todoId: string, tagId: string): Promise<To
       // Для SQLite используем короткий SELECT 1 ... LIMIT 1
       const rows = await prisma.$queryRaw<{ found: number }[]>`
         WITH RECURSIVE subtree AS (
-          SELECT "id" FROM "Todo" WHERE "id" = ${todoId}
+          SELECT "id" FROM "Todo" WHERE "id" = ${todoId} AND "userId" = ${userId}
           UNION ALL
           SELECT t."id" FROM "Todo" t
           JOIN subtree ON t."parentId" = subtree."id"
+          WHERE t."userId" = ${userId}
         )
         SELECT 1 AS found
         FROM "Todo" tt
         JOIN "_TagToTodo" j ON j."B" = tt."id"
         JOIN "Tag" tg ON tg."id" = j."A"
-        WHERE tg."name" = 'Раздел' AND tt."id" IN (SELECT "id" FROM subtree)
+        WHERE tg."name" = 'Раздел' AND tt."userId" = ${userId} AND tg."userId" = ${userId}
+          AND tt."id" IN (SELECT "id" FROM subtree)
         LIMIT 1;
       `
       if (rows.length > 0) return getTodoState()
     } else {
       const rows = await prisma.$queryRaw<{ found: number }[]>`
         WITH RECURSIVE subtree AS (
-          SELECT "id" FROM "Todo" WHERE "id" = ${todoId}
+          SELECT "id" FROM "Todo" WHERE "id" = ${todoId} AND "userId" = ${userId}
           UNION ALL
           SELECT t."id" FROM "Todo" t
           JOIN subtree ON t."parentId" = subtree."id"
+          WHERE t."userId" = ${userId}
         )
         SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END AS found
         FROM "Todo" tt
         JOIN "_TagToTodo" j ON j."B" = tt."id"
         JOIN "Tag" tg ON tg."id" = j."A"
-        WHERE tg."name" = 'Раздел' AND tt."id" IN (SELECT "id" FROM subtree);
+        WHERE tg."name" = 'Раздел' AND tt."userId" = ${userId} AND tg."userId" = ${userId}
+          AND tt."id" IN (SELECT "id" FROM subtree);
       `
       if (rows[0]?.found) return getTodoState()
     }
@@ -717,16 +711,17 @@ export async function attachTagToTodo(todoId: string, tagId: string): Promise<To
     // Разрешен только если в иерархии вверх есть "Проект"
     const rows = await prisma.$queryRaw<{ hasProject: number }[]>`
       WITH RECURSIVE ancestors AS (
-        SELECT "id", "parentId" FROM "Todo" WHERE "id" = ${todoId}
+        SELECT "id", "parentId" FROM "Todo" WHERE "id" = ${todoId} AND "userId" = ${userId}
         UNION ALL
         SELECT t."id", t."parentId" FROM "Todo" t
         JOIN ancestors a ON a."parentId" = t."id"
+        WHERE t."userId" = ${userId}
       )
       SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END AS "hasProject"
       FROM ancestors anc
       JOIN "_TagToTodo" j ON j."B" = anc."id"
       JOIN "Tag" tg ON tg."id" = j."A"
-      WHERE tg."name" = 'Проект';
+      WHERE tg."name" = 'Проект' AND tg."userId" = ${userId};
     `
     if (!rows[0]?.hasProject) return getTodoState()
   }
@@ -736,7 +731,11 @@ export async function attachTagToTodo(todoId: string, tagId: string): Promise<To
 }
 
 export async function detachTagFromTodo(todoId: string, tagId: string): Promise<TodoState> {
-  await ensureSeedData()
+  const userId = await prepareUser()
+  const todo = await prisma.todo.findFirst({ where: { id: todoId, userId } })
+  if (!todo) return getTodoState()
+  const tag = await prisma.tag.findFirst({ where: { id: tagId, userId } })
+  if (!tag) return getTodoState()
   await prisma.todo.update({ where: { id: todoId }, data: { tags: { disconnect: { id: tagId } } } })
   return getTodoState()
 }
@@ -746,36 +745,32 @@ export async function moveTodo(
   targetParentId: string | null,
   targetIndex: number,
 ): Promise<TodoState> {
-  await ensureSeedData()
-  const todo = await prisma.todo.findUnique({ where: { id } })
+  const userId = await prepareUser()
+  const todo = await prisma.todo.findFirst({ where: { id, userId } })
   if (!todo) {
     return getTodoState()
   }
 
   if (targetParentId) {
-    const parentExists = await prisma.todo.findUnique({ where: { id: targetParentId } })
-    if (!parentExists) {
+    const parentExists = await prisma.todo.findFirst({ where: { id: targetParentId, userId } })
+    if (!parentExists || parentExists.id === id) {
       return getTodoState()
     }
 
-    if (parentExists.id === id) {
-      return getTodoState()
-    }
-
-    const parentDepth = Number(await getTodoDepth(targetParentId))
-    const subtreeDepth = Number(await getSubtreeDepth(id))
+    const parentDepth = Number(await getTodoDepth(targetParentId, userId))
+    const subtreeDepth = Number(await getSubtreeDepth(id, userId))
     if (parentDepth + 1 + subtreeDepth > MAX_DEPTH) {
       return getTodoState()
     }
 
-    // ensure not moving into descendant (single query via recursive CTE)
     if (isSQLite) {
       const descendantRows = await prisma.$queryRaw<{ id: string }[]>`
         WITH RECURSIVE subtree AS (
-          SELECT "id" FROM "Todo" WHERE "id" = ${id}
+          SELECT "id" FROM "Todo" WHERE "id" = ${id} AND "userId" = ${userId}
           UNION ALL
           SELECT t."id" FROM "Todo" t
           JOIN subtree ON t."parentId" = subtree."id"
+          WHERE t."userId" = ${userId}
         )
         SELECT "id" FROM subtree WHERE "id" = ${targetParentId} LIMIT 1;
       `
@@ -785,10 +780,11 @@ export async function moveTodo(
     } else {
       const descendantRows = await prisma.$queryRaw<{ found: number }[]>`
         WITH RECURSIVE subtree AS (
-          SELECT "id" FROM "Todo" WHERE "id" = ${id}
+          SELECT "id" FROM "Todo" WHERE "id" = ${id} AND "userId" = ${userId}
           UNION ALL
           SELECT t."id" FROM "Todo" t
           JOIN subtree ON t."parentId" = subtree."id"
+          WHERE t."userId" = ${userId}
         )
         SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END AS found
         FROM subtree
@@ -799,7 +795,7 @@ export async function moveTodo(
       }
     }
   } else {
-    const subtreeDepth = Number(await getSubtreeDepth(id))
+    const subtreeDepth = Number(await getSubtreeDepth(id, userId))
     if (subtreeDepth > MAX_DEPTH) {
       return getTodoState()
     }
@@ -808,14 +804,14 @@ export async function moveTodo(
   const sourceParentId = todo.parentId
 
   const sourceSiblings = await prisma.todo.findMany({
-    where: { parentId: sourceParentId },
+    where: { parentId: sourceParentId, userId },
     orderBy: { position: 'asc' },
   })
 
   const targetSiblings = targetParentId === sourceParentId
     ? sourceSiblings
     : await prisma.todo.findMany({
-      where: { parentId: targetParentId },
+      where: { parentId: targetParentId, userId },
       orderBy: { position: 'asc' },
     })
 
@@ -835,9 +831,8 @@ export async function moveTodo(
     const bounded = Math.min(Math.max(nextIndex, 0), order.length)
     order.splice(bounded, 0, id)
 
-    // Single SQL UPDATE for all affected rows (same parent)
     const rows = order.map((todoId, index) => ({ id: todoId, parentId: sourceParentId, position: index }))
-    await bulkRepositionTodos(rows)
+    await bulkRepositionTodos(rows, userId)
 
     return getTodoState()
   }
@@ -847,20 +842,19 @@ export async function moveTodo(
   const bounded = Math.min(Math.max(nextIndex, 0), targetOrder.length)
   targetOrder.splice(bounded, 0, id)
 
-  // Single SQL UPDATE for both source and target lists (cross-parent move)
   const rows = [
     ...sourceOrder.map((todoId, index) => ({ id: todoId, parentId: sourceParentId, position: index })),
     ...targetOrder.map((todoId, index) => ({ id: todoId, parentId: targetParentId, position: index })),
   ]
 
-  await bulkRepositionTodos(rows)
+  await bulkRepositionTodos(rows, userId)
 
   return getTodoState()
 }
 
 export async function togglePinned(id: string): Promise<TodoState> {
-  await ensureSeedData()
-  const todo = await prisma.todo.findUnique({ where: { id } })
+  const userId = await prepareUser()
+  const todo = await prisma.todo.findFirst({ where: { id, userId } })
   if (!todo) {
     return getTodoState()
   }
@@ -868,7 +862,7 @@ export async function togglePinned(id: string): Promise<TodoState> {
   if (todo.pinned) {
     await prisma.$transaction([
       prisma.todo.update({ where: { id }, data: { pinned: false } }),
-      prisma.pinnedTodo.deleteMany({ where: { todoId: id } }),
+      prisma.pinnedTodo.deleteMany({ where: { todoId: id, pinnedList: { userId } } }),
     ])
   } else {
     // Choose active list if set, otherwise primary
@@ -894,13 +888,13 @@ export async function movePinnedTodo(
   targetListId: string,
   targetIndex: number,
 ): Promise<TodoState> {
-  await ensureSeedData()
-  const entry = await prisma.pinnedTodo.findFirst({ where: { todoId } })
+  const userId = await prepareUser()
+  const entry = await prisma.pinnedTodo.findFirst({ where: { todoId, pinnedList: { userId } } })
   if (!entry) {
     return getTodoState()
   }
 
-  const targetList = await prisma.pinnedList.findUnique({ where: { id: targetListId } })
+  const targetList = await prisma.pinnedList.findFirst({ where: { id: targetListId, userId } })
   if (!targetList) {
     return getTodoState()
   }
@@ -909,14 +903,14 @@ export async function movePinnedTodo(
   const sameList = sourceListId === targetListId
 
   const sourceEntries = await prisma.pinnedTodo.findMany({
-    where: { pinnedListId: sourceListId },
+    where: { pinnedListId: sourceListId, pinnedList: { userId } },
     orderBy: { position: 'asc' },
   })
 
   const targetEntries = sameList
     ? sourceEntries
     : await prisma.pinnedTodo.findMany({
-      where: { pinnedListId: targetListId },
+      where: { pinnedListId: targetListId, pinnedList: { userId } },
       orderBy: { position: 'asc' },
     })
 
@@ -977,14 +971,14 @@ interface RepositionRow { id: string; parentId: string | null; position: number 
  * Postgres: один UPDATE ... FROM (VALUES ...)
  * SQLite: батч updateMany (обычно количество элементов невелико -> допустимо)
  */
-async function bulkRepositionTodos(rows: RepositionRow[]) {
+async function bulkRepositionTodos(rows: RepositionRow[], userId: string) {
   if (rows.length === 0) return
   if (isSQLite) {
     // Последовательные апдейты в транзакции
     await prisma.$transaction(
       rows.map((r) =>
-        prisma.todo.update({
-          where: { id: r.id },
+        prisma.todo.updateMany({
+          where: { id: r.id, userId },
           data: { parentId: r.parentId, position: r.position },
         }),
       ),
@@ -995,7 +989,7 @@ async function bulkRepositionTodos(rows: RepositionRow[]) {
       SET "parentId" = v.parent_id,
           "position" = v.position
       FROM (VALUES ${Prisma.join(values)}) AS v(id, parent_id, position)
-      WHERE t."id" = v.id;`
+      WHERE t."id" = v.id AND t."userId" = ${userId};`
   }
 }
 
@@ -1005,15 +999,17 @@ export async function addPinnedList(title: string): Promise<TodoState> {
     return getTodoState()
   }
 
-  await ensureSeedData()
+  const userId = await prepareUser()
 
   const position = await getNextPinnedListPosition()
+  const hasActive = await prisma.pinnedList.findFirst({ where: { userId, isActive: true } })
   await prisma.pinnedList.create({
     data: {
+      userId,
       title: trimmed,
       position,
       isPrimary: position === 0,
-      isActive: position === 0 && !(await prisma.pinnedList.findFirst({ where: { isActive: true } })),
+      isActive: position === 0 && !hasActive,
     },
   })
 
@@ -1026,7 +1022,12 @@ export async function renamePinnedList(id: string, title: string): Promise<TodoS
     return getTodoState()
   }
 
-  await ensureSeedData()
+  const userId = await prepareUser()
+
+  const list = await prisma.pinnedList.findFirst({ where: { id, userId } })
+  if (!list) {
+    return getTodoState()
+  }
 
   await prisma.pinnedList.update({
     where: { id },
@@ -1037,8 +1038,8 @@ export async function renamePinnedList(id: string, title: string): Promise<TodoS
 }
 
 export async function deletePinnedList(id: string): Promise<TodoState> {
-  await ensureSeedData()
-  const list = await prisma.pinnedList.findUnique({ where: { id } })
+  const userId = await prepareUser()
+  const list = await prisma.pinnedList.findFirst({ where: { id, userId } })
   if (!list) {
     return getTodoState()
   }
@@ -1077,7 +1078,7 @@ export async function deletePinnedList(id: string): Promise<TodoState> {
       nextPosition += 1
     }
 
-    await tx.pinnedTodo.deleteMany({ where: { pinnedListId: id } })
+    await tx.pinnedTodo.deleteMany({ where: { pinnedListId: id, pinnedList: { userId } } })
     // If the deleted list was active, switch active to primary
     const wasActive = list.isActive
     await tx.pinnedList.delete({ where: { id } })
@@ -1090,11 +1091,11 @@ export async function deletePinnedList(id: string): Promise<TodoState> {
 }
 
 export async function setActivePinnedList(id: string): Promise<TodoState> {
-  await ensureSeedData()
-  const list = await prisma.pinnedList.findUnique({ where: { id } })
+  const userId = await prepareUser()
+  const list = await prisma.pinnedList.findFirst({ where: { id, userId } })
   if (!list) return getTodoState()
   await prisma.$transaction(async (tx) => {
-    await tx.pinnedList.updateMany({ data: { isActive: false } })
+    await tx.pinnedList.updateMany({ where: { userId }, data: { isActive: false } })
     await tx.pinnedList.update({ where: { id }, data: { isActive: true } })
   })
   return getTodoState()

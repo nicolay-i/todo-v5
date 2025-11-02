@@ -3,8 +3,9 @@
 import type { ChangeEventHandler, FormEventHandler } from 'react'
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { observer } from 'mobx-react-lite'
-import { FiPlus } from 'react-icons/fi'
+import { FiLogOut, FiPlus } from 'react-icons/fi'
 import type { TodoState } from '@/lib/types'
+import type { AuthenticatedUser } from '@/lib/auth/types'
 import { TodoStore } from '@/stores/TodoStore'
 import type { VisibilityMode } from '@/stores/TodoStore'
 import { TodoStoreProvider, useTodoStore } from '@/stores/TodoStoreContext'
@@ -18,12 +19,15 @@ import { PinnedTextView } from './PinnedTextView'
 import { TodoItem } from './TodoItem'
 import { TodoSearchBar } from './TodoSearchBar'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { TelegramLoginButton } from './TelegramLoginButton'
+import Image from 'next/image'
 
 interface TodoAppProps {
   initialState: TodoState
+  currentUser: AuthenticatedUser | null
 }
 
-const TodoAppContent = () => {
+const TodoAppContent = ({ currentUser }: { currentUser: AuthenticatedUser }) => {
   const store = useTodoStore()
   const [newTitle, setNewTitle] = useState('')
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -218,7 +222,7 @@ const TodoAppContent = () => {
     <div className="min-h-screen bg-canvas-light text-slate-900">
       <div className="mx-auto flex min-h-screen max-w-4xl flex-col px-4 py-10 sm:px-6 lg:px-8">
         <section className="flex-1 rounded-3xl bg-white/60 p-5 shadow-inner ring-1 ring-white/40">
-          <div className="mb-6 flex items-center justify-between gap-3">
+          <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex rounded-2xl bg-white/70 p-1 text-sm font-medium text-slate-500 shadow-sm ring-1 ring-slate-200/70">
               {tabs.map((tab) => (
                 <button
@@ -236,17 +240,20 @@ const TodoAppContent = () => {
                 </button>
               ))}
             </div>
-            {activeTab === 'all' && (
-              <button
-                type="button"
-                onClick={openAddModal}
-                className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
-                aria-label="Добавить задачу"
-              >
-                <FiPlus />
-                Добавить
-              </button>
-            )}
+            <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-end">
+              {activeTab === 'all' && (
+                <button
+                  type="button"
+                  onClick={openAddModal}
+                  className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
+                  aria-label="Добавить задачу"
+                >
+                  <FiPlus />
+                  Добавить
+                </button>
+              )}
+              <UserMenu currentUser={currentUser} />
+            </div>
           </div>
 
           {activeTab === 'pinned' ? (
@@ -454,18 +461,110 @@ const TodoAppContent = () => {
 
 const ObservedContent = observer(TodoAppContent)
 
-export const TodoApp = ({ initialState }: TodoAppProps) => {
-  const [notificationStore] = useState(() => new NotificationStore())
-  const [store] = useState(() => new TodoStore(initialState, notificationStore))
+export const TodoApp = ({ initialState, currentUser }: TodoAppProps) => {
+  const notificationStoreRef = useRef<NotificationStore | null>(null)
+  if (!notificationStoreRef.current) {
+    notificationStoreRef.current = new NotificationStore()
+  }
+
+  const storeRef = useRef<TodoStore | null>(null)
+
+  if (!currentUser) {
+    storeRef.current = null
+    return <UnauthenticatedView />
+  }
+
+  if (!storeRef.current) {
+    storeRef.current = new TodoStore(initialState, notificationStoreRef.current, currentUser.id)
+  }
 
   return (
-    <TodoStoreProvider store={store}>
+    <TodoStoreProvider store={storeRef.current}>
       <LoadingIndicator />
       <NotificationContainer />
-      <ObservedContent />
+      <ObservedContent currentUser={currentUser} />
     </TodoStoreProvider>
   )
 }
+
+const UserMenu = ({ currentUser }: { currentUser: AuthenticatedUser }) => {
+  const router = useRouter()
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+
+  const initials = useMemo(() => {
+    const first = currentUser.firstName.charAt(0)
+    const last = currentUser.lastName?.charAt(0) ?? ''
+    return `${first}${last}`.toUpperCase()
+  }, [currentUser.firstName, currentUser.lastName])
+
+  const fullName = useMemo(() => {
+    return currentUser.lastName ? `${currentUser.firstName} ${currentUser.lastName}` : currentUser.firstName
+  }, [currentUser.firstName, currentUser.lastName])
+
+  const handleLogout = useCallback(async () => {
+    try {
+      setIsLoggingOut(true)
+      const response = await fetch('/api/auth/logout', { method: 'POST' })
+      if (!response.ok) {
+        throw new Error('Failed to logout')
+      }
+      router.refresh()
+    } catch (error) {
+      console.error('Failed to logout', error)
+      setIsLoggingOut(false)
+    }
+  }, [router])
+
+  return (
+    <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:gap-3">
+      <div className="flex items-center gap-3 rounded-2xl bg-white/70 px-3 py-2 text-sm text-slate-600 shadow-sm ring-1 ring-slate-200/70">
+        {currentUser.photoUrl ? (
+          <Image
+            src={currentUser.photoUrl}
+            alt="Аватар"
+            width={36}
+            height={36}
+            className="h-9 w-9 rounded-full object-cover shadow"
+            unoptimized
+          />
+        ) : (
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold uppercase tracking-wide text-white">
+            {initials}
+          </div>
+        )}
+        <div className="flex flex-col leading-tight">
+          <span className="text-sm font-semibold text-slate-700">{fullName}</span>
+          {currentUser.username && <span className="text-xs text-slate-500">@{currentUser.username}</span>}
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={handleLogout}
+        disabled={isLoggingOut}
+        className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-xs font-medium text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-500"
+      >
+        <FiLogOut className="h-4 w-4" />
+        {isLoggingOut ? 'Выход...' : 'Выйти'}
+      </button>
+    </div>
+  )
+}
+
+const UnauthenticatedView = () => (
+  <div className="min-h-screen bg-canvas-light text-slate-900">
+    <div className="mx-auto flex min-h-screen max-w-xl flex-col items-center justify-center px-4 py-10 sm:px-6 lg:px-8">
+      <div className="w-full rounded-3xl bg-white/70 p-8 text-center shadow-xl ring-1 ring-white/50">
+        <h1 className="text-2xl font-semibold text-slate-800">Войдите через Telegram</h1>
+        <p className="mt-3 text-sm text-slate-600">
+          Авторизуйтесь, чтобы создавать личные задачи, закреплять важные элементы и возвращаться к ним с любого устройства.
+        </p>
+        <div className="mt-6 flex justify-center">
+          <TelegramLoginButton />
+        </div>
+      </div>
+    </div>
+  </div>
+)
 
 const filterOptions: { value: VisibilityMode; label: string }[] = [
   { value: 'activeOnly', label: 'Только активные' },
