@@ -533,6 +533,14 @@ export class TodoStore {
             }
           })
         }
+
+        // Обновляем флаг pinned в randomChain, если задача там есть
+        const chainIndex = this.randomChain.findIndex((t) => t.id === id)
+        if (chainIndex !== -1) {
+          this.randomChain = this.randomChain.map((t, idx) =>
+            idx === chainIndex ? { ...t, pinned: info.node.pinned } : t
+          )
+        }
       },
       // Запрос на сервер
       async () => {

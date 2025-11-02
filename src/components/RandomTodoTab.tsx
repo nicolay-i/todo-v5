@@ -103,7 +103,7 @@ const TodoItemInChain = observer(({ todo, isLeaf, indent, onUpdate, onAddChild, 
 
   const handleTogglePinned = async () => {
     await store.togglePinned(todo.id)
-    onUpdate()
+    // Не перезагружаем цепочку - состояние обновится оптимистично
   }
 
   const handleToggleTag = async (tagId: string) => {
@@ -127,6 +127,8 @@ const TodoItemInChain = observer(({ todo, isLeaf, indent, onUpdate, onAddChild, 
       className={`rounded-lg border transition-colors ${
         isLeaf
           ? 'bg-green-100 border-green-400'
+          : todo.pinned
+          ? 'bg-amber-50 border-amber-300'
           : 'bg-white border-slate-200'
       }`}
       style={{ marginLeft: `${indent}px` }}
