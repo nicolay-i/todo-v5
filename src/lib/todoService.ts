@@ -441,9 +441,10 @@ export async function replaceTodoState(state: unknown): Promise<TodoState> {
       await tx.tag.createMany({ data: tagRecords })
     }
 
-    for (const todo of todos) {
-      await tx.todo.create({
-        data: {
+    // Batch create todos instead of one by one
+    if (todos.length > 0) {
+      await tx.todo.createMany({
+        data: todos.map((todo) => ({
           id: todo.id,
           title: todo.title,
           completed: todo.completed,
@@ -451,17 +452,25 @@ export async function replaceTodoState(state: unknown): Promise<TodoState> {
           alias: todo.alias,
           parentId: todo.parentId,
           position: todo.position,
-        },
+        })),
       })
     }
 
-    // connect tags to todos
+    // connect tags to todos in batches
     if (todoTagMap.size > 0) {
-      for (const [todoId, tagIds] of todoTagMap) {
-        await tx.todo.update({
-          where: { id: todoId },
-          data: { tags: { set: [], connect: tagIds.map((id) => ({ id })) } },
-        })
+      const tagUpdates = Array.from(todoTagMap.entries())
+      // Process in chunks to avoid too many sequential updates
+      const CHUNK_SIZE = 50
+      for (let i = 0; i < tagUpdates.length; i += CHUNK_SIZE) {
+        const chunk = tagUpdates.slice(i, i + CHUNK_SIZE)
+        await Promise.all(
+          chunk.map(([todoId, tagIds]) =>
+            tx.todo.update({
+              where: { id: todoId },
+              data: { tags: { set: [], connect: tagIds.map((id) => ({ id })) } },
+            })
+          )
+        )
       }
     }
 
@@ -485,6 +494,9 @@ export async function replaceTodoState(state: unknown): Promise<TodoState> {
         })
       }
     }
+  }, {
+    maxWait: 30000, // Максимум 30 секунд ожидания начала транзакции
+    timeout: 60000, // Максимум 60 секунд на выполнение транзакции
   })
 
   return getTodoState()
