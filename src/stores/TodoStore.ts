@@ -110,6 +110,10 @@ export class TodoStore {
   async refresh() {
     try {
       const response = await fetch('/api/state', { cache: 'no-store' })
+      if (response.status === 401) {
+        window.location.href = '/'
+        return
+      }
       if (!response.ok) {
         throw new Error('Failed to load state')
       }
@@ -704,6 +708,11 @@ export class TodoStore {
         ...(init.headers ?? {}),
       },
     })
+
+    if (response.status === 401) {
+      window.location.href = '/'
+      throw new Error('Unauthorized')
+    }
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))

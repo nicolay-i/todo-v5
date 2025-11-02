@@ -32,8 +32,12 @@ model Todo {
   children  Todo[]   @relation("TodoChildren")
   pinnedIn  PinnedTodo[]
   tags      Tag[]
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }
 
 model PinnedList {
@@ -43,8 +47,12 @@ model PinnedList {
   isPrimary Boolean      @default(false)
   isActive  Boolean      @default(false)
   todos     PinnedTodo[]
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
+
+  @@index([userId])
 }
 
 model PinnedTodo {
@@ -66,6 +74,37 @@ model Tag {
   position  Int      @default(0)
   isSystem  Boolean  @default(false)
   todos     Todo[]
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model User {
+  id         String    @id @default(cuid())
+  telegramId String    @unique
+  firstName  String
+  lastName   String?
+  username   String?
+  photoUrl   String?
+  todos      Todo[]
+  pinnedLists PinnedList[]
+  tags       Tag[]
+  sessions   Session[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  expiresAt DateTime?
+
+  @@index([userId])
+  @@index([expiresAt])
 }
