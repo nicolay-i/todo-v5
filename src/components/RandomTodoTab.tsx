@@ -363,13 +363,7 @@ function RandomTodoTabComponent() {
   if (store.randomChain.length === 0) {
     return (
       <div className="p-4">
-        <button
-          onClick={handleLoadAnother}
-          className="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 mb-4"
-        >
-          Загрузить
-        </button>
-        <p className="text-slate-500">Нет незавершённых задач</p>
+        <p className="text-slate-500 text-center py-8">Нет незавершённых задач</p>
       </div>
     )
   }
@@ -379,13 +373,6 @@ function RandomTodoTabComponent() {
 
   return (
     <div className="p-4">
-      <button
-        onClick={handleLoadAnother}
-        className="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 mb-6 shadow-sm"
-      >
-        Другой
-      </button>
-
       <div className="space-y-3">
         {store.randomChain.map((todo, index) => {
           const isLeaf = index === store.randomChain.length - 1

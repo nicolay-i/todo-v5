@@ -238,17 +238,29 @@ const TodoAppContent = () => {
                 </button>
               ))}
             </div>
-            {activeTab === 'all' && (
-              <button
-                type="button"
-                onClick={openAddModal}
-                className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
-                aria-label="Добавить задачу"
-              >
-                <FiPlus />
-                Добавить
-              </button>
-            )}
+            <div className="flex items-center gap-3">
+              {activeTab === 'random' && (
+                <button
+                  type="button"
+                  onClick={() => store.loadRandomChain()}
+                  className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
+                  aria-label="Загрузить другую задачу"
+                >
+                  Другой
+                </button>
+              )}
+              {activeTab === 'all' && (
+                <button
+                  type="button"
+                  onClick={openAddModal}
+                  className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
+                  aria-label="Добавить задачу"
+                >
+                  <FiPlus />
+                  Добавить
+                </button>
+              )}
+            </div>
           </div>
 
           {activeTab === 'pinned' ? (
