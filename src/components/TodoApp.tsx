@@ -17,6 +17,7 @@ import { PinnedList } from './PinnedList'
 import { PinnedTextView } from './PinnedTextView'
 import { TodoItem } from './TodoItem'
 import { TodoSearchBar } from './TodoSearchBar'
+import { RandomTodoTab } from './RandomTodoTab'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 interface TodoAppProps {
@@ -35,10 +36,10 @@ const TodoAppContent = () => {
 
   // Инициализируем вкладку из URL (?tab=...)
   const tabFromUrl = searchParams.get('tab')
-  const normalizedTab = (tabFromUrl === 'pinned' || tabFromUrl === 'all' || tabFromUrl === 'settings')
-    ? (tabFromUrl as 'pinned' | 'all' | 'settings')
+  const normalizedTab = (tabFromUrl === 'pinned' || tabFromUrl === 'all' || tabFromUrl === 'settings' || tabFromUrl === 'random')
+    ? (tabFromUrl as 'pinned' | 'all' | 'settings' | 'random')
     : 'pinned'
-  const [activeTab, setActiveTab] = useState<'pinned' | 'all' | 'settings'>(normalizedTab)
+  const [activeTab, setActiveTab] = useState<'pinned' | 'all' | 'settings' | 'random'>(normalizedTab)
   const [isAddingPinnedList, setIsAddingPinnedList] = useState(false)
   const [isTextViewOpen, setIsTextViewOpen] = useState(false)
   const [newPinnedListTitle, setNewPinnedListTitle] = useState('')
@@ -126,10 +127,11 @@ const TodoAppContent = () => {
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [closeAddModal, handleAdd, isAddModalOpen])
-  const tabs: { key: 'pinned' | 'all' | 'settings'; label: string }[] = useMemo(
+  const tabs: { key: 'pinned' | 'all' | 'settings' | 'random'; label: string }[] = useMemo(
     () => [
       { key: 'pinned', label: 'Слоты' },
       { key: 'all', label: 'Список задач' },
+      { key: 'random', label: 'Случайное' },
       { key: 'settings', label: 'Настройки' },
     ],
     [],
@@ -138,14 +140,14 @@ const TodoAppContent = () => {
   const tabKeys = useMemo(() => tabs.map((tab) => tab.key), [tabs])
 
   // Синхронизация URL при смене вкладки пользователем
-  const applyTabToUrl = useCallback((tab: 'pinned' | 'all' | 'settings') => {
+  const applyTabToUrl = useCallback((tab: 'pinned' | 'all' | 'settings' | 'random') => {
     const params = new URLSearchParams(searchParams.toString())
     params.set('tab', tab)
     const next = `${pathname}?${params.toString()}`
     router.replace(next, { scroll: false })
   }, [pathname, router, searchParams])
 
-  const handleSwitchTab = useCallback((tab: 'pinned' | 'all' | 'settings') => {
+  const handleSwitchTab = useCallback((tab: 'pinned' | 'all' | 'settings' | 'random') => {
     if (tab === activeTab) return
     setActiveTab(tab)
     if (tab !== 'pinned') {
@@ -202,8 +204,8 @@ const TodoAppContent = () => {
   // Обратная синхронизация: если URL поменялся (например, навигация назад/вперёд), обновим стейт
   useEffect(() => {
     const current = searchParams.get('tab')
-    const nextTab = (current === 'pinned' || current === 'all' || current === 'settings')
-      ? (current as 'pinned' | 'all' | 'settings')
+    const nextTab = (current === 'pinned' || current === 'all' || current === 'settings' || current === 'random')
+      ? (current as 'pinned' | 'all' | 'settings' | 'random')
       : 'pinned'
     if (nextTab !== activeTab) {
       setActiveTab(nextTab)
@@ -357,6 +359,8 @@ const TodoAppContent = () => {
                 </div>
               )}
             </>
+          ) : activeTab === 'random' ? (
+            <RandomTodoTab />
           ) : (
             <SettingsTab />
           )}

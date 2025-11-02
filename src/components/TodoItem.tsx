@@ -544,7 +544,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
           {/* Заголовок и теги в одной строке: теги перед текстом, чтобы перенос был под тегами */}
           <div className="flex-1 todo-main">
             {isEditing ? (
-              <form onSubmit={handleEditSubmit} className="flex flex-col gap-3 sm:flex-row sm:items-center form-title">
+              <form onSubmit={handleEditSubmit} className="flex flex-col gap-3 sm:flex-row sm:items-start form-title">
                 <div ref={editWrapRef} className="w-full">
                   <textarea
                     className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm leading-snug text-slate-700 shadow-sm focus:border-slate-400 focus:outline-none resize-none"
@@ -571,9 +571,6 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                 </div>
                 {canEditAlias && (
                   <div className="w-full sm:w-64">
-                    <label htmlFor={aliasInputId} className="mb-1 block text-xs font-medium text-slate-500">
-                      Алиас
-                    </label>
                     <input
                       id={aliasInputId}
                       type="text"
@@ -589,7 +586,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                     />
                   </div>
                 )}
-                <div className="flex items-center gap-1 self-end sm:self-auto">
+                <div className="flex items-center gap-1 self-end sm:self-auto mt-1">
                   <button
                     type="submit"
                     className={`${actionButtonStyles} bg-emerald-500 text-white hover:bg-emerald-500/90`}

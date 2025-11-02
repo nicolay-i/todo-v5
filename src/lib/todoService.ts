@@ -1111,3 +1111,43 @@ export async function setActivePinnedList(id: string): Promise<TodoState> {
   })
   return getTodoState()
 }
+
+/**
+ * Получить случайную цепочку todo (от корня до листового незавершённого элемента)
+ * Возвращает массив todo от корня до листа
+ */
+export async function getRandomTodoChain(): Promise<(Todo & { tags: Tag[] })[]> {
+  await ensureSeedData()
+  
+  // Получаем все незавершённые листовые todo (у которых нет детей и completed = false) с тегами
+  const allTodos = await prisma.todo.findMany({
+    where: { completed: false },
+    include: { tags: true },
+    orderBy: { position: 'asc' }
+  })
+  
+  // Находим листовые элементы (у которых нет детей)
+  const leafTodos = allTodos.filter(todo => {
+    return !allTodos.some(t => t.parentId === todo.id)
+  })
+  
+  if (leafTodos.length === 0) {
+    return []
+  }
+  
+  // Выбираем случайный листовой элемент
+  const randomLeaf = leafTodos[Math.floor(Math.random() * leafTodos.length)]
+  
+  // Строим цепочку от корня до листа
+  const chain: (Todo & { tags: Tag[] })[] = [randomLeaf]
+  let currentId = randomLeaf.parentId
+  
+  while (currentId) {
+    const parent = allTodos.find(t => t.id === currentId)
+    if (!parent) break
+    chain.unshift(parent)
+    currentId = parent.parentId
+  }
+  
+  return chain
+}
