@@ -496,7 +496,7 @@ export async function replaceTodoState(state: unknown): Promise<TodoState> {
     }
   }, {
     maxWait: 30000, // Максимум 30 секунд ожидания начала транзакции
-    timeout: 60000, // Максимум 60 секунд на выполнение транзакции
+    timeout: 600000, // Максимум 600 секунд на выполнение транзакции
   })
 
   return getTodoState()
