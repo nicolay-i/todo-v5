@@ -19,12 +19,15 @@ import { TodoItem } from './TodoItem'
 import { TodoSearchBar } from './TodoSearchBar'
 import { RandomTodoTab } from './RandomTodoTab'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import type { SessionUser } from '@/lib/auth/session'
+import Image from 'next/image'
 
 interface TodoAppProps {
   initialState: TodoState
+  user: SessionUser
 }
 
-const TodoAppContent = () => {
+const TodoAppContent = ({ user }: { user: SessionUser }) => {
   const store = useTodoStore()
   const [newTitle, setNewTitle] = useState('')
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -44,6 +47,18 @@ const TodoAppContent = () => {
   const [isTextViewOpen, setIsTextViewOpen] = useState(false)
   const [newPinnedListTitle, setNewPinnedListTitle] = useState('')
   const pinnedListInputRef = useRef<HTMLInputElement>(null)
+  const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ')
+  const displayName = fullName || (user.username ? `@${user.username}` : 'Пользователь Telegram')
+
+  const handleLogout = useCallback(async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' })
+    } catch (error) {
+      console.error('Failed to log out', error)
+    } finally {
+      window.location.href = '/'
+    }
+  }, [])
 
   const closeAddModal = useCallback(() => {
     setIsAddModalOpen(false)
@@ -220,23 +235,36 @@ const TodoAppContent = () => {
     <div className="min-h-screen bg-canvas-light text-slate-900">
       <div className="mx-auto flex min-h-screen max-w-4xl flex-col px-4 py-10 sm:px-6 lg:px-8">
         <section className="flex-1 rounded-3xl bg-white/60 p-5 shadow-inner ring-1 ring-white/40">
-          <div className="mb-6 flex items-center justify-between gap-3">
-            <div className="flex rounded-2xl bg-white/70 p-1 text-sm font-medium text-slate-500 shadow-sm ring-1 ring-slate-200/70">
-              {tabs.map((tab) => (
+          <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex rounded-2xl bg-white/70 p-1 text-sm font-medium text-slate-500 shadow-sm ring-1 ring-slate-200/70">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => handleSwitchTab(tab.key)}
+                    className={[
+                      'rounded-xl px-4 py-2 transition focus-visible:outline-none',
+                      activeTab === tab.key
+                        ? 'bg-slate-900 text-white shadow-sm'
+                        : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700',
+                    ].join(' ')}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+              {activeTab === 'all' && (
                 <button
-                  key={tab.key}
                   type="button"
-                  onClick={() => handleSwitchTab(tab.key)}
-                  className={[
-                    'rounded-xl px-4 py-2 transition focus-visible:outline-none',
-                    activeTab === tab.key
-                      ? 'bg-slate-900 text-white shadow-sm'
-                      : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700',
-                  ].join(' ')}
+                  onClick={openAddModal}
+                  className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
+                  aria-label="Добавить задачу"
                 >
-                  {tab.label}
+                  <FiPlus />
+                  Добавить
                 </button>
-              ))}
+              )}
             </div>
             <div className="flex items-center gap-3">
               {activeTab === 'random' && (
@@ -249,17 +277,7 @@ const TodoAppContent = () => {
                   Другой
                 </button>
               )}
-              {activeTab === 'all' && (
-                <button
-                  type="button"
-                  onClick={openAddModal}
-                  className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
-                  aria-label="Добавить задачу"
-                >
-                  <FiPlus />
-                  Добавить
-                </button>
-              )}
+              <UserBadge user={user} displayName={displayName} />
             </div>
           </div>
 
@@ -374,7 +392,7 @@ const TodoAppContent = () => {
           ) : activeTab === 'random' ? (
             <RandomTodoTab />
           ) : (
-            <SettingsTab />
+            <SettingsTab user={user} onLogout={handleLogout} />
           )}
         </section>
         {/* Modal for adding new todo with animation and tag selection */}
@@ -468,9 +486,36 @@ const TodoAppContent = () => {
   )
 }
 
+const UserBadge = ({ user, displayName }: { user: SessionUser; displayName: string }) => {
+  const usernameLabel = user.username ? `@${user.username}` : null
+  const showUsername = usernameLabel && usernameLabel !== displayName
+
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white/70 px-4 py-2 text-left shadow-sm">
+      {user.photoUrl ? (
+        <Image
+          src={user.photoUrl}
+          alt={displayName}
+          width={40}
+          height={40}
+          className="h-10 w-10 rounded-full object-cover shadow-inner"
+        />
+      ) : (
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white">
+          {displayName.charAt(0).toUpperCase()}
+        </div>
+      )}
+      <div className="flex flex-col">
+        <span className="text-sm font-medium text-slate-700">{displayName}</span>
+        {showUsername && <span className="text-xs text-slate-500">{usernameLabel}</span>}
+      </div>
+    </div>
+  )
+}
+
 const ObservedContent = observer(TodoAppContent)
 
-export const TodoApp = ({ initialState }: TodoAppProps) => {
+export const TodoApp = ({ initialState, user }: TodoAppProps) => {
   const [notificationStore] = useState(() => new NotificationStore())
   const [store] = useState(() => new TodoStore(initialState, notificationStore))
 
@@ -478,7 +523,7 @@ export const TodoApp = ({ initialState }: TodoAppProps) => {
     <TodoStoreProvider store={store}>
       <LoadingIndicator />
       <NotificationContainer />
-      <ObservedContent />
+      <ObservedContent user={user} />
     </TodoStoreProvider>
   )
 }
@@ -574,7 +619,7 @@ const ListContainer = observer(() => {
   )
 })
 
-const SettingsTab = () => {
+const SettingsTab = ({ user, onLogout }: { user: SessionUser; onLogout: () => Promise<void> | void }) => {
   const store = useTodoStore()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isExporting, setIsExporting] = useState(false)
@@ -584,12 +629,21 @@ const SettingsTab = () => {
   const [editingTagId, setEditingTagId] = useState<string | null>(null)
   const [editingTagName, setEditingTagName] = useState('')
   const [draggedTagId, setDraggedTagId] = useState<string | null>(null)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const profileName =
+    [user.firstName, user.lastName].filter(Boolean).join(' ') ||
+    (user.username ? `@${user.username}` : 'Пользователь Telegram')
+  const showUsername = user.username && profileName !== `@${user.username}`
 
   const handleExport = async () => {
     setStatus(null)
     setIsExporting(true)
     try {
       const response = await fetch('/api/state', { cache: 'no-store' })
+      if (response.status === 401) {
+        window.location.href = '/'
+        return
+      }
       if (!response.ok) {
         throw new Error('Failed to export state')
       }
@@ -629,6 +683,11 @@ const SettingsTab = () => {
         body: JSON.stringify(parsed),
       })
 
+      if (response.status === 401) {
+        window.location.href = '/'
+        return
+      }
+
       if (!response.ok) {
         throw new Error('Import failed')
       }
@@ -649,6 +708,46 @@ const SettingsTab = () => {
 
   return (
     <div className="space-y-6">
+      <div className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
+        <h3 className="text-base font-semibold text-slate-700">Профиль</h3>
+        <div className="mt-3 flex items-center gap-3">
+          {user.photoUrl ? (
+            <Image
+              src={user.photoUrl}
+              alt={profileName}
+              width={48}
+              height={48}
+              className="h-12 w-12 rounded-full object-cover shadow-inner"
+            />
+          ) : (
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 text-base font-semibold text-white">
+              {profileName.charAt(0).toUpperCase()}
+            </div>
+          )}
+          <div className="text-left">
+            <div className="text-sm font-medium text-slate-700">{profileName}</div>
+            {showUsername && <div className="text-xs text-slate-500">@{user.username}</div>}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={async () => {
+            setIsLoggingOut(true)
+            try {
+              await onLogout()
+            } finally {
+              setIsLoggingOut(false)
+            }
+          }}
+          disabled={isLoggingOut}
+          className={`mt-4 inline-flex items-center rounded-xl px-4 py-2 text-sm font-medium text-white shadow-sm transition ${
+            isLoggingOut ? 'cursor-wait bg-slate-400' : 'bg-rose-500 hover:bg-rose-600'
+          }`}
+        >
+          {isLoggingOut ? 'Выходим...' : 'Выйти из аккаунта'}
+        </button>
+      </div>
+
       {/* Tags management */}
       <div className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
         <h3 className="text-base font-semibold text-slate-700">Теги</h3>

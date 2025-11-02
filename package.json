@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start_local": "next start",
-    "lint": "next lint",
+    "check": "tsc --noEmit",
     "prisma:generate": "prisma generate",
     "start": "node .next/standalone/server.js",
     "deploy": "npm i && npm run mode:prod && node scripts/deploy-script.js",
