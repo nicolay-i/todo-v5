@@ -201,6 +201,7 @@ export class TodoStore {
           alias: null,
           parentId,
           position: 0,
+          userId: '', // Временное значение, будет заменено сервером
           createdAt: now,
           updatedAt: now,
           children: [],
