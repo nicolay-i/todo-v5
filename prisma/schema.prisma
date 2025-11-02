@@ -13,8 +13,9 @@ generator client {
 
 // DATASOURCE_START - Не удаляйте эту строку, используется для автоматической замены
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 // DATASOURCE_END - Не удаляйте эту строку, используется для автоматической замены
 
@@ -24,6 +25,7 @@ model Todo {
   completed Boolean  @default(false)
   completedAt DateTime?
   pinned    Boolean  @default(false)
+  alias     String?
   position  Int
   parentId  String?
   parent    Todo?    @relation("TodoChildren", fields: [parentId], references: [id], onDelete: Cascade)

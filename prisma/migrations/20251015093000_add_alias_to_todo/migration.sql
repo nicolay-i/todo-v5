@@ -1,0 +1,1 @@
+ALTER TABLE "Todo" ADD COLUMN "alias" TEXT;

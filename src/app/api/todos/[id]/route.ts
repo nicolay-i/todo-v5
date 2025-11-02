@@ -4,12 +4,13 @@ import {
   moveTodo,
   togglePinned,
   toggleTodoCompleted,
-  updateTodoTitle,
+  updateTodoDetails,
 } from '@/lib/todoService'
 
 interface PatchBody {
-  action: 'rename' | 'toggleCompleted' | 'move' | 'togglePinned'
+  action: 'rename' | 'toggleCompleted' | 'move' | 'togglePinned' | 'updateDetails'
   title?: string
+  alias?: string | null
   targetParentId?: string | null
   targetIndex?: number
 }
@@ -20,7 +21,18 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
   switch (body.action) {
     case 'rename': {
-      const state = await updateTodoTitle(id, body.title ?? '')
+      const state = await updateTodoDetails(id, { title: body.title ?? '' })
+      return NextResponse.json(state)
+    }
+    case 'updateDetails': {
+      const details: { title?: string; alias?: string | null } = {}
+      if (typeof body.title === 'string') {
+        details.title = body.title
+      }
+      if (Object.prototype.hasOwnProperty.call(body, 'alias')) {
+        details.alias = body.alias ?? null
+      }
+      const state = await updateTodoDetails(id, details)
       return NextResponse.json(state)
     }
     case 'toggleCompleted': {

@@ -1,13 +1,17 @@
 'use client'
 
 import type { ChangeEventHandler, FormEventHandler } from 'react'
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { observer } from 'mobx-react-lite'
 import { FiPlus } from 'react-icons/fi'
 import type { TodoState } from '@/lib/types'
 import { TodoStore } from '@/stores/TodoStore'
 import type { VisibilityMode } from '@/stores/TodoStore'
 import { TodoStoreProvider, useTodoStore } from '@/stores/TodoStoreContext'
+import { focusEdgeTodo, isInputLike } from '@/lib/dom/todoFocus'
+import { NotificationStore } from '@/stores/NotificationStore'
+import { NotificationContainer } from './NotificationContainer'
+import { LoadingIndicator } from './LoadingIndicator'
 // мини-плейсхолдеры для сортировки больше не используются
 import { PinnedList } from './PinnedList'
 import { PinnedTextView } from './PinnedTextView'
@@ -40,14 +44,49 @@ const TodoAppContent = () => {
   const [newPinnedListTitle, setNewPinnedListTitle] = useState('')
   const pinnedListInputRef = useRef<HTMLInputElement>(null)
 
-  const handleAdd = async () => {
+  const closeAddModal = useCallback(() => {
+    setIsAddModalOpen(false)
+    // Используем window.setTimeout чтобы избежать коллизий с Jest/SSR окружением
+    window.setTimeout(() => setIsAddModalMounted(false), 200)
+  }, [])
+
+  const openAddModal = useCallback(() => {
+    setIsAddModalMounted(true)
+    setSelectedTagIds([])
+    // next tick to триггер анимацию появления
+    requestAnimationFrame(() => setIsAddModalOpen(true))
+  }, [])
+
+  const handleAdd = useCallback(async () => {
     const trimmed = newTitle.trim()
     if (!trimmed) return
     await store.addTodo(null, trimmed, selectedTagIds)
     setNewTitle('')
     setSelectedTagIds([])
     closeAddModal()
-  }
+  }, [closeAddModal, newTitle, selectedTagIds, store])
+  // Авто-обновление данных при возвращении во вкладку / фокусе окна
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    let isRefreshing = false
+
+    const refreshIfVisible = () => {
+      if (document.visibilityState !== 'visible' || isRefreshing) return
+      isRefreshing = true
+      void store.refresh().finally(() => {
+        isRefreshing = false
+      })
+    }
+
+    document.addEventListener('visibilitychange', refreshIfVisible)
+    window.addEventListener('focus', refreshIfVisible)
+
+    return () => {
+      document.removeEventListener('visibilitychange', refreshIfVisible)
+      window.removeEventListener('focus', refreshIfVisible)
+    }
+  }, [store])
 
   const handlePinnedListSubmit: FormEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault()
@@ -86,20 +125,7 @@ const TodoAppContent = () => {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [isAddModalOpen, newTitle])
-
-  const openAddModal = () => {
-    setIsAddModalMounted(true)
-    setSelectedTagIds([])
-    // next tick to trigger transition
-    requestAnimationFrame(() => setIsAddModalOpen(true))
-  }
-
-  const closeAddModal = () => {
-    setIsAddModalOpen(false)
-    setTimeout(() => setIsAddModalMounted(false), 200)
-  }
-
+  }, [closeAddModal, handleAdd, isAddModalOpen])
   const tabs: { key: 'pinned' | 'all' | 'settings'; label: string }[] = useMemo(
     () => [
       { key: 'pinned', label: 'Слоты' },
@@ -109,22 +135,69 @@ const TodoAppContent = () => {
     [],
   )
 
+  const tabKeys = useMemo(() => tabs.map((tab) => tab.key), [tabs])
+
   // Синхронизация URL при смене вкладки пользователем
-  const applyTabToUrl = (tab: 'pinned' | 'all' | 'settings') => {
-    const params = new URLSearchParams(searchParams)
+  const applyTabToUrl = useCallback((tab: 'pinned' | 'all' | 'settings') => {
+    const params = new URLSearchParams(searchParams.toString())
     params.set('tab', tab)
     const next = `${pathname}?${params.toString()}`
     router.replace(next, { scroll: false })
-  }
+  }, [pathname, router, searchParams])
 
-  const handleSwitchTab = (tab: 'pinned' | 'all' | 'settings') => {
+  const handleSwitchTab = useCallback((tab: 'pinned' | 'all' | 'settings') => {
     if (tab === activeTab) return
     setActiveTab(tab)
     if (tab !== 'pinned') {
       setIsTextViewOpen(false)
     }
     applyTabToUrl(tab)
-  }
+  }, [activeTab, applyTabToUrl])
+
+  useEffect(() => {
+    const handleGlobalKeys = (event: KeyboardEvent) => {
+      if (isInputLike(event.target)) return
+
+      const lowerKey = event.key.toLowerCase()
+
+      if (!event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && lowerKey === 'n' && activeTab === 'all') {
+        event.preventDefault()
+        openAddModal()
+        return
+      }
+
+      if (!event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+        const scope = activeTab === 'all' ? 'list' : activeTab === 'pinned' ? 'pinned' : null
+        if (!scope) return
+        const activeElement = document.activeElement as HTMLElement | null
+        if (activeElement && activeElement !== document.body) return
+        event.preventDefault()
+        focusEdgeTodo(scope, event.key === 'ArrowUp')
+        return
+      }
+
+      if (event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+        if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+          const currentIndex = tabKeys.indexOf(activeTab)
+          if (currentIndex === -1) return
+          const delta = event.key === 'ArrowRight' ? 1 : -1
+          const nextIndex = Math.min(Math.max(currentIndex + delta, 0), tabKeys.length - 1)
+          if (nextIndex !== currentIndex) {
+            event.preventDefault()
+            handleSwitchTab(tabKeys[nextIndex])
+          }
+          return
+        }
+        if (activeTab === 'pinned' && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+          event.preventDefault()
+          store.stepActivePinnedList(event.key === 'ArrowDown' ? 1 : -1)
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleGlobalKeys)
+    return () => window.removeEventListener('keydown', handleGlobalKeys)
+  }, [activeTab, handleSwitchTab, openAddModal, store, tabKeys])
 
   // Обратная синхронизация: если URL поменялся (например, навигация назад/вперёд), обновим стейт
   useEffect(() => {
@@ -264,7 +337,16 @@ const TodoAppContent = () => {
             <>
               {/* Добавление задачи теперь через модал */}
               <TodoSearchBar />
-              <div className="mb-3 flex items-center justify-end">
+              <div className="mb-3 flex items-center justify-between gap-3 pl-3">
+                <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={store.highlightFirstAtMaxDepth}
+                    onChange={() => store.toggleHighlightFirstAtMaxDepth()}
+                    className="h-4 w-4 cursor-pointer rounded border-slate-300 text-emerald-600 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-0"
+                  />
+                  <span>Выделение первого todo</span>
+                </label>
                 <FilterSelect value={store.listFilterMode} onChange={(v) => store.setListFilterMode(v)} />
               </div>
               <ListContainer />
@@ -373,10 +455,13 @@ const TodoAppContent = () => {
 const ObservedContent = observer(TodoAppContent)
 
 export const TodoApp = ({ initialState }: TodoAppProps) => {
-  const [store] = useState(() => new TodoStore(initialState))
+  const [notificationStore] = useState(() => new NotificationStore())
+  const [store] = useState(() => new TodoStore(initialState, notificationStore))
 
   return (
     <TodoStoreProvider store={store}>
+      <LoadingIndicator />
+      <NotificationContainer />
       <ObservedContent />
     </TodoStoreProvider>
   )

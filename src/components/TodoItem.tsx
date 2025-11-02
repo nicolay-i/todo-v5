@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { observer } from 'mobx-react-lite'
 import {
   FiCheck,
@@ -16,6 +16,7 @@ import {
   FiX,
 } from 'react-icons/fi'
 import { MAX_DEPTH } from '@/lib/constants'
+import { focusEdgeTodo, focusTodoByOffset } from '@/lib/dom/todoFocus'
 import { useDropdown } from '@/lib/hooks/useDropdown'
 import type { TodoNode } from '@/lib/types'
 import { useTodoStore } from '@/stores/TodoStoreContext'
@@ -40,10 +41,12 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
   const [isEditing, setIsEditing] = useState(false)
   const [isAddingChild, setIsAddingChild] = useState(false)
   const [titleDraft, setTitleDraft] = useState(todo.title)
+  const [aliasDraft, setAliasDraft] = useState(todo.alias ?? '')
   const [childTitle, setChildTitle] = useState('')
   const [isOverInside, setIsOverInside] = useState(false)
   const [overPosition, setOverPosition] = useState<null | 'above' | 'below' | 'inside'>(null)
   const childInputRef = useRef<HTMLInputElement>(null)
+  const focusRef = useRef<HTMLDivElement>(null)
   // Выпадающий список тегов: управляeм через общий хук
   const tagDropdown = useDropdown({ closeDelay: 300, animationDuration: 200, groupKey: 'tag-picker', openOnHover: false })
   // Многострочное редактирование: вычисляем строки один раз при входе в режим
@@ -72,6 +75,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
     setEditRows(rows)
   }
 
+  const navScope: 'list' | 'pinned' = pinnedListId ? 'pinned' : 'list'
   const canAddChild = allowChildren && depth < MAX_DEPTH
   const isDragging = store.draggedId === todo.id
   const searchActive = store.isSearchActive
@@ -82,10 +86,16 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
   const canReorderInTree = draggedId !== null && store.canDrop(draggedId, parentId)
   const isPinnedContext = Boolean(pinnedListId)
   const canReorderInPinned = draggedId !== null && isPinnedContext && store.isPinned(draggedId!)
+  // Проверяем, является ли задача первым ребенком узла на максимальной глубине
+  const isFirstChildAtMaxDepth = !isPinnedContext && store.highlightFirstAtMaxDepth && store.isFirstChildAtMaxDepth(todo.id)
 
   useEffect(() => {
     setTitleDraft(todo.title)
   }, [todo.title])
+
+  useEffect(() => {
+    setAliasDraft(todo.alias ?? '')
+  }, [todo.alias])
 
   // При входе в режим редактирования определяем число строк на основе ширины поля и текущего текста
   useEffect(() => {
@@ -109,26 +119,60 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
   // Привязываем ref корня выпадушки для клика-вне
   const tagPickerRef = tagDropdown.rootRef
 
-  const handleToggle = () => {
-    void store.toggleTodo(todo.id)
-  }
+  const wasEditingRef = useRef(false)
+  useEffect(() => {
+    if (wasEditingRef.current && !isEditing && focusRef.current) {
+      focusRef.current.focus()
+    }
+    wasEditingRef.current = isEditing
+  }, [isEditing])
+  const wasAddingChildRef = useRef(false)
+  useEffect(() => {
+    if (wasAddingChildRef.current && !isAddingChild && focusRef.current) {
+      focusRef.current.focus()
+    }
+    wasAddingChildRef.current = isAddingChild
+  }, [isAddingChild])
 
-  const handleEditSubmit: React.FormEventHandler<HTMLFormElement> = async (event) => {
-    event.preventDefault()
-    await store.updateTitle(todo.id, titleDraft)
+  // Фокус менеджмент для меню тегов
+  useEffect(() => {
+    if (!tagDropdown.isOpen) {
+      const active = document.activeElement
+      if (focusRef.current && tagDropdown.menuRef.current?.contains(active)) {
+        focusRef.current.focus()
+      }
+      return
+    }
+    const menu = tagDropdown.menuRef.current
+    if (!menu) return
+    const firstButton = menu.querySelector<HTMLButtonElement>('[data-tag-option="true"]')
+    firstButton?.focus()
+  }, [tagDropdown.isOpen, tagDropdown.menuRef])
+
+  const handleToggle = useCallback(() => {
+    void store.toggleTodo(todo.id)
+  }, [store, todo.id])
+
+  const cancelEditing = useCallback(() => {
+    setTitleDraft(todo.title)
+    setAliasDraft(todo.alias ?? '')
     setIsEditing(false)
-  }
+  }, [todo.alias, todo.title])
+
+  // --- Фильтрация тегов и вычислимые значения ниже нужны commitEdit, поэтому объявим commitEdit после них ---
 
   const handleAddChild: React.FormEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault()
-    await store.addTodo(todo.id, childTitle)
+    const trimmed = childTitle.trim()
+    if (!trimmed) return
+    await store.addTodo(todo.id, trimmed)
     setChildTitle('')
     setIsAddingChild(false)
   }
 
-  const handleDelete = () => {
+  const handleDelete = useCallback(() => {
     void store.deleteTodo(todo.id)
-  }
+  }, [store, todo.id])
 
   const handleTogglePinned = () => {
     void store.togglePinned(todo.id)
@@ -160,7 +204,54 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
     }
     return true
   })
-  const todoTagIds = new Set((todo.tags ?? []).map((t) => t.id))
+  const todoTagIds = useMemo(() => new Set((todo.tags ?? []).map((t) => t.id)), [todo.tags])
+  const canEditAlias = useMemo(
+    () => (todo.tags ?? []).some((tag) => tag.name === 'Проект' || tag.name === 'Раздел'),
+    [todo.tags],
+  )
+  const aliasBadge = store.getNearestAlias(todo.id)
+  const aliasInputId = `todo-alias-${todo.id}`
+  const hasVisualTags = Boolean(aliasBadge) || (todo.tags?.length ?? 0) > 0
+
+  // Автосохранение с дебаунсингом при изменении текста
+  useEffect(() => {
+    if (!isEditing) return
+    
+    const trimmed = titleDraft.trim()
+    // Не сохраняем если текст не изменился или пустой
+    if (trimmed === todo.title || !trimmed) return
+
+    const timer = setTimeout(() => {
+      const details: { title: string; alias?: string | null } = { title: trimmed }
+      if (canEditAlias) {
+        const aliasTrimmed = aliasDraft.trim()
+        details.alias = aliasTrimmed ? aliasTrimmed : null
+      }
+      void store.updateTodoDetails(todo.id, details)
+    }, 500) // дебаунс 500мс
+
+    return () => clearTimeout(timer)
+  }, [titleDraft, aliasDraft, isEditing, todo.title, todo.id, canEditAlias, store])
+
+  const commitEdit = useCallback(async () => {
+    const trimmed = titleDraft.trim()
+    const aliasTrimmed = aliasDraft.trim()
+    if (!trimmed) {
+      cancelEditing()
+      return
+    }
+    const details: { title: string; alias?: string | null } = { title: trimmed }
+    if (canEditAlias) {
+      details.alias = aliasTrimmed ? aliasTrimmed : null
+    }
+    await store.updateTodoDetails(todo.id, details)
+    setIsEditing(false)
+  }, [aliasDraft, cancelEditing, canEditAlias, store, titleDraft, todo.id])
+
+  const handleEditSubmit: React.FormEventHandler<HTMLFormElement> = (event) => {
+    event.preventDefault()
+    void commitEdit()
+  }
 
   const handleToggleCollapsed = () => {
     // Разрешаем сворачивать только если потенциально есть дети (или уже есть), иначе кнопка не показывается
@@ -248,6 +339,153 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
     [todo.completed],
   )
 
+  const menuProps = tagDropdown.getMenuProps()
+
+  const handleCardKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.target !== event.currentTarget) return
+    if (!focusRef.current) return
+
+    switch (event.key) {
+      case 'ArrowDown': {
+        event.preventDefault()
+        focusTodoByOffset(focusRef.current, 1)
+        return
+      }
+      case 'ArrowUp': {
+        event.preventDefault()
+        focusTodoByOffset(focusRef.current, -1)
+        return
+      }
+      case 'Home': {
+        event.preventDefault()
+        focusEdgeTodo(navScope, false)
+        return
+      }
+      case 'End': {
+        event.preventDefault()
+        focusEdgeTodo(navScope, true)
+        return
+      }
+      case 'ArrowLeft': {
+        if (todo.children.length > 0 && !isCollapsed) {
+          event.preventDefault()
+          store.setCollapsed(todo.id, true)
+        }
+        return
+      }
+      case 'ArrowRight': {
+        if (todo.children.length > 0 && isCollapsed) {
+          event.preventDefault()
+          store.setCollapsed(todo.id, false)
+        }
+        return
+      }
+      case ' ': {
+        event.preventDefault()
+        handleToggle()
+        return
+      }
+      case 'Delete':
+      case 'Backspace': {
+        event.preventDefault()
+        handleDelete()
+        return
+      }
+      default:
+    }
+
+    const key = event.key.toLowerCase()
+    if (key === 'e') {
+      event.preventDefault()
+      setIsEditing(true)
+      return
+    }
+    if (key === 'a') {
+      event.preventDefault()
+      if (!canAddChild) return
+      setIsAddingChild((prev) => {
+        const next = !prev
+        if (!next) {
+          setChildTitle('')
+          return next
+        }
+        requestAnimationFrame(() => {
+          childInputRef.current?.focus()
+        })
+        return next
+      })
+      return
+    }
+    if (key === 't') {
+      event.preventDefault()
+      if (event.shiftKey) {
+        const availableToAttach = availableTags.filter((tag) => !todoTagIds.has(tag.id))
+        if (availableToAttach.length > 0) {
+          void store.attachTag(todo.id, availableToAttach[0].id)
+        } else if (todo.tags?.length) {
+          const lastTag = todo.tags[todo.tags.length - 1]
+          void store.detachTag(todo.id, lastTag.id)
+        }
+        return
+      }
+      if (tagDropdown.isOpen) {
+        tagDropdown.close()
+        focusRef.current?.focus()
+      } else if (availableTags.length > 0) {
+        tagDropdown.open()
+      }
+    }
+  }, [availableTags, canAddChild, handleDelete, handleToggle, isCollapsed, navScope, store, tagDropdown, todo.children.length, todo.id, todo.tags, todoTagIds])
+
+  const handleTagMenuKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!tagDropdown.isOpen) return
+    const menu = tagDropdown.menuRef.current
+    if (!menu) return
+    const buttons = Array.from(menu.querySelectorAll<HTMLButtonElement>('[data-tag-option="true"]'))
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      tagDropdown.close()
+      focusRef.current?.focus()
+      return
+    }
+    if (buttons.length === 0) return
+
+    const activeElement = document.activeElement as HTMLElement | null
+    const currentIndex = activeElement ? buttons.findIndex((button) => button === activeElement) : -1
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault()
+      const nextIndex = currentIndex < buttons.length - 1 ? currentIndex + 1 : 0
+      buttons[nextIndex].focus()
+      return
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault()
+      const prevIndex = currentIndex > 0 ? currentIndex - 1 : buttons.length - 1
+      buttons[prevIndex].focus()
+      return
+    }
+    if (event.key === 'Home') {
+      event.preventDefault()
+      buttons[0].focus()
+      return
+    }
+    if (event.key === 'End') {
+      event.preventDefault()
+      buttons[buttons.length - 1].focus()
+      return
+    }
+    if (event.code.startsWith('Digit')) {
+      const digit = Number.parseInt(event.code.replace('Digit', ''), 10)
+      if (Number.isNaN(digit) || digit <= 0) return
+      const index = digit - 1
+      if (index >= buttons.length) return
+      event.preventDefault()
+      buttons[index].click()
+      buttons[index].focus()
+    }
+  }, [tagDropdown])
+
   return (
     <div className="space-y-1">
       <div
@@ -257,6 +495,8 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
           isOverInside && canDropInside ? 'ring-2 ring-emerald-400/80 bg-emerald-50/50' : '',
           overPosition === 'above' ? 'shadow-[inset_0_2px_0_0_rgba(16,185,129,0.7)]' : '',
           overPosition === 'below' ? 'shadow-[inset_0_-2px_0_0_rgba(16,185,129,0.7)]' : '',
+          isFirstChildAtMaxDepth ? 'is-first' : '',
+          todo.id.startsWith('temp_') ? 'opacity-50' : '',
         ].join(' ')}
         draggable={!isEditing && !isAddingChild}
         onDragStart={handleDragStart}
@@ -264,6 +504,13 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
         onDragOver={handleCardDragOver}
         onDragLeave={handleCardDragLeave}
         onDrop={handleCardDrop}
+        ref={focusRef}
+        tabIndex={-1}
+        role="listitem"
+        data-todo-focusable="true"
+        data-focus-scope={navScope}
+        data-todo-id={todo.id}
+        onKeyDown={handleCardKeyDown}
       >
         <div className="todo-card-row flex items-center gap-3 px-4 py-2">
           {/* Toggle collapse button for nodes that can have children */}
@@ -307,14 +554,41 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                     onBlur={recalcRows}
                     onKeyDown={(event) => {
                       if (event.key === 'Escape') {
-                        setTitleDraft(todo.title)
-                        setIsEditing(false)
+                        cancelEditing()
+                        return
+                      }
+                      if (event.key === 'Enter' && !event.shiftKey) {
+                        const isMultiline = titleDraft.includes('\n') || editRows > 1
+                        if (event.ctrlKey || event.metaKey || !isMultiline) {
+                          event.preventDefault()
+                          void commitEdit()
+                        }
                       }
                     }}
                     placeholder="Название задачи"
                     rows={editRows}
                   />
                 </div>
+                {canEditAlias && (
+                  <div className="w-full sm:w-64">
+                    <label htmlFor={aliasInputId} className="mb-1 block text-xs font-medium text-slate-500">
+                      Алиас
+                    </label>
+                    <input
+                      id={aliasInputId}
+                      type="text"
+                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm leading-snug text-slate-700 shadow-sm focus:border-slate-400 focus:outline-none"
+                      value={aliasDraft}
+                      onChange={(event) => setAliasDraft(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Escape') {
+                          cancelEditing()
+                        }
+                      }}
+                      placeholder="Алиас для дочерних задач"
+                    />
+                  </div>
+                )}
                 <div className="flex items-center gap-1 self-end sm:self-auto">
                   <button
                     type="submit"
@@ -325,10 +599,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      setTitleDraft(todo.title)
-                      setIsEditing(false)
-                    }}
+                    onClick={cancelEditing}
                     className={`${actionButtonStyles} hover:bg-slate-200`}
                     aria-label="Отменить редактирование"
                   >
@@ -347,6 +618,15 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
              ) : (
                <div className="flex flex-wrap items-start gap-2 tags-span" onDoubleClick={() => setIsEditing(true)}>
                  <p className={`${titleStyles} text-sm`}>
+                  {aliasBadge ? (
+                    <>
+                      <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-700">
+                        {aliasBadge.alias}
+                      </span>
+                      &nbsp;
+                    </>
+                  ) : null}
+
                   {(todo.tags ?? []).map((tag) => (<>
                     <span
                       key={tag.id}
@@ -366,7 +646,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                     </>
                   ))}
 
-                  {todo.tags?.length ? <>&nbsp;</> : null}
+                  {hasVisualTags ? <>&nbsp;</> : null}
 
                   <HighlightedText text={todo.title} ranges={store.getSearchHighlight(todo.id)} />
                 </p>
@@ -417,7 +697,9 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                       <div
                         ref={tagDropdown.menuRef}
                         className={tagDropdown.getMenuClassName('absolute right-0 z-20 w-48 rounded-lg border border-slate-200 bg-white p-2 shadow-lg')}
-                        {...tagDropdown.getMenuProps()}
+                        onMouseEnter={menuProps.onMouseEnter}
+                        onMouseLeave={menuProps.onMouseLeave}
+                        onKeyDown={handleTagMenuKeyDown}
                       >
                         <div className="mb-2 px-1 text-xs font-medium text-slate-500">Теги</div>
                         <ul className="max-h-56 overflow-auto">
@@ -436,7 +718,8 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                                       void store.attachTag(todo.id, t.id)
                                     }
                                   }}
-                                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-slate-100"
+                                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 focus:bg-slate-100"
+                                  data-tag-option="true"
                                 >
                                   <span className={`inline-flex h-4 w-4 items-center justify-center rounded-sm border ${selected ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-slate-300 text-transparent'}`}>
                                     <FiCheck className="h-3 w-3" />
@@ -482,6 +765,17 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
               value={childTitle}
               onChange={(event) => setChildTitle(event.target.value)}
               placeholder="Новая подзадача"
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                  event.preventDefault()
+                  setChildTitle('')
+                  setIsAddingChild(false)
+                }
+                if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+                  event.preventDefault()
+                  event.currentTarget.form?.requestSubmit()
+                }
+              }}
             />
             <div className="flex items-center gap-1">
               <button
