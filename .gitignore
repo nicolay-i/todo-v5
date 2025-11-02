@@ -34,3 +34,5 @@ dist-ssr
 *.db-wal
 prisma/*.db
 prisma/*.db-journal
+
+tsconfig.tsbuildinfo
