@@ -25,18 +25,15 @@ model Todo {
   completed Boolean  @default(false)
   completedAt DateTime?
   pinned    Boolean  @default(false)
+  alias     String?
   position  Int
   parentId  String?
   parent    Todo?    @relation("TodoChildren", fields: [parentId], references: [id], onDelete: Cascade)
   children  Todo[]   @relation("TodoChildren")
   pinnedIn  PinnedTodo[]
   tags      Tag[]
-  creatorId String
-  creator   User     @relation(fields: [creatorId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  @@index([creatorId])
 }
 
 model PinnedList {
@@ -45,13 +42,9 @@ model PinnedList {
   position  Int
   isPrimary Boolean      @default(false)
   isActive  Boolean      @default(false)
-  userId    String
-  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   todos     PinnedTodo[]
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
-
-  @@index([userId, position])
 }
 
 model PinnedTodo {
@@ -72,37 +65,7 @@ model Tag {
   name      String
   position  Int      @default(0)
   isSystem  Boolean  @default(false)
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   todos     Todo[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  @@index([userId, position])
-}
-
-model User {
-  id         String    @id @default(cuid())
-  telegramId String    @unique
-  firstName  String
-  lastName   String?
-  username   String?
-  photoUrl   String?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  todos      Todo[]
-  pinnedLists PinnedList[]
-  tags       Tag[]
-  sessions   Session[]
-}
-
-model Session {
-  id        String   @id @default(cuid())
-  token     String   @unique
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-  expiresAt DateTime
-
-  @@index([userId])
 }

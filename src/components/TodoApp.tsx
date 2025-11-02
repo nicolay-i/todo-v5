@@ -1,14 +1,17 @@
 'use client'
 
 import type { ChangeEventHandler, FormEventHandler } from 'react'
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { observer } from 'mobx-react-lite'
 import { FiPlus } from 'react-icons/fi'
-import type { AuthenticatedUser } from '@/lib/auth/session'
 import type { TodoState } from '@/lib/types'
 import { TodoStore } from '@/stores/TodoStore'
 import type { VisibilityMode } from '@/stores/TodoStore'
 import { TodoStoreProvider, useTodoStore } from '@/stores/TodoStoreContext'
+import { focusEdgeTodo, isInputLike } from '@/lib/dom/todoFocus'
+import { NotificationStore } from '@/stores/NotificationStore'
+import { NotificationContainer } from './NotificationContainer'
+import { LoadingIndicator } from './LoadingIndicator'
 // мини-плейсхолдеры для сортировки больше не используются
 import { PinnedList } from './PinnedList'
 import { PinnedTextView } from './PinnedTextView'
@@ -18,10 +21,9 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 interface TodoAppProps {
   initialState: TodoState
-  currentUser: AuthenticatedUser
 }
 
-const TodoAppContent = ({ currentUser }: { currentUser: AuthenticatedUser }) => {
+const TodoAppContent = () => {
   const store = useTodoStore()
   const [newTitle, setNewTitle] = useState('')
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -30,16 +32,6 @@ const TodoAppContent = ({ currentUser }: { currentUser: AuthenticatedUser }) => 
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-
-  const handleLogout = async () => {
-    try {
-      await fetch('/api/auth/logout', { method: 'POST' })
-    } catch (error) {
-      console.error('Failed to logout', error)
-    } finally {
-      router.replace('/login')
-    }
-  }
 
   // Инициализируем вкладку из URL (?tab=...)
   const tabFromUrl = searchParams.get('tab')
@@ -52,14 +44,49 @@ const TodoAppContent = ({ currentUser }: { currentUser: AuthenticatedUser }) => 
   const [newPinnedListTitle, setNewPinnedListTitle] = useState('')
   const pinnedListInputRef = useRef<HTMLInputElement>(null)
 
-  const handleAdd = async () => {
+  const closeAddModal = useCallback(() => {
+    setIsAddModalOpen(false)
+    // Используем window.setTimeout чтобы избежать коллизий с Jest/SSR окружением
+    window.setTimeout(() => setIsAddModalMounted(false), 200)
+  }, [])
+
+  const openAddModal = useCallback(() => {
+    setIsAddModalMounted(true)
+    setSelectedTagIds([])
+    // next tick to триггер анимацию появления
+    requestAnimationFrame(() => setIsAddModalOpen(true))
+  }, [])
+
+  const handleAdd = useCallback(async () => {
     const trimmed = newTitle.trim()
     if (!trimmed) return
     await store.addTodo(null, trimmed, selectedTagIds)
     setNewTitle('')
     setSelectedTagIds([])
     closeAddModal()
-  }
+  }, [closeAddModal, newTitle, selectedTagIds, store])
+  // Авто-обновление данных при возвращении во вкладку / фокусе окна
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    let isRefreshing = false
+
+    const refreshIfVisible = () => {
+      if (document.visibilityState !== 'visible' || isRefreshing) return
+      isRefreshing = true
+      void store.refresh().finally(() => {
+        isRefreshing = false
+      })
+    }
+
+    document.addEventListener('visibilitychange', refreshIfVisible)
+    window.addEventListener('focus', refreshIfVisible)
+
+    return () => {
+      document.removeEventListener('visibilitychange', refreshIfVisible)
+      window.removeEventListener('focus', refreshIfVisible)
+    }
+  }, [store])
 
   const handlePinnedListSubmit: FormEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault()
@@ -98,20 +125,7 @@ const TodoAppContent = ({ currentUser }: { currentUser: AuthenticatedUser }) => 
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [isAddModalOpen, newTitle])
-
-  const openAddModal = () => {
-    setIsAddModalMounted(true)
-    setSelectedTagIds([])
-    // next tick to trigger transition
-    requestAnimationFrame(() => setIsAddModalOpen(true))
-  }
-
-  const closeAddModal = () => {
-    setIsAddModalOpen(false)
-    setTimeout(() => setIsAddModalMounted(false), 200)
-  }
-
+  }, [closeAddModal, handleAdd, isAddModalOpen])
   const tabs: { key: 'pinned' | 'all' | 'settings'; label: string }[] = useMemo(
     () => [
       { key: 'pinned', label: 'Слоты' },
@@ -121,22 +135,69 @@ const TodoAppContent = ({ currentUser }: { currentUser: AuthenticatedUser }) => 
     [],
   )
 
+  const tabKeys = useMemo(() => tabs.map((tab) => tab.key), [tabs])
+
   // Синхронизация URL при смене вкладки пользователем
-  const applyTabToUrl = (tab: 'pinned' | 'all' | 'settings') => {
-    const params = new URLSearchParams(searchParams)
+  const applyTabToUrl = useCallback((tab: 'pinned' | 'all' | 'settings') => {
+    const params = new URLSearchParams(searchParams.toString())
     params.set('tab', tab)
     const next = `${pathname}?${params.toString()}`
     router.replace(next, { scroll: false })
-  }
+  }, [pathname, router, searchParams])
 
-  const handleSwitchTab = (tab: 'pinned' | 'all' | 'settings') => {
+  const handleSwitchTab = useCallback((tab: 'pinned' | 'all' | 'settings') => {
     if (tab === activeTab) return
     setActiveTab(tab)
     if (tab !== 'pinned') {
       setIsTextViewOpen(false)
     }
     applyTabToUrl(tab)
-  }
+  }, [activeTab, applyTabToUrl])
+
+  useEffect(() => {
+    const handleGlobalKeys = (event: KeyboardEvent) => {
+      if (isInputLike(event.target)) return
+
+      const lowerKey = event.key.toLowerCase()
+
+      if (!event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && lowerKey === 'n' && activeTab === 'all') {
+        event.preventDefault()
+        openAddModal()
+        return
+      }
+
+      if (!event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+        const scope = activeTab === 'all' ? 'list' : activeTab === 'pinned' ? 'pinned' : null
+        if (!scope) return
+        const activeElement = document.activeElement as HTMLElement | null
+        if (activeElement && activeElement !== document.body) return
+        event.preventDefault()
+        focusEdgeTodo(scope, event.key === 'ArrowUp')
+        return
+      }
+
+      if (event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+        if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+          const currentIndex = tabKeys.indexOf(activeTab)
+          if (currentIndex === -1) return
+          const delta = event.key === 'ArrowRight' ? 1 : -1
+          const nextIndex = Math.min(Math.max(currentIndex + delta, 0), tabKeys.length - 1)
+          if (nextIndex !== currentIndex) {
+            event.preventDefault()
+            handleSwitchTab(tabKeys[nextIndex])
+          }
+          return
+        }
+        if (activeTab === 'pinned' && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+          event.preventDefault()
+          store.stepActivePinnedList(event.key === 'ArrowDown' ? 1 : -1)
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleGlobalKeys)
+    return () => window.removeEventListener('keydown', handleGlobalKeys)
+  }, [activeTab, handleSwitchTab, openAddModal, store, tabKeys])
 
   // Обратная синхронизация: если URL поменялся (например, навигация назад/вперёд), обновим стейт
   useEffect(() => {
@@ -276,7 +337,16 @@ const TodoAppContent = ({ currentUser }: { currentUser: AuthenticatedUser }) => 
             <>
               {/* Добавление задачи теперь через модал */}
               <TodoSearchBar />
-              <div className="mb-3 flex items-center justify-end">
+              <div className="mb-3 flex items-center justify-between gap-3 pl-3">
+                <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={store.highlightFirstAtMaxDepth}
+                    onChange={() => store.toggleHighlightFirstAtMaxDepth()}
+                    className="h-4 w-4 cursor-pointer rounded border-slate-300 text-emerald-600 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-0"
+                  />
+                  <span>Выделение первого todo</span>
+                </label>
                 <FilterSelect value={store.listFilterMode} onChange={(v) => store.setListFilterMode(v)} />
               </div>
               <ListContainer />
@@ -288,7 +358,7 @@ const TodoAppContent = ({ currentUser }: { currentUser: AuthenticatedUser }) => 
               )}
             </>
           ) : (
-            <SettingsTab currentUser={currentUser} onLogout={handleLogout} />
+            <SettingsTab />
           )}
         </section>
         {/* Modal for adding new todo with animation and tag selection */}
@@ -384,12 +454,15 @@ const TodoAppContent = ({ currentUser }: { currentUser: AuthenticatedUser }) => 
 
 const ObservedContent = observer(TodoAppContent)
 
-export const TodoApp = ({ initialState, currentUser }: TodoAppProps) => {
-  const [store] = useState(() => new TodoStore(initialState))
+export const TodoApp = ({ initialState }: TodoAppProps) => {
+  const [notificationStore] = useState(() => new NotificationStore())
+  const [store] = useState(() => new TodoStore(initialState, notificationStore))
 
   return (
     <TodoStoreProvider store={store}>
-      <ObservedContent currentUser={currentUser} />
+      <LoadingIndicator />
+      <NotificationContainer />
+      <ObservedContent />
     </TodoStoreProvider>
   )
 }
@@ -485,13 +558,7 @@ const ListContainer = observer(() => {
   )
 })
 
-const SettingsTab = ({
-  currentUser,
-  onLogout,
-}: {
-  currentUser: AuthenticatedUser
-  onLogout: () => void | Promise<void>
-}) => {
+const SettingsTab = () => {
   const store = useTodoStore()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isExporting, setIsExporting] = useState(false)
@@ -566,40 +633,6 @@ const SettingsTab = ({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
-        <div className="flex items-center gap-4">
-          {currentUser.photoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={currentUser.photoUrl}
-              alt={currentUser.firstName}
-              className="h-14 w-14 rounded-full border border-slate-200 object-cover"
-            />
-          ) : (
-            <div className="flex h-14 w-14 items-center justify-center rounded-full border border-slate-200 bg-slate-100 text-lg font-semibold text-slate-600">
-              {currentUser.firstName.charAt(0)}
-            </div>
-          )}
-          <div className="text-left">
-            <p className="text-base font-semibold text-slate-700">
-              {currentUser.firstName}
-              {currentUser.lastName ? ` ${currentUser.lastName}` : ''}
-            </p>
-            {currentUser.username && (
-              <p className="text-sm text-slate-500">@{currentUser.username}</p>
-            )}
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={() => {
-            void onLogout()
-          }}
-          className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
-        >
-          Выйти
-        </button>
-      </div>
       {/* Tags management */}
       <div className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
         <h3 className="text-base font-semibold text-slate-700">Теги</h3>
