@@ -86,6 +86,16 @@ async function getSessionFromToken(token: string): Promise<(Session & { user: Us
 }
 
 export async function getCurrentUser(): Promise<SessionUser | null> {
+  // Dev режим: если указан DEV_USER_ID, используем его (только в development)
+  const devUserId = process.env.DEV_USER_ID
+  if (devUserId && process.env.NODE_ENV === 'development') {
+    const user = await prisma.user.findUnique({ where: { id: devUserId } })
+    if (user) {
+      return mapUser(user)
+    }
+    console.warn(`DEV_USER_ID=${devUserId} не найден в базе данных`)
+  }
+
   const token = cookies().get(SESSION_COOKIE_NAME)?.value
   if (!token) return null
 
@@ -104,6 +114,15 @@ export async function requireUser(): Promise<SessionUser> {
 }
 
 export async function getUserId(): Promise<string | null> {
+  // Dev режим: если указан DEV_USER_ID, используем его (только в development)
+  const devUserId = process.env.DEV_USER_ID
+  if (devUserId && process.env.NODE_ENV === 'development') {
+    const user = await prisma.user.findUnique({ where: { id: devUserId } })
+    if (user) {
+      return user.id
+    }
+  }
+
   const token = cookies().get(SESSION_COOKIE_NAME)?.value
   if (!token) return null
 

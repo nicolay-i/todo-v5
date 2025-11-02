@@ -235,49 +235,47 @@ const TodoAppContent = ({ user }: { user: SessionUser }) => {
     <div className="min-h-screen bg-canvas-light text-slate-900">
       <div className="mx-auto flex min-h-screen max-w-4xl flex-col px-4 py-10 sm:px-6 lg:px-8">
         <section className="flex-1 rounded-3xl bg-white/60 p-5 shadow-inner ring-1 ring-white/40">
-          <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex rounded-2xl bg-white/70 p-1 text-sm font-medium text-slate-500 shadow-sm ring-1 ring-slate-200/70">
-                {tabs.map((tab) => (
-                  <button
-                    key={tab.key}
-                    type="button"
-                    onClick={() => handleSwitchTab(tab.key)}
-                    className={[
-                      'rounded-xl px-4 py-2 transition focus-visible:outline-none',
-                      activeTab === tab.key
-                        ? 'bg-slate-900 text-white shadow-sm'
-                        : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700',
-                    ].join(' ')}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-              {activeTab === 'all' && (
+          <div className="pb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex rounded-2xl bg-white/70 p-1 text-sm font-medium text-slate-500 shadow-sm ring-1 ring-slate-200/70">
+              {tabs.map((tab) => (
                 <button
+                  key={tab.key}
                   type="button"
-                  onClick={openAddModal}
-                  className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
-                  aria-label="Добавить задачу"
+                  onClick={() => handleSwitchTab(tab.key)}
+                  className={[
+                    'rounded-xl px-4 py-2 transition focus-visible:outline-none',
+                    activeTab === tab.key
+                      ? 'bg-slate-900 text-white shadow-sm'
+                      : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700',
+                  ].join(' ')}
                 >
-                  <FiPlus />
-                  Добавить
+                  {tab.label}
                 </button>
-              )}
+              ))}
             </div>
-            <div className="flex items-center gap-3">
-              {activeTab === 'random' && (
-                <button
-                  type="button"
-                  onClick={() => store.loadRandomChain()}
-                  className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
-                  aria-label="Загрузить другую задачу"
-                >
-                  Другой
-                </button>
-              )}
-            </div>
+            {activeTab === 'all' && (
+              <button
+                type="button"
+                onClick={openAddModal}
+                className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
+                aria-label="Добавить задачу"
+              >
+                <FiPlus />
+                Добавить
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            {activeTab === 'random' && (
+              <button
+                type="button"
+                onClick={() => store.loadRandomChain()}
+                className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
+                aria-label="Загрузить другую задачу"
+              >
+                Другой
+              </button>
+            )}
           </div>
 
           {activeTab === 'pinned' ? (
@@ -712,9 +710,8 @@ const SettingsTab = ({ user, onLogout }: { user: SessionUser; onLogout: () => Pr
             }
           }}
           disabled={isLoggingOut}
-          className={`mt-4 inline-flex items-center rounded-xl px-4 py-2 text-sm font-medium text-white shadow-sm transition ${
-            isLoggingOut ? 'cursor-wait bg-slate-400' : 'bg-rose-500 hover:bg-rose-600'
-          }`}
+          className={`mt-4 inline-flex items-center rounded-xl px-4 py-2 text-sm font-medium text-white shadow-sm transition ${isLoggingOut ? 'cursor-wait bg-slate-400' : 'bg-rose-500 hover:bg-rose-600'
+            }`}
         >
           {isLoggingOut ? 'Выходим...' : 'Выйти из аккаунта'}
         </button>
@@ -748,31 +745,31 @@ const SettingsTab = ({ user, onLogout }: { user: SessionUser; onLogout: () => Pr
         </form>
 
         <ul className="mt-4 space-y-2">
-           {store.tags.map((tag) => (
-             <li
-               key={tag.id}
-               className={`flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 ${draggedTagId === tag.id ? 'opacity-50' : ''}`}
-               draggable
-               onDragStart={(e) => {
-                 setDraggedTagId(tag.id)
-                 e.dataTransfer.effectAllowed = 'move'
-               }}
-               onDragEnd={() => setDraggedTagId(null)}
-               onDragOver={(e) => e.preventDefault()}
-               onDrop={(e) => {
-                 e.preventDefault()
-                 if (draggedTagId && draggedTagId !== tag.id) {
-                   const draggedIndex = store.tags.findIndex(t => t.id === draggedTagId)
-                   const targetIndex = store.tags.findIndex(t => t.id === tag.id)
-                   const newOrder = [...store.tags]
-                   const [removed] = newOrder.splice(draggedIndex, 1)
-                   newOrder.splice(targetIndex, 0, removed)
-                   const tagIds = newOrder.map(t => t.id)
-                   void store.reorderTags(tagIds)
-                 }
-                 setDraggedTagId(null)
-               }}
-             >
+          {store.tags.map((tag) => (
+            <li
+              key={tag.id}
+              className={`flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 ${draggedTagId === tag.id ? 'opacity-50' : ''}`}
+              draggable
+              onDragStart={(e) => {
+                setDraggedTagId(tag.id)
+                e.dataTransfer.effectAllowed = 'move'
+              }}
+              onDragEnd={() => setDraggedTagId(null)}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault()
+                if (draggedTagId && draggedTagId !== tag.id) {
+                  const draggedIndex = store.tags.findIndex(t => t.id === draggedTagId)
+                  const targetIndex = store.tags.findIndex(t => t.id === tag.id)
+                  const newOrder = [...store.tags]
+                  const [removed] = newOrder.splice(draggedIndex, 1)
+                  newOrder.splice(targetIndex, 0, removed)
+                  const tagIds = newOrder.map(t => t.id)
+                  void store.reorderTags(tagIds)
+                }
+                setDraggedTagId(null)
+              }}
+            >
               {editingTagId === tag.id ? (
                 <>
                   <input
