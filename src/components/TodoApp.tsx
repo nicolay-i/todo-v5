@@ -264,8 +264,6 @@ const TodoAppContent = ({ user }: { user: SessionUser }) => {
                 Добавить
               </button>
             )}
-          </div>
-          <div className="flex items-center gap-3">
             {activeTab === 'random' && (
               <button
                 type="button"

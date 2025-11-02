@@ -374,7 +374,7 @@ function RandomTodoTabComponent() {
   const leafTodo = store.randomChain[store.randomChain.length - 1]
 
   return (
-    <div className="p-4">
+    <div className="pt-3">
       <div className="space-y-3">
         {store.randomChain.map((todo, index) => {
           const isLeaf = index === store.randomChain.length - 1
