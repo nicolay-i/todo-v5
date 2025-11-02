@@ -340,6 +340,7 @@ function normalizeTodos(
 function normalizePinnedLists(
   lists: unknown,
   todoIds: Set<string>,
+  forceNewIds = false, // флаг для принудительной генерации новых ID при импорте
 ): NormalizedPinnedList[] {
   if (!Array.isArray(lists)) {
     return [
@@ -362,8 +363,18 @@ function normalizePinnedLists(
     }
 
     const raw = item as Partial<PinnedListState>
-    const idCandidate = typeof raw.id === 'string' && raw.id.trim().length > 0 ? raw.id.trim() : randomUUID()
-    const id = normalized.some((list) => list.id === idCandidate) ? randomUUID() : idCandidate
+    // При импорте всегда генерируем новые ID
+    let id: string
+    if (forceNewIds) {
+      id = randomUUID()
+    } else {
+      const rawId = typeof raw.id === 'string' && raw.id.trim().length > 0 ? raw.id.trim() : null
+      if (rawId && !normalized.some((list) => list.id === rawId)) {
+        id = rawId
+      } else {
+        id = randomUUID()
+      }
+    }
     const title = typeof raw.title === 'string' && raw.title.trim().length > 0 ? raw.title.trim() : 'Главное'
     const order = Array.isArray(raw.order)
       ? raw.order
@@ -413,21 +424,24 @@ export async function replaceTodoState(userId: string, state: unknown): Promise<
   normalizeTodos(parsed.todos ?? [], null, 0, todos, idSet)
 
   // normalize tags (top-level)
+  // При импорте генерируем новые ID для тегов чтобы избежать конфликтов
   const tagRecords: { id: string; name: string; position: number }[] = []
-  const tagIdSet = new Set<string>()
+  const oldTagIdToNewId = new Map<string, string>() // маппинг старых ID на новые
   if (Array.isArray((parsed as any).tags)) {
     for (const [index, raw] of (parsed as any).tags.entries()) {
       if (!raw || typeof raw !== 'object') continue
-      const rid = typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : randomUUID()
-      const id = tagIdSet.has(rid) ? randomUUID() : rid
-      tagIdSet.add(id)
+      const oldId = typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : undefined
+      const newId = randomUUID() // всегда генерируем новый ID
       const name = typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim() : 'Без имени'
       const position = typeof raw.position === 'number' ? raw.position : index
-      tagRecords.push({ id, name, position })
+      tagRecords.push({ id: newId, name, position })
+      if (oldId) {
+        oldTagIdToNewId.set(oldId, newId)
+      }
     }
   }
 
-  // collect per-todo tag ids if present
+  // collect per-todo tag ids if present, преобразуя старые ID в новые
   const todoTagMap = new Map<string, string[]>()
   if (Array.isArray(parsed.todos)) {
     const walk = (nodes: any[], idLookup: Map<string, string>) => {
@@ -440,8 +454,14 @@ export async function replaceTodoState(userId: string, state: unknown): Promise<
           if (Array.isArray(raw.tags)) {
             for (const t of raw.tags) {
               if (t && typeof t === 'object') {
-                const tid = typeof t.id === 'string' && t.id.trim() ? t.id.trim() : undefined
-                if (tid) tagIds.push(tid)
+                const oldTagId = typeof t.id === 'string' && t.id.trim() ? t.id.trim() : undefined
+                if (oldTagId) {
+                  // Преобразуем старый ID тега в новый
+                  const newTagId = oldTagIdToNewId.get(oldTagId)
+                  if (newTagId) {
+                    tagIds.push(newTagId)
+                  }
+                }
               }
             }
           }
@@ -458,7 +478,8 @@ export async function replaceTodoState(userId: string, state: unknown): Promise<
   }
 
   const todoIds = new Set(todos.map((item) => item.id))
-  const pinnedLists = normalizePinnedLists(parsed.pinnedLists ?? [], todoIds)
+  // При импорте генерируем новые ID для pinned lists чтобы избежать конфликтов
+  const pinnedLists = normalizePinnedLists(parsed.pinnedLists ?? [], todoIds, true)
 
   const pinnedTodoIds = new Set<string>()
   pinnedLists.forEach((list) => {
