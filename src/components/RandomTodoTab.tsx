@@ -80,7 +80,7 @@ const TodoItemInChain = observer(({ todo, isLeaf, indent, onUpdate, onAddChild, 
     
     if (Object.keys(changes).length > 0) {
       await store.updateTodoDetails(todo.id, changes)
-      onUpdate()
+      // Не вызываем onUpdate(), так как изменения уже оптимистично применены к randomChain
     }
     setIsEditing(false)
   }

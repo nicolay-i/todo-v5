@@ -275,6 +275,19 @@ export class TodoStore {
           }
           info.node.updatedAt = new Date()
         }
+
+        // Обновляем также в randomChain, если задача там есть
+        const chainIndex = this.randomChain.findIndex((todo) => todo.id === id)
+        if (chainIndex !== -1) {
+          const chainTodo = this.randomChain[chainIndex]
+          if (typeof details.title === 'string') {
+            chainTodo.title = details.title.trim()
+          }
+          if (Object.prototype.hasOwnProperty.call(details, 'alias')) {
+            chainTodo.alias = details.alias ?? null
+          }
+          chainTodo.updatedAt = new Date()
+        }
       },
       // Запрос на сервер
       async () => {
