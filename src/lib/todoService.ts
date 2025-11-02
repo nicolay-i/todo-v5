@@ -479,9 +479,10 @@ export async function replaceTodoState(userId: string, state: unknown): Promise<
       await tx.tag.createMany({ data: tagRecords.map((record) => ({ ...record, userId })) })
     }
 
-    for (const todo of todos) {
-      await tx.todo.create({
-        data: {
+    // Batch create todos instead of one by one
+    if (todos.length > 0) {
+      await tx.todo.createMany({
+        data: todos.map((todo) => ({
           id: todo.id,
           title: todo.title,
           completed: todo.completed,
@@ -490,17 +491,25 @@ export async function replaceTodoState(userId: string, state: unknown): Promise<
           parentId: todo.parentId,
           position: todo.position,
           userId,
-        },
+        })),
       })
     }
 
-    // connect tags to todos
+    // connect tags to todos in batches
     if (todoTagMap.size > 0) {
-      for (const [todoId, tagIds] of todoTagMap) {
-        await tx.todo.update({
-          where: { id: todoId },
-          data: { tags: { set: [], connect: tagIds.map((id) => ({ id })) } },
-        })
+      const tagUpdates = Array.from(todoTagMap.entries())
+      // Process in chunks to avoid too many sequential updates
+      const CHUNK_SIZE = 50
+      for (let i = 0; i < tagUpdates.length; i += CHUNK_SIZE) {
+        const chunk = tagUpdates.slice(i, i + CHUNK_SIZE)
+        await Promise.all(
+          chunk.map(([todoId, tagIds]) =>
+            tx.todo.update({
+              where: { id: todoId },
+              data: { tags: { set: [], connect: tagIds.map((id) => ({ id })) } },
+            })
+          )
+        )
       }
     }
 
@@ -526,6 +535,9 @@ export async function replaceTodoState(userId: string, state: unknown): Promise<
         })
       }
     }
+  }, {
+    maxWait: 30000, // Максимум 30 секунд ожидания начала транзакции
+    timeout: 600000, // Максимум 600 секунд на выполнение транзакции
   })
 
   return getTodoState(userId)
@@ -1189,4 +1201,44 @@ export async function setActivePinnedList(userId: string, id: string): Promise<T
     await tx.pinnedList.update({ where: { id }, data: { isActive: true } })
   })
   return getTodoState(userId)
+}
+
+/**
+ * Получить случайную цепочку todo (от корня до листового незавершённого элемента)
+ * Возвращает массив todo от корня до листа
+ */
+export async function getRandomTodoChain(userId: string): Promise<(Todo & { tags: Tag[] })[]> {
+  await ensureSeedData(userId)
+  
+  // Получаем все незавершённые листовые todo (у которых нет детей и completed = false) с тегами
+  const allTodos = await prisma.todo.findMany({
+    where: { completed: false, userId },
+    include: { tags: true },
+    orderBy: { position: 'asc' }
+  })
+  
+  // Находим листовые элементы (у которых нет детей)
+  const leafTodos = allTodos.filter(todo => {
+    return !allTodos.some(t => t.parentId === todo.id)
+  })
+  
+  if (leafTodos.length === 0) {
+    return []
+  }
+  
+  // Выбираем случайный листовой элемент
+  const randomLeaf = leafTodos[Math.floor(Math.random() * leafTodos.length)]
+  
+  // Строим цепочку от корня до листа
+  const chain: (Todo & { tags: Tag[] })[] = [randomLeaf]
+  let currentId = randomLeaf.parentId
+  
+  while (currentId) {
+    const parent = allTodos.find(t => t.id === currentId)
+    if (!parent) break
+    chain.unshift(parent)
+    currentId = parent.parentId
+  }
+  
+  return chain
 }
