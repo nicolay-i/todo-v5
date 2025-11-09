@@ -137,8 +137,8 @@ class CapRoverDeployer {
 
       const tarRel = path.basename(tarPath);
       const deployCommand = this.config.appToken
-        ? `caprover deploy -h ${this.config.serverUrl} -a ${this.config.appName} --appToken ${this.config.appToken} -t ${tarRel}`
-        : `caprover deploy -a ${this.config.appName} -t ${tarRel}`;
+        ? `npx caprover deploy -h ${this.config.serverUrl} -a ${this.config.appName} --appToken ${this.config.appToken} -t ${tarRel}`
+        : `npx caprover deploy -a ${this.config.appName} -t ${tarRel}`;
 
       console.log(`Выполняю команду: ${deployCommand}`);
       try {
@@ -151,8 +151,8 @@ class CapRoverDeployer {
 
     // fallback: отправляем текущую папку как контекст
     const deployCommand = this.config.appToken 
-      ? `caprover deploy -h ${this.config.serverUrl} -a ${this.config.appName} --appToken ${this.config.appToken}`
-      : `caprover deploy -a ${this.config.appName}`;
+      ? `npx caprover deploy -h ${this.config.serverUrl} -a ${this.config.appName} --appToken ${this.config.appToken}`
+      : `npx caprover deploy -a ${this.config.appName}`;
     console.log(`Выполняю команду: ${deployCommand}`);
     return this.execCommand(deployCommand);
   }
