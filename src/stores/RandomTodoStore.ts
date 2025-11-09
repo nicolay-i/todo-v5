@@ -1,6 +1,7 @@
 import { makeAutoObservable, runInAction } from 'mobx'
 import type { TodoNode } from '@/lib/types'
 import { NotificationStore } from './NotificationStore'
+import { ApiClient } from '@/lib/apiClient'
 
 export class RandomTodoStore {
   randomChain: TodoNode[] = []
@@ -17,14 +18,7 @@ export class RandomTodoStore {
       this.isLoadingRandomChain = true
     })
     try {
-      const url = todoId 
-        ? `/api/todos/random?id=${encodeURIComponent(todoId)}`
-        : '/api/todos/random'
-      const response = await fetch(url, { cache: 'no-store' })
-      if (!response.ok) {
-        throw new Error('Failed to load random chain')
-      }
-      const data = await response.json()
+      const data = await ApiClient.getRandomChain(todoId)
       runInAction(() => {
         // Преобразуем Todo[] в TodoNode[] с пустыми children и сохраняем теги
         this.randomChain = (data.chain || []).map((todo: any) => ({
@@ -53,20 +47,7 @@ export class RandomTodoStore {
   ) {
     try {
       // Добавляем задачу через API
-      const payload = { parentId, title: childTitle.trim() }
-      const response = await fetch('/api/todos', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to add todo')
-      }
-
-      const data = await response.json()
+      const data = await ApiClient.addTodo(parentId, childTitle.trim())
       
       // Находим добавленную задачу в ответе
       const findNewChild = (nodes: TodoNode[], parentId: string): TodoNode | null => {
@@ -102,16 +83,7 @@ export class RandomTodoStore {
   ) {
     try {
       // Удаляем задачу из базы
-      const response = await fetch(`/api/todos/${todoId}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to delete todo')
-      }
+      await ApiClient.deleteTodo(todoId)
       
       // Убираем последний элемент из цепочки
       runInAction(() => {

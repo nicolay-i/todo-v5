@@ -3,6 +3,7 @@ import { MAX_DEPTH } from '@/lib/constants'
 import type { TodoNode, TodoState, PinnedListState, Tag } from '@/lib/types'
 import { fuzzyMatch } from '@/lib/search/fuzzyMatch'
 import { NotificationStore } from './NotificationStore'
+import { ApiClient } from '@/lib/apiClient'
 
 export interface PinnedListView extends PinnedListState {
   todos: TodoNode[]
@@ -109,15 +110,7 @@ export class TodoStore {
 
   async refresh() {
     try {
-      const response = await fetch('/api/state', { cache: 'no-store' })
-      if (response.status === 401) {
-        window.location.href = '/'
-        return
-      }
-      if (!response.ok) {
-        throw new Error('Failed to load state')
-      }
-      const data = (await response.json()) as TodoState
+      const data = await ApiClient.getState()
       this.setState(data)
     } catch (error) {
       console.error('Failed to refresh state', error)
@@ -175,15 +168,7 @@ export class TodoStore {
       },
       // Запрос на сервер
       async () => {
-        const payload: any = { parentId, title: title.trim() }
-        if (Array.isArray(tagIds) && tagIds.length > 0) {
-          payload.tagIds = Array.from(new Set(tagIds))
-        }
-        
-        const data = await this.serverMutate('/api/todos', {
-          method: 'POST',
-          body: JSON.stringify(payload),
-        })
+        const data = await ApiClient.addTodo(parentId, title, tagIds)
         this.setState(data)
       },
       'Не удалось создать задачу'
@@ -224,10 +209,7 @@ export class TodoStore {
       },
       // Запрос на сервер
       async () => {
-        const data = await this.serverMutate(`/api/todos/${id}`, {
-          method: 'PATCH',
-          body: JSON.stringify(payload),
-        })
+        const data = await ApiClient.updateTodoDetails(id, details)
         this.setState(data)
       },
       'Не удалось обновить задачу'
@@ -250,10 +232,7 @@ export class TodoStore {
       },
       // Запрос на сервер
       async () => {
-        const data = await this.serverMutate(`/api/todos/${id}`, {
-          method: 'PATCH',
-          body: JSON.stringify({ action: 'toggleCompleted' }),
-        })
+        const data = await ApiClient.toggleTodoCompleted(id)
         this.setState(data)
       },
       'Не удалось изменить статус задачи'
@@ -270,7 +249,13 @@ export class TodoStore {
   }
 
   async deleteTodo(id: string) {
-    await this.mutate(`/api/todos/${id}`, { method: 'DELETE' })
+    try {
+      const data = await ApiClient.deleteTodo(id)
+      this.setState(data)
+    } catch (error) {
+      console.error('Failed to delete todo', error)
+      await this.refresh()
+    }
   }
 
   setDragged(id: string | null) {
@@ -450,10 +435,13 @@ export class TodoStore {
 
   async moveTodo(id: string, targetParentId: string | null, targetIndex: number) {
     if (!this.canDrop(id, targetParentId)) return
-    await this.mutate(`/api/todos/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ action: 'move', targetParentId, targetIndex }),
-    })
+    try {
+      const data = await ApiClient.moveTodo(id, targetParentId, targetIndex)
+      this.setState(data)
+    } catch (error) {
+      console.error('Failed to move todo', error)
+      await this.refresh()
+    }
   }
 
   async togglePinned(id: string) {
@@ -482,10 +470,7 @@ export class TodoStore {
       },
       // Запрос на сервер
       async () => {
-        const data = await this.serverMutate(`/api/todos/${id}`, {
-          method: 'PATCH',
-          body: JSON.stringify({ action: 'togglePinned' }),
-        })
+        const data = await ApiClient.toggleTodoPinned(id)
         this.setState(data)
       },
       'Не удалось изменить закрепление задачи'
@@ -493,54 +478,78 @@ export class TodoStore {
   }
 
   async movePinnedTodo(id: string, targetListId: string, targetIndex: number) {
-    await this.mutate('/api/pinned-lists/move', {
-      method: 'POST',
-      body: JSON.stringify({ todoId: id, targetListId, targetIndex }),
-    })
+    try {
+      const data = await ApiClient.movePinnedTodo(id, targetListId, targetIndex)
+      this.setState(data)
+    } catch (error) {
+      console.error('Failed to move pinned todo', error)
+      await this.refresh()
+    }
   }
 
   async addPinnedList(title: string) {
     if (!title.trim()) return
-    await this.mutate('/api/pinned-lists', {
-      method: 'POST',
-      body: JSON.stringify({ title }),
-    })
+    try {
+      const data = await ApiClient.addPinnedList(title)
+      this.setState(data)
+    } catch (error) {
+      console.error('Failed to add pinned list', error)
+      await this.refresh()
+    }
   }
 
   async renamePinnedList(id: string, title: string) {
     if (!title.trim()) return
-    await this.mutate(`/api/pinned-lists/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ title }),
-    })
+    try {
+      const data = await ApiClient.renamePinnedList(id, title)
+      this.setState(data)
+    } catch (error) {
+      console.error('Failed to rename pinned list', error)
+      await this.refresh()
+    }
   }
 
   async deletePinnedList(id: string) {
-    await this.mutate(`/api/pinned-lists/${id}`, { method: 'DELETE' })
+    try {
+      const data = await ApiClient.deletePinnedList(id)
+      this.setState(data)
+    } catch (error) {
+      console.error('Failed to delete pinned list', error)
+      await this.refresh()
+    }
   }
 
   // ---- Tags CRUD ----
   async addTag(name: string) {
     if (!name.trim()) return
-    await this.mutate('/api/tags', {
-      method: 'POST',
-      body: JSON.stringify({ name }),
-    })
+    try {
+      const data = await ApiClient.addTag(name)
+      this.setState(data)
+    } catch (error) {
+      console.error('Failed to add tag', error)
+      await this.refresh()
+    }
   }
 
   async renameTag(id: string, name: string) {
     if (!name.trim()) return
-    await this.mutate('/api/tags', {
-      method: 'PATCH',
-      body: JSON.stringify({ id, name }),
-    })
+    try {
+      const data = await ApiClient.renameTag(id, name)
+      this.setState(data)
+    } catch (error) {
+      console.error('Failed to rename tag', error)
+      await this.refresh()
+    }
   }
 
   async deleteTag(id: string) {
-    await this.mutate('/api/tags', {
-      method: 'DELETE',
-      body: JSON.stringify({ id }),
-    })
+    try {
+      const data = await ApiClient.deleteTag(id)
+      this.setState(data)
+    } catch (error) {
+      console.error('Failed to delete tag', error)
+      await this.refresh()
+    }
   }
 
   async attachTag(todoId: string, tagId: string) {
@@ -562,10 +571,7 @@ export class TodoStore {
       },
       // Запрос на сервер
       async () => {
-        const data = await this.serverMutate(`/api/todos/${todoId}/tags`, {
-          method: 'POST',
-          body: JSON.stringify({ tagId }),
-        })
+        const data = await ApiClient.attachTag(todoId, tagId)
         this.setState(data)
       },
       'Не удалось добавить тег'
@@ -583,10 +589,7 @@ export class TodoStore {
       },
       // Запрос на сервер
       async () => {
-        const data = await this.serverMutate(`/api/todos/${todoId}/tags`, {
-          method: 'DELETE',
-          body: JSON.stringify({ tagId }),
-        })
+        const data = await ApiClient.detachTag(todoId, tagId)
         this.setState(data)
       },
       'Не удалось удалить тег'
@@ -615,10 +618,13 @@ export class TodoStore {
   }
 
   async reorderTags(tagIds: string[]) {
-    await this.mutate('/api/tags', {
-      method: 'PUT',
-      body: JSON.stringify({ tagIds }),
-    })
+    try {
+      const data = await ApiClient.reorderTags(tagIds)
+      this.setState(data)
+    } catch (error) {
+      console.error('Failed to reorder tags', error)
+      await this.refresh()
+    }
   }
 
   isPinned(id: string): boolean {
@@ -636,10 +642,13 @@ export class TodoStore {
   }
 
   async setActivePinnedList(id: string) {
-    await this.mutate(`/api/pinned-lists/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ action: 'setActive' }),
-    })
+    try {
+      const data = await ApiClient.setActivePinnedList(id)
+      this.setState(data)
+    } catch (error) {
+      console.error('Failed to set active pinned list', error)
+      await this.refresh()
+    }
   }
 
   stepActivePinnedList(offset: number) {
@@ -674,53 +683,6 @@ export class TodoStore {
     if (this.containsNode(itemInfo.node, parentId)) return false
 
     return parentInfo.depth + 1 + subtreeDepth <= MAX_DEPTH
-  }
-
-  private async mutate(url: string, init: RequestInit) {
-    try {
-      const response = await fetch(url, {
-        ...init,
-        headers: {
-          'Content-Type': 'application/json',
-          ...(init.headers ?? {}),
-        },
-      })
-
-      if (!response.ok) {
-        throw new Error(`Request failed: ${response.status}`)
-      }
-
-      const data = (await response.json()) as TodoState
-      this.setState(data)
-    } catch (error) {
-      console.error('Failed to update state', error)
-      await this.refresh()
-    }
-  }
-
-  /**
-   * Выполняет запрос к серверу и возвращает новое состояние
-   */
-  private async serverMutate(url: string, init: RequestInit): Promise<TodoState> {
-    const response = await fetch(url, {
-      ...init,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(init.headers ?? {}),
-      },
-    })
-
-    if (response.status === 401) {
-      window.location.href = '/'
-      throw new Error('Unauthorized')
-    }
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.error || `Request failed: ${response.status}`)
-    }
-
-    return (await response.json()) as TodoState
   }
 
   /**
