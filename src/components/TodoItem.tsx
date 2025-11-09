@@ -31,12 +31,14 @@ interface TodoItemProps {
   // если передан pinnedListId, сортировка идет внутри закрепленного списка
   pinnedListId?: string
   allowChildren?: boolean
+  enableDragDrop?: boolean
+  forceExpanded?: boolean
 }
 
 const actionButtonStyles =
   'rounded-lg p-1.5 text-slate-400 transition-colors duration-150 hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none'
 
-const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowChildren = true }: TodoItemProps) => {
+const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowChildren = true, enableDragDrop = true, forceExpanded = false }: TodoItemProps) => {
   const store = useTodoStore()
   const [isEditing, setIsEditing] = useState(false)
   const [isAddingChild, setIsAddingChild] = useState(false)
@@ -79,7 +81,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
   const canAddChild = allowChildren && depth < MAX_DEPTH
   const isDragging = store.draggedId === todo.id
   const searchActive = store.isSearchActive
-  const isCollapsed = searchActive ? false : store.isCollapsed(todo.id)
+  const isCollapsed = forceExpanded ? false : (searchActive ? false : store.isCollapsed(todo.id))
   const draggedId = store.draggedId
   const canDropInside =
     allowChildren && depth < MAX_DEPTH && draggedId !== null && store.canDrop(draggedId, todo.id)
@@ -498,12 +500,12 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
           isFirstChildAtMaxDepth ? 'is-first' : '',
           todo.id.startsWith('temp_') ? 'opacity-50' : '',
         ].join(' ')}
-        draggable={!isEditing && !isAddingChild}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-        onDragOver={handleCardDragOver}
-        onDragLeave={handleCardDragLeave}
-        onDrop={handleCardDrop}
+        draggable={enableDragDrop && !isEditing && !isAddingChild}
+        onDragStart={enableDragDrop ? handleDragStart : undefined}
+        onDragEnd={enableDragDrop ? handleDragEnd : undefined}
+        onDragOver={enableDragDrop ? handleCardDragOver : undefined}
+        onDragLeave={enableDragDrop ? handleCardDragLeave : undefined}
+        onDrop={enableDragDrop ? handleCardDrop : undefined}
         ref={focusRef}
         tabIndex={-1}
         role="listitem"
@@ -521,13 +523,13 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
               className={[
                 actionButtonStyles,
                 '-ml-1.5 text-lg',
-                todo.children.length > 0 && !searchActive
+                todo.children.length > 0 && !searchActive && !forceExpanded
                   ? 'text-slate-500'
                   : 'text-slate-300 cursor-default',
                   'btn-collapse'
               ].join(' ')}
               aria-label={isCollapsed ? 'Развернуть' : 'Свернуть'}
-              disabled={todo.children.length === 0 || searchActive}
+              disabled={todo.children.length === 0 || searchActive || forceExpanded}
             >
               {isCollapsed ? <FiChevronRight /> : <FiChevronDown />}
             </button>
@@ -802,7 +804,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
           <div className="space-y-2 border-l border-slate-200/70 pl-6">
             {todo.children.map((child, childIndex) => (
               <Fragment key={child.id}>
-              <TodoItem todo={child} depth={depth + 1} parentId={todo.id} index={childIndex} />
+              <TodoItem todo={child} depth={depth + 1} parentId={todo.id} index={childIndex} enableDragDrop={enableDragDrop} forceExpanded={forceExpanded} />
             </Fragment>
           ))}
         </div>

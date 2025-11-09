@@ -18,6 +18,7 @@ import { PinnedTextView } from './PinnedTextView'
 import { TodoItem } from './TodoItem'
 import { TodoSearchBar } from './TodoSearchBar'
 import { RandomTodoTab } from './RandomTodoTab'
+import { TodoTreeView } from './TodoTreeView'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import type { SessionUser } from '@/lib/auth/session'
 import Image from 'next/image'
@@ -376,13 +377,11 @@ const TodoAppContent = ({ user }: { user: SessionUser }) => {
                 </label>
                 <FilterSelect value={store.listFilterMode} onChange={(v) => store.setListFilterMode(v)} />
               </div>
-              <ListContainer />
-
-              {store.todos.length === 0 && (
-                <div className="mt-6 rounded-2xl border border-dashed border-slate-300/80 bg-white/70 px-6 py-10 text-center text-sm text-slate-500">
-                  Начните с новой задачи — вы всегда сможете добавить вложенные подзадачи и перетащить элементы между уровнями.
-                </div>
-              )}
+              <TodoTreeView
+                showEmptyPlaceholder={store.todos.length === 0}
+                emptyPlaceholderText="Начните с новой задачи — вы всегда сможете добавить вложенные подзадачи и перетащить элементы между уровнями."
+                enableDragDrop={true}
+              />
             </>
           ) : activeTab === 'random' ? (
             <RandomTodoTab />
@@ -519,73 +518,6 @@ function FilterSelect({ value, onChange }: { value: VisibilityMode; onChange: (v
     </select>
   )
 }
-
-// Контейнер списка верхнего уровня: без мини-плейсхолдеров.
-const ListContainer = observer(() => {
-  const store = useTodoStore()
-  const draggedId = store.draggedId
-  const canAcceptRoot = draggedId !== null && store.canDrop(draggedId, null)
-  const searchActive = store.isSearchActive
-  const visibleTodos = store.visibleTodos
-  const [isOverEmpty, setIsOverEmpty] = useState(false)
-  const isRootEmpty = store.todos.length === 0
-
-  const handleEmptyDragOver: React.DragEventHandler<HTMLDivElement> = (event) => {
-    if (!canAcceptRoot || !isRootEmpty) return
-    event.preventDefault()
-    event.dataTransfer.dropEffect = 'move'
-    if (!isOverEmpty) {
-      setIsOverEmpty(true)
-    }
-  }
-
-  const handleEmptyDragLeave: React.DragEventHandler<HTMLDivElement> = () => {
-    if (isOverEmpty) {
-      setIsOverEmpty(false)
-    }
-  }
-
-  const handleEmptyDrop: React.DragEventHandler<HTMLDivElement> = (event) => {
-    if (!canAcceptRoot || draggedId === null || !isRootEmpty) return
-    event.preventDefault()
-    setIsOverEmpty(false)
-    void store.moveTodo(draggedId, null, 0)
-    store.clearDragged()
-  }
-
-  return (
-    <div
-      className="space-y-3"
-      onDragOver={handleEmptyDragOver}
-      onDragLeave={handleEmptyDragLeave}
-      onDrop={handleEmptyDrop}
-    >
-      {searchActive && visibleTodos.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-slate-300/70 bg-white/70 px-6 py-10 text-center text-sm text-slate-500">
-          Ничего не найдено — попробуйте изменить текст запроса или фильтр по тегам.
-        </div>)}
-
-      {isRootEmpty ? (
-        <div
-          className={[
-            'flex min-h-[120px] items-center justify-center rounded-2xl border border-dashed px-4 py-8 text-center text-sm transition-colors',
-            isOverEmpty && canAcceptRoot
-              ? 'border-emerald-300 bg-emerald-50/70 text-emerald-700'
-              : 'border-slate-200 bg-slate-50 text-slate-500',
-          ].join(' ')}
-        >
-          Добавьте первую задачу или перетащите её в этот список
-        </div>
-      ) : (
-        store.visibleTodos.map((todo, index) => (
-          <Fragment key={todo.id}>
-            <TodoItem todo={todo} depth={0} parentId={null} index={index} />
-          </Fragment>
-        ))
-      )}
-    </div>
-  )
-})
 
 const SettingsTab = ({ user, onLogout }: { user: SessionUser; onLogout: () => Promise<void> | void }) => {
   const store = useTodoStore()
