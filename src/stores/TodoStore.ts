@@ -125,8 +125,12 @@ export class TodoStore {
   }
 
   randomChain: TodoNode[] = []
+  isLoadingRandomChain = true
 
   async loadRandomChain(todoId?: string) {
+    runInAction(() => {
+      this.isLoadingRandomChain = true
+    })
     try {
       const url = todoId 
         ? `/api/todos/random?id=${encodeURIComponent(todoId)}`
@@ -146,11 +150,13 @@ export class TodoStore {
           children: [],
           tags: todo.tags || [],
         }))
+        this.isLoadingRandomChain = false
       })
     } catch (error) {
       console.error('Failed to load random chain', error)
       runInAction(() => {
         this.randomChain = []
+        this.isLoadingRandomChain = false
       })
     }
   }

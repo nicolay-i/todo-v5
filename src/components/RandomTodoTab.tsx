@@ -1,7 +1,7 @@
 'use client'
 
 import { observer } from 'mobx-react-lite'
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useTodoStore } from '@/stores/TodoStoreContext'
 import { TodoTreeView } from './TodoTreeView'
@@ -12,8 +12,16 @@ function RandomTodoTabComponent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const todoId = searchParams.get('id')
+  
+  // Флаг для предотвращения повторной загрузки при обновлении URL
+  const isUpdatingUrlRef = useRef(false)
 
   useEffect(() => {
+    // Если мы только что обновили URL, сбрасываем флаг и не загружаем
+    if (isUpdatingUrlRef.current) {
+      isUpdatingUrlRef.current = false
+      return
+    }
     // Загружаем цепочку: если есть id в URL, загружаем по id, иначе случайную
     void store.loadRandomChain(todoId || undefined)
   }, [store, todoId])
@@ -28,6 +36,8 @@ function RandomTodoTabComponent() {
       params.set('tab', 'random')
       params.set('id', leafTodo.id)
       router.replace(`?${params.toString()}`, { scroll: false })
+      // Устанавливаем флаг, что мы обновляем URL из-за изменения состояния
+      isUpdatingUrlRef.current = true
     }
   }, [leafTodo?.id, todoId, searchParams, router])
 
@@ -54,6 +64,17 @@ function RandomTodoTabComponent() {
     
     return result
   }, [store.randomChain])
+
+  if (store.isLoadingRandomChain) {
+    return (
+      <div className="p-4">
+        <div className="flex items-center justify-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+          <span className="ml-2 text-slate-500">Загрузка случайной задачи...</span>
+        </div>
+      </div>
+    )
+  }
 
   if (store.randomChain.length === 0) {
     return (
