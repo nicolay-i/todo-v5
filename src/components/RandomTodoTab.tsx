@@ -3,12 +3,12 @@
 import { observer } from 'mobx-react-lite'
 import { useEffect, useMemo, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { useTodoStore } from '@/stores/TodoStoreContext'
+import { useRandomTodoStore } from '@/stores/RandomTodoStoreContext'
 import { TodoTreeView } from './TodoTreeView'
 import type { TodoNode } from '@/lib/types'
 
 function RandomTodoTabComponent() {
-  const store = useTodoStore()
+  const store = useRandomTodoStore()
   const searchParams = useSearchParams()
   const router = useRouter()
   const todoId = searchParams.get('id')

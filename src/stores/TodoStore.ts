@@ -124,74 +124,6 @@ export class TodoStore {
     }
   }
 
-  randomChain: TodoNode[] = []
-  isLoadingRandomChain = true
-
-  async loadRandomChain(todoId?: string) {
-    runInAction(() => {
-      this.isLoadingRandomChain = true
-    })
-    try {
-      const url = todoId 
-        ? `/api/todos/random?id=${encodeURIComponent(todoId)}`
-        : '/api/todos/random'
-      const response = await fetch(url, { cache: 'no-store' })
-      if (!response.ok) {
-        throw new Error('Failed to load random chain')
-      }
-      const data = await response.json()
-      runInAction(() => {
-        // Преобразуем Todo[] в TodoNode[] с пустыми children и сохраняем теги
-        this.randomChain = (data.chain || []).map((todo: any) => ({
-          ...todo,
-          createdAt: new Date(todo.createdAt),
-          updatedAt: new Date(todo.updatedAt),
-          completedAt: todo.completedAt ? new Date(todo.completedAt) : null,
-          children: [],
-          tags: todo.tags || [],
-        }))
-        this.isLoadingRandomChain = false
-      })
-    } catch (error) {
-      console.error('Failed to load random chain', error)
-      runInAction(() => {
-        this.randomChain = []
-        this.isLoadingRandomChain = false
-      })
-    }
-  }
-
-  async extendRandomChainWithChild(parentId: string, childTitle: string) {
-    // Добавляем задачу
-    await this.addTodo(parentId, childTitle)
-    
-    // Находим parent в основном дереве после обновления
-    const parentInfo = this.findTodo(parentId)
-    if (!parentInfo || parentInfo.node.children.length === 0) {
-      return
-    }
-    
-    // Берём первого ребёнка (он на позиции 0 - последний добавленный)
-    const newChild = parentInfo.node.children[0]
-    
-    // Добавляем в конец текущей цепочки
-    runInAction(() => {
-      this.randomChain = [...this.randomChain, newChild]
-    })
-  }
-
-  async removeLastFromRandomChain(todoId: string) {
-    // Удаляем задачу из базы
-    await this.deleteTodo(todoId)
-    
-    // Убираем последний элемент из цепочки
-    runInAction(() => {
-      if (this.randomChain.length > 0) {
-        this.randomChain = this.randomChain.slice(0, -1)
-      }
-    })
-  }
-
   async addTodo(parentId: string | null, title: string, tagIds?: string[]) {
     if (!title.trim()) return
     
@@ -288,19 +220,6 @@ export class TodoStore {
             info.node.alias = details.alias ?? null
           }
           info.node.updatedAt = new Date()
-        }
-
-        // Обновляем также в randomChain, если задача там есть
-        const chainIndex = this.randomChain.findIndex((todo) => todo.id === id)
-        if (chainIndex !== -1) {
-          const chainTodo = this.randomChain[chainIndex]
-          if (typeof details.title === 'string') {
-            chainTodo.title = details.title.trim()
-          }
-          if (Object.prototype.hasOwnProperty.call(details, 'alias')) {
-            chainTodo.alias = details.alias ?? null
-          }
-          chainTodo.updatedAt = new Date()
         }
       },
       // Запрос на сервер
@@ -559,14 +478,6 @@ export class TodoStore {
               list.order = list.order.filter((todoId) => todoId !== id)
             }
           })
-        }
-
-        // Обновляем флаг pinned в randomChain, если задача там есть
-        const chainIndex = this.randomChain.findIndex((t) => t.id === id)
-        if (chainIndex !== -1) {
-          this.randomChain = this.randomChain.map((t, idx) =>
-            idx === chainIndex ? { ...t, pinned: info.node.pinned } : t
-          )
         }
       },
       // Запрос на сервер

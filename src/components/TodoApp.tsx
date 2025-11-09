@@ -8,6 +8,8 @@ import type { TodoState } from '@/lib/types'
 import { TodoStore } from '@/stores/TodoStore'
 import type { VisibilityMode } from '@/stores/TodoStore'
 import { TodoStoreProvider, useTodoStore } from '@/stores/TodoStoreContext'
+import { RandomTodoStore } from '@/stores/RandomTodoStore'
+import { RandomTodoStoreProvider, useRandomTodoStore } from '@/stores/RandomTodoStoreContext'
 import { focusEdgeTodo, isInputLike } from '@/lib/dom/todoFocus'
 import { NotificationStore } from '@/stores/NotificationStore'
 import { NotificationContainer } from './NotificationContainer'
@@ -30,6 +32,7 @@ interface TodoAppProps {
 
 const TodoAppContent = ({ user }: { user: SessionUser }) => {
   const store = useTodoStore()
+  const randomStore = useRandomTodoStore()
   const [newTitle, setNewTitle] = useState('')
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isAddModalMounted, setIsAddModalMounted] = useState(false)
@@ -268,7 +271,7 @@ const TodoAppContent = ({ user }: { user: SessionUser }) => {
             {activeTab === 'random' && (
               <button
                 type="button"
-                onClick={() => store.loadRandomChain()}
+                onClick={() => randomStore.loadRandomChain()}
                 className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
                 aria-label="Загрузить другую задачу"
               >
@@ -485,12 +488,15 @@ const ObservedContent = observer(TodoAppContent)
 export const TodoApp = ({ initialState, user }: TodoAppProps) => {
   const [notificationStore] = useState(() => new NotificationStore())
   const [store] = useState(() => new TodoStore(initialState, notificationStore))
+  const [randomStore] = useState(() => new RandomTodoStore(notificationStore))
 
   return (
     <TodoStoreProvider store={store}>
-      <LoadingIndicator />
-      <NotificationContainer />
-      <ObservedContent user={user} />
+      <RandomTodoStoreProvider store={randomStore}>
+        <LoadingIndicator />
+        <NotificationContainer />
+        <ObservedContent user={user} />
+      </RandomTodoStoreProvider>
     </TodoStoreProvider>
   )
 }
