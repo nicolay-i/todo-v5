@@ -42,6 +42,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
   const store = useTodoStore()
   const [isEditing, setIsEditing] = useState(false)
   const [isAddingChild, setIsAddingChild] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [titleDraft, setTitleDraft] = useState(todo.title)
   const [aliasDraft, setAliasDraft] = useState(todo.alias ?? '')
   const [childTitle, setChildTitle] = useState('')
@@ -173,8 +174,17 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
   }
 
   const handleDelete = useCallback(() => {
+    setShowDeleteConfirm(true)
+  }, [])
+
+  const confirmDelete = useCallback(() => {
     void store.deleteTodo(todo.id)
+    setShowDeleteConfirm(false)
   }, [store, todo.id])
+
+  const cancelDelete = useCallback(() => {
+    setShowDeleteConfirm(false)
+  }, [])
 
   const handleTogglePinned = () => {
     void store.togglePinned(todo.id)
@@ -819,6 +829,36 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
               <TodoItem todo={child} depth={depth + 1} parentId={todo.id} index={childIndex} enableDragDrop={enableDragDrop} forceExpanded={forceExpanded} />
             </Fragment>
           ))}
+        </div>
+      )}
+
+      {/* Модальное окно подтверждения удаления */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={cancelDelete}>
+          <div className="rounded-lg bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="mb-4 text-lg font-semibold text-slate-900">Удалить задачу?</h3>
+            <p className="mb-6 text-sm text-slate-600">
+              {todo.children.length > 0 
+                ? `Задача "${todo.title}" и все её подзадачи (${todo.children.length}) будут удалены. Это действие нельзя отменить.`
+                : `Задача "${todo.title}" будет удалена. Это действие нельзя отменить.`}
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={cancelDelete}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300"
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                onClick={confirmDelete}
+                className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-500"
+              >
+                Удалить
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
