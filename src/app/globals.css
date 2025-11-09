@@ -36,6 +36,15 @@ button {
   @apply bg-emerald-50/60 ring-emerald-300;
 }
 
+/* Системные теги: Проект и Раздел - усиленное выделение при hover */
+.group\/todo.ring-blue-300:hover {
+  @apply ring-blue-400 bg-blue-50/60;
+}
+
+.group\/todo.ring-purple-300:hover {
+  @apply ring-purple-400 bg-purple-50/60;
+}
+
 /* Анимации для уведомлений */
 @keyframes slideIn {
   from {

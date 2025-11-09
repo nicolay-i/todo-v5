@@ -215,6 +215,14 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
   const aliasInputId = `todo-alias-${todo.id}`
   const hasVisualTags = Boolean(aliasBadge) || (todo.tags?.length ?? 0) > 0
 
+  // Определяем тип системного тега для цветового выделения
+  const systemTagType = useMemo(() => {
+    const tags = todo.tags ?? []
+    if (tags.some(tag => tag.name === 'Проект')) return 'project'
+    if (tags.some(tag => tag.name === 'Раздел')) return 'section'
+    return null
+  }, [todo.tags])
+
   // Автосохранение с дебаунсингом при изменении текста
   useEffect(() => {
     if (!isEditing) return
@@ -492,7 +500,11 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
     <div className="space-y-1">
       <div
         className={[
-          'group/todo rounded-xl bg-white/95 ring-1 ring-slate-200 transition-all duration-200 hover:shadow-md',
+          'group/todo rounded-xl transition-all duration-200 hover:shadow-md',
+          // Базовый фон или фон системных тегов
+          systemTagType === 'project' ? 'bg-blue-50/40 ring-2 ring-blue-300' : 
+          systemTagType === 'section' ? 'bg-purple-50/40 ring-2 ring-purple-300' : 
+          'bg-white/95 ring-1 ring-slate-200',
           isDragging ? 'opacity-60 ring-2 ring-slate-300' : '',
           isOverInside && canDropInside ? 'ring-2 ring-emerald-400/80 bg-emerald-50/50' : '',
           overPosition === 'above' ? 'shadow-[inset_0_2px_0_0_rgba(16,185,129,0.7)]' : '',
