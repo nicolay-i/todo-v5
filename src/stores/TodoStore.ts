@@ -126,9 +126,12 @@ export class TodoStore {
 
   randomChain: TodoNode[] = []
 
-  async loadRandomChain() {
+  async loadRandomChain(todoId?: string) {
     try {
-      const response = await fetch('/api/todos/random', { cache: 'no-store' })
+      const url = todoId 
+        ? `/api/todos/random?id=${encodeURIComponent(todoId)}`
+        : '/api/todos/random'
+      const response = await fetch(url, { cache: 'no-store' })
       if (!response.ok) {
         throw new Error('Failed to load random chain')
       }

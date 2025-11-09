@@ -1263,3 +1263,33 @@ export async function getRandomTodoChain(userId: string): Promise<(Todo & { tags
   
   return chain
 }
+
+export async function getTodoChainById(userId: string, todoId: string): Promise<(Todo & { tags: Tag[] })[]> {
+  await ensureSeedData(userId)
+  
+  // Получаем все todo пользователя с тегами
+  const allTodos = await prisma.todo.findMany({
+    where: { userId },
+    include: { tags: true },
+    orderBy: { position: 'asc' }
+  })
+  
+  // Находим целевое todo
+  const targetTodo = allTodos.find(t => t.id === todoId)
+  if (!targetTodo) {
+    return []
+  }
+  
+  // Строим цепочку от корня до целевого элемента
+  const chain: (Todo & { tags: Tag[] })[] = [targetTodo]
+  let currentId = targetTodo.parentId
+  
+  while (currentId) {
+    const parent = allTodos.find(t => t.id === currentId)
+    if (!parent) break
+    chain.unshift(parent)
+    currentId = parent.parentId
+  }
+  
+  return chain
+}
