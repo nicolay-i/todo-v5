@@ -4,25 +4,26 @@ import type { TodoNode, TodoState, PinnedListState, Tag } from '@/lib/types'
 import { fuzzyMatch } from '@/lib/search/fuzzyMatch'
 import { NotificationStore } from './NotificationStore'
 import { ApiClient } from '@/lib/apiClient'
+import {
+  type VisibilityMode,
+  type SearchHighlight,
+  type ListViewResult,
+  type TodoLookup,
+  isVisibilityMode,
+  shouldIncludeTodo,
+  getMaxDepth,
+  containsNode,
+  flattenNodes,
+  matchesSelectedTags,
+  findTodo as findTodoUtil,
+  filterTreeByMode as filterTreeByModeUtil,
+  findFirstChildAtMaxDepthInSubtree,
+} from '@/lib/todoUtils'
+
+export type { VisibilityMode }
 
 export interface PinnedListView extends PinnedListState {
   todos: TodoNode[]
-}
-
-interface TodoLookup {
-  node: TodoNode
-  parent: TodoNode | null
-  depth: number
-  index: number
-}
-
-interface SearchHighlight {
-  indices: ReadonlyArray<[number, number]>
-}
-
-interface ListViewResult {
-  todos: TodoNode[]
-  highlightMap: Map<string, SearchHighlight>
 }
 
 export class TodoStore {
@@ -72,7 +73,7 @@ export class TodoStore {
     return this.pinnedLists.map((list) => ({
       ...list,
       todos: list.order
-        .map((id) => this.findTodo(id)?.node)
+        .map((id) => findTodoUtil(id, this.todos)?.node)
         .filter((node): node is TodoNode => Boolean(node?.pinned))
         .filter((node) => this.shouldIncludeTodo(node, this.pinnedFilterMode)),
     }))
@@ -149,7 +150,7 @@ export class TodoStore {
         }
 
         if (parentId) {
-          const parent = this.findTodo(parentId)
+          const parent = findTodoUtil(parentId, this.todos)
           if (parent) {
             // Добавляем в начало списка детей
             parent.node.children = [newTodo, ...parent.node.children]
@@ -196,7 +197,7 @@ export class TodoStore {
     await this.optimisticMutate(
       // Оптимистичное обновление
       () => {
-        const info = this.findTodo(id)
+        const info = findTodoUtil(id, this.todos)
         if (info) {
           if (typeof details.title === 'string') {
             info.node.title = details.title.trim()
@@ -220,7 +221,7 @@ export class TodoStore {
     await this.optimisticMutate(
       // Оптимистичное обновление
       () => {
-        const info = this.findTodo(id)
+        const info = findTodoUtil(id, this.todos)
         if (info) {
           info.node.completed = !info.node.completed
           info.node.completedAt = info.node.completed ? new Date() : null
@@ -448,7 +449,7 @@ export class TodoStore {
     await this.optimisticMutate(
       // Оптимистичное обновление
       () => {
-        const info = this.findTodo(id)
+        const info = findTodoUtil(id, this.todos)
         if (!info) return
 
         info.node.pinned = !info.node.pinned
@@ -556,7 +557,7 @@ export class TodoStore {
     await this.optimisticMutate(
       // Оптимистичное обновление
       () => {
-        const todoInfo = this.findTodo(todoId)
+        const todoInfo = findTodoUtil(todoId, this.todos)
         const tag = this.tags.find((t) => t.id === tagId)
 
         if (todoInfo && tag) {
@@ -582,7 +583,7 @@ export class TodoStore {
     await this.optimisticMutate(
       // Оптимистичное обновление
       () => {
-        const todoInfo = this.findTodo(todoId)
+        const todoInfo = findTodoUtil(todoId, this.todos)
         if (todoInfo && todoInfo.node.tags) {
           todoInfo.node.tags = todoInfo.node.tags.filter((t) => t.id !== tagId)
         }
@@ -597,7 +598,7 @@ export class TodoStore {
   }
 
   getNearestAlias(todoId: string): { todoId: string; alias: string } | null {
-    const info = this.findTodo(todoId)
+    const info = findTodoUtil(todoId, this.todos)
     if (!info) return null
 
     let currentParent = info.parent
@@ -610,7 +611,7 @@ export class TodoStore {
         return { todoId: currentParent.id, alias: aliasValue }
       }
 
-      const parentInfo = this.findTodo(currentParent.id)
+      const parentInfo = findTodoUtil(currentParent.id, this.todos)
       currentParent = parentInfo?.parent ?? null
     }
 
@@ -628,7 +629,7 @@ export class TodoStore {
   }
 
   isPinned(id: string): boolean {
-    const info = this.findTodo(id)
+    const info = findTodoUtil(id, this.todos)
     return info?.node.pinned ?? false
   }
 
@@ -668,19 +669,19 @@ export class TodoStore {
   }
 
   canDrop(id: string, parentId: string | null): boolean {
-    const itemInfo = this.findTodo(id)
+    const itemInfo = findTodoUtil(id, this.todos)
     if (!itemInfo) return false
 
-    const subtreeDepth = this.getMaxDepth(itemInfo.node)
+    const subtreeDepth = getMaxDepth(itemInfo.node)
 
     if (!parentId) {
       return subtreeDepth <= MAX_DEPTH
     }
 
-    const parentInfo = this.findTodo(parentId)
+    const parentInfo = findTodoUtil(parentId, this.todos)
     if (!parentInfo) return false
 
-    if (this.containsNode(itemInfo.node, parentId)) return false
+    if (containsNode(itemInfo.node, parentId)) return false
 
     return parentInfo.depth + 1 + subtreeDepth <= MAX_DEPTH
   }
@@ -762,29 +763,11 @@ export class TodoStore {
     depth = 0,
     parent: TodoNode | null = null,
   ): TodoLookup | null {
-    for (let index = 0; index < nodes.length; index += 1) {
-      const node = nodes[index]
-      if (node.id === id) {
-        return { node, parent, depth, index }
-      }
-
-      const result = this.findTodo(id, node.children, depth + 1, node)
-      if (result) {
-        return result
-      }
-    }
-
-    return null
+    return findTodoUtil(id, nodes, depth, parent)
   }
 
   private filterTreeByMode(nodes: TodoNode[], mode: VisibilityMode): TodoNode[] {
-    const result: TodoNode[] = []
-    for (const node of nodes) {
-      const filteredChildren = this.filterTreeByMode(node.children, mode)
-      if (!this.shouldIncludeTodo(node, mode) && filteredChildren.length === 0) continue
-      result.push({ ...node, children: filteredChildren })
-    }
-    return result
+    return filterTreeByModeUtil(nodes, mode)
   }
 
   private applySearchFilters(
@@ -798,7 +781,7 @@ export class TodoStore {
 
     for (const node of nodes) {
       const filteredChildren = this.applySearchFilters(node.children, highlightMap)
-      const matchesTags = this.matchesSelectedTags(node)
+      const matchesTags = matchesSelectedTags(node, this.searchTagIds)
       const matchesText = highlightMap.has(node.id)
 
       let include = false
@@ -822,9 +805,9 @@ export class TodoStore {
     const query = this.searchQuery.trim()
     if (query.length === 0) return result
 
-    const flattened = this.flattenNodes(nodes)
+    const flattened = flattenNodes(nodes)
     for (const node of flattened) {
-      if (!this.matchesSelectedTags(node)) continue
+      if (!matchesSelectedTags(node, this.searchTagIds)) continue
       const match = fuzzyMatch(query, node.title)
       if (!match) continue
       result.set(node.id, { indices: match.indices })
@@ -834,51 +817,22 @@ export class TodoStore {
   }
 
   private flattenNodes(nodes: TodoNode[], acc: TodoNode[] = []): TodoNode[] {
-    for (const node of nodes) {
-      acc.push(node)
-      if (node.children.length > 0) {
-        this.flattenNodes(node.children, acc)
-      }
-    }
-    return acc
+    return flattenNodes(nodes, acc)
   }
 
   private matchesSelectedTags(node: TodoNode): boolean {
-    if (this.searchTagIds.length === 0) return true
-    const tagIds = new Set((node.tags ?? []).map((tag) => tag.id))
-    for (const id of this.searchTagIds) {
-      if (!tagIds.has(id)) return false
-    }
-    return true
+    return matchesSelectedTags(node, this.searchTagIds)
   }
 
   private shouldIncludeTodo(node: TodoNode, mode: VisibilityMode): boolean {
-    if (!node.completed) return true
-    const completedAt = (node as any).completedAt
-      ? new Date((node as any).completedAt)
-      : (node as any).updatedAt
-        ? new Date((node as any).updatedAt)
-        : null
-    if (!completedAt) return false
-    const start = startBoundary(mode)
-    if (!start) return false
-    return completedAt >= start
+    return shouldIncludeTodo(node, mode)
   }
   private getMaxDepth(node: TodoNode): number {
-    if (node.children.length === 0) return 0
-    let maxDepth = 0
-    for (const child of node.children) {
-      const childDepth = 1 + this.getMaxDepth(child)
-      if (childDepth > maxDepth) {
-        maxDepth = childDepth
-      }
-    }
-    return maxDepth
+    return getMaxDepth(node)
   }
 
   private containsNode(node: TodoNode, id: string): boolean {
-    if (node.id === id) return true
-    return node.children.some((child) => this.containsNode(child, id))
+    return containsNode(node, id)
   }
 
   /**
@@ -922,66 +876,7 @@ export class TodoStore {
    * Находит первого ребенка на максимальной глубине в поддереве узла
    */
   private findFirstChildAtMaxDepthInSubtree(node: TodoNode): TodoNode | null {
-    const maxDepth = this.getMaxDepth(node)
-    
-    if (maxDepth === 0) {
-      // Нет детей
-      return null
-    }
-
-    // Ищем первого ребенка на глубине maxDepth
-    return this.findFirstAtDepth(node, maxDepth, 0)
+    return findFirstChildAtMaxDepthInSubtree(node)
   }
 
-  /**
-   * Рекурсивно ищет первого ребенка на заданной глубине
-   */
-  private findFirstAtDepth(node: TodoNode, targetDepth: number, currentDepth: number): TodoNode | null {
-    if (currentDepth === targetDepth) {
-      return node
-    }
-
-    for (const child of node.children) {
-      const result = this.findFirstAtDepth(child, targetDepth, currentDepth + 1)
-      if (result) {
-        return result
-      }
-    }
-
-    return null
-  }
-}
-
-export type VisibilityMode = 'activeOnly' | 'today' | 'oneDay' | 'twoDays' | 'week'
-
-function isVisibilityMode(value: string): value is VisibilityMode {
-  return ['activeOnly', 'today', 'oneDay', 'twoDays', 'week'].includes(value)
-}
-
-function startBoundary(mode: VisibilityMode): Date | null {
-  const now = new Date()
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  switch (mode) {
-    case 'activeOnly':
-      return new Date(8640000000000000) // far future; but will be unused because completed are hidden
-    case 'today':
-      return startOfToday
-    case 'oneDay': {
-      const d = new Date(startOfToday)
-      d.setDate(d.getDate() - 1)
-      return d
-    }
-    case 'twoDays': {
-      const d = new Date(startOfToday)
-      d.setDate(d.getDate() - 2)
-      return d
-    }
-    case 'week': {
-      const d = new Date(startOfToday)
-      d.setDate(d.getDate() - 6)
-      return d
-    }
-    default:
-      return startOfToday
-  }
 }

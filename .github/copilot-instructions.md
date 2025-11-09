@@ -30,6 +30,9 @@ Next.js (App Router) + Prisma (SQLite) + MobX + Tailwind. Все бизнес‑
 ## Клиентский store
 `TodoStore` хранит дерево, pinned lists, теги, фильтры завершённых (`VisibilityMode`), поиск (fuzzy + строгая интерсекция тегов). Любой вызов мутации = fetch → полная замена состояния. Collapse/фильтры в localStorage: `todoCollapsedIds_v1`, `pinnedCollapsedIds_v1`, `listFilterMode_v1`, `pinnedFilterMode_v1`.
 
+## Утилиты
+Чистые функции для работы с деревом задач вынесены в `src/lib/todoUtils.ts`: `findTodo`, `filterTreeByMode`, `getMaxDepth`, `containsNode`, `shouldIncludeTodo`, `matchesSelectedTags`, `flattenNodes`, `findFirstAtDepth`, `findFirstChildAtMaxDepthInSubtree`. Типы: `VisibilityMode`, `SearchHighlight`, `ListViewResult`, `TodoLookup`.
+
 ## API формы
 Todos: `POST /api/todos` (add), `PATCH /api/todos/:id { action: rename|toggleCompleted|move|togglePinned }`, `DELETE /api/todos/:id`.
 Tags: `POST|PATCH|DELETE /api/tags`; связь: `POST|DELETE /api/todos/:id/tags { tagId }`.
