@@ -326,3 +326,5 @@ export const SettingsTab = observer(({ user, onLogout }: SettingsTabProps) => {
 })
 
 SettingsTab.displayName = 'SettingsTab'
+
+export default SettingsTab

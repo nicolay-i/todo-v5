@@ -86,7 +86,7 @@ function RandomTodoTabComponent() {
 
   return (
     <div className="pt-3">
-      <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 flex items-center justify-between">
+      <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 flex items-center justify-between p-2">
         <h3 className="text-sm font-semibold text-amber-900">
           🎯 Цепочка до случайной задачи
         </h3>
@@ -100,7 +100,7 @@ function RandomTodoTabComponent() {
       />
 
       {leafTodo && (
-        <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+        <div className="mt-6 p-4 rounded-lg bg-green-50 border border-green-200">
           <h3 className="font-semibold text-green-800 mb-2 text-sm">
             🎯 Текущая задача
           </h3>
@@ -117,3 +117,5 @@ function RandomTodoTabComponent() {
 }
 
 export const RandomTodoTab = observer(RandomTodoTabComponent)
+
+export default RandomTodoTab

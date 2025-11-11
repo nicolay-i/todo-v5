@@ -151,3 +151,5 @@ export const PinnedTab = observer(() => {
 })
 
 PinnedTab.displayName = 'PinnedTab'
+
+export default PinnedTab

@@ -18,10 +18,10 @@ import type { SessionUser } from '@/lib/auth/session'
 import type { TabKey } from './components/TabLayout'
 import { TabLayout } from './components/TabLayout'
 import { AddTodoModal } from './components/AddTodoModal'
-import { AllTasksTab } from '@/pages/AllTasksTab'
-import { PinnedTab } from '@/pages/PinnedTab'
-import { SettingsTab } from '@/pages/SettingsTab'
-import { RandomTodoTab } from '@/pages/RandomTodoTab'
+import { AllTasksTab } from '@/page-components/AllTasksTab'
+import { PinnedTab } from '@/page-components/PinnedTab'
+import { SettingsTab } from '@/page-components/SettingsTab'
+import { RandomTodoTab } from '@/page-components/RandomTodoTab'
 
 interface TodoAppProps {
   initialState: TodoState

@@ -58,3 +58,5 @@ export const AllTasksTab = observer(() => {
 })
 
 AllTasksTab.displayName = 'AllTasksTab'
+
+export default AllTasksTab
