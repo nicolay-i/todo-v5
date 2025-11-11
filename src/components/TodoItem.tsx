@@ -568,7 +568,19 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
           </button>
 
           {/* Заголовок и теги в одной строке: теги перед текстом, чтобы перенос был под тегами */}
-          <div className="flex-1 todo-main">
+          <div 
+            className="flex-1 todo-main"
+            onClick={(e) => {
+              // Клик по заголовку сворачивает/разворачивает задачу
+              if (!isEditing && todo.children.length > 0 && !searchActive && !forceExpanded) {
+                // Не обрабатываем клики по кнопкам и ссылкам внутри заголовка
+                const target = e.target as HTMLElement
+                if (!target.closest('button') && !target.closest('a')) {
+                  handleToggleCollapsed()
+                }
+              }
+            }}
+          >
             {isEditing ? (
               <form onSubmit={handleEditSubmit} className="flex flex-col gap-3 sm:flex-row sm:items-start form-title">
                 <div ref={editWrapRef} className="w-full">
