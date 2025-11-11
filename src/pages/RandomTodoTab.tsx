@@ -4,14 +4,14 @@ import { observer } from 'mobx-react-lite'
 import { useEffect, useMemo, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useRandomTodoStore } from '@/stores/RandomTodoStoreContext'
-import { TodoTreeView } from './TodoTreeView'
+import { TodoTreeView } from '@/components/TodoTreeView'
 import type { TodoNode } from '@/lib/types'
 
 function RandomTodoTabComponent() {
   const store = useRandomTodoStore()
   const searchParams = useSearchParams()
   const router = useRouter()
-  const todoId = searchParams.get('id')
+  const todoId = searchParams?.get('id')
   
   // Флаг для предотвращения повторной загрузки при обновлении URL
   const isUpdatingUrlRef = useRef(false)
@@ -32,7 +32,7 @@ function RandomTodoTabComponent() {
   // Обновляем URL параметр при загрузке новой цепочки
   useEffect(() => {
     if (leafTodo?.id && leafTodo.id !== todoId) {
-      const params = new URLSearchParams(searchParams.toString())
+      const params = new URLSearchParams(searchParams?.toString())
       params.set('tab', 'random')
       params.set('id', leafTodo.id)
       router.replace(`?${params.toString()}`, { scroll: false })

@@ -1,4 +1,4 @@
-import { TodoApp } from '@/components/TodoApp'
+import { TodoApp } from '@/TodoApp'
 import { LoginScreen } from '@/components/LoginScreen'
 import { TelegramAuthHandler } from '@/components/TelegramAuthHandler'
 import { getCurrentUser } from '@/lib/auth/session'

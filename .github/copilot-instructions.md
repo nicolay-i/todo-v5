@@ -7,6 +7,18 @@ Next.js (App Router) + Prisma (SQLite) + MobX + Tailwind. Все бизнес‑
 
 Структура также описывается в файле plans/Техническое описание системы.md
 
+### Структура компонентов
+- **`src/pages/`** — компоненты-экраны/вкладки приложения:
+  - `AllTasksTab.tsx` — вкладка со списком всех задач
+  - `PinnedTab.tsx` — вкладка с закреплёнными слотами
+  - `SettingsTab.tsx` — настройки, профиль, управление тегами, импорт/экспорт
+  - `RandomTodoTab.tsx` — случайная задача
+- **`src/components/`** — переиспользуемые компоненты UI:
+  - `TabLayout.tsx` — базовый layout с навигацией по вкладкам, управлением URL и глобальными хоткеями
+  - `AddTodoModal.tsx` — модальное окно добавления задачи с выбором тегов
+  - `TodoItem.tsx`, `TodoTreeView.tsx`, `PinnedList.tsx` и др.
+- **`src/stores/`** — MobX стейт менеджмент (TodoStore, TagStore, RandomTodoStore, NotificationStore)
+
 ## База данных
 Проект использует **SQLite** для разработки — простая файловая БД, не требует установки сервера. База данных хранится в файле `dev.db` в корне проекта.
 
@@ -29,6 +41,14 @@ Next.js (App Router) + Prisma (SQLite) + MobX + Tailwind. Все бизнес‑
 
 ## Клиентский store
 `TodoStore` хранит дерево, pinned lists, теги, фильтры завершённых (`VisibilityMode`), поиск (fuzzy + строгая интерсекция тегов). Любой вызов мутации = fetch → полная замена состояния. Collapse/фильтры в localStorage: `todoCollapsedIds_v1`, `pinnedCollapsedIds_v1`, `listFilterMode_v1`, `pinnedFilterMode_v1`.
+
+## Навигация и хоткеи
+`TabLayout` управляет переключением между вкладками (pinned, all, random, settings):
+- **Alt + ←/→** — переключение между вкладками
+- **Alt + ↑/↓** — переключение активного pinned list (на вкладке pinned)
+- **n** — открыть модал добавления задачи (на вкладке all)
+- **↑/↓** — фокус на первую/последнюю задачу в списке/pinned
+- URL синхронизация через `?tab=...` параметр с поддержкой browser history
 
 ## Утилиты
 Чистые функции для работы с деревом задач вынесены в `src/lib/todoUtils.ts`: `findTodo`, `filterTreeByMode`, `getMaxDepth`, `containsNode`, `shouldIncludeTodo`, `matchesSelectedTags`, `flattenNodes`, `findFirstAtDepth`, `findFirstChildAtMaxDepthInSubtree`. Типы: `VisibilityMode`, `SearchHighlight`, `ListViewResult`, `TodoLookup`.
@@ -60,6 +80,7 @@ Dev: `pnpm dev`; build: `pnpm build` + `pnpm start` (standalone).
 - Миграции: `pnpm db:migrate:dev` (создание и применение)
 - Studio: `pnpm db:studio`
 
-Генерация клиента: `pnpm prisma:generate`. Lint: `pnpm lint`.
+Генерация клиента: `pnpm prisma:generate`. 
+Проверка типов ts: `pnpm check`.
 
 Нужны дополнительные разделы (deployment env vars, экспорт состояния, стратегия фильтров)? — дайте знать.
