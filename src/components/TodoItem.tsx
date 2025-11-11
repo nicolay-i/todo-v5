@@ -20,6 +20,7 @@ import { focusEdgeTodo, focusTodoByOffset } from '@/lib/dom/todoFocus'
 import { useDropdown } from '@/lib/hooks/useDropdown'
 import type { TodoNode } from '@/lib/types'
 import { useTodoStore } from '@/stores/TodoStoreContext'
+import { useTagStore } from '@/stores/TagStoreContext'
 // мини-плейсхолдеры для сортировки больше не используются
 
 interface TodoItemProps {
@@ -40,6 +41,7 @@ const actionButtonStyles =
 
 const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowChildren = true, enableDragDrop = true, forceExpanded = false }: TodoItemProps) => {
   const store = useTodoStore()
+  const tagStore = useTagStore()
   const [isEditing, setIsEditing] = useState(false)
   const [isAddingChild, setIsAddingChild] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -191,7 +193,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
   }
 
   // Фильтруем видимые теги по системным правилам
-  const availableTags = store.tags.filter((t) => {
+  const availableTags = tagStore.tags.filter((t) => {
     if (t.name === 'Проект') {
       // скрыть, если у предков уже есть 'Проект'
       const hasProjectAncestor = (function checkParent(parentId: string | null): boolean {

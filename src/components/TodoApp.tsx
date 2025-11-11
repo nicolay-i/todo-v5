@@ -10,14 +10,14 @@ import type { VisibilityMode } from '@/stores/TodoStore'
 import { TodoStoreProvider, useTodoStore } from '@/stores/TodoStoreContext'
 import { RandomTodoStore } from '@/stores/RandomTodoStore'
 import { RandomTodoStoreProvider, useRandomTodoStore } from '@/stores/RandomTodoStoreContext'
+import { TagStore } from '@/stores/TagStore'
+import { TagStoreProvider, useTagStore } from '@/stores/TagStoreContext'
 import { focusEdgeTodo, isInputLike } from '@/lib/dom/todoFocus'
 import { NotificationStore } from '@/stores/NotificationStore'
 import { NotificationContainer } from './NotificationContainer'
 import { LoadingIndicator } from './LoadingIndicator'
-// мини-плейсхолдеры для сортировки больше не используются
 import { PinnedList } from './PinnedList'
 import { PinnedTextView } from './PinnedTextView'
-import { TodoItem } from './TodoItem'
 import { TodoSearchBar } from './TodoSearchBar'
 import { RandomTodoTab } from './RandomTodoTab'
 import { TodoTreeView } from './TodoTreeView'
@@ -33,6 +33,7 @@ interface TodoAppProps {
 const TodoAppContent = ({ user }: { user: SessionUser }) => {
   const store = useTodoStore()
   const randomStore = useRandomTodoStore()
+  const tagStore = useTagStore()
   const [newTitle, setNewTitle] = useState('')
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isAddModalMounted, setIsAddModalMounted] = useState(false)
@@ -419,11 +420,11 @@ const TodoAppContent = ({ user }: { user: SessionUser }) => {
                 />
               </div>
               {/* Tag selector */}
-              {store.tags.length > 0 && (
+              {tagStore.tags.length > 0 && (
                 <div className="mt-4">
                   <div className="mb-2 text-xs font-medium text-slate-500">Теги</div>
                   <div className="flex flex-wrap gap-2">
-                    {store.tags.map((t) => {
+                    {tagStore.tags.map((t) => {
                       const selected = selectedTagIds.includes(t.id)
                       return (
                         <button
@@ -489,13 +490,20 @@ export const TodoApp = ({ initialState, user }: TodoAppProps) => {
   const [notificationStore] = useState(() => new NotificationStore())
   const [store] = useState(() => new TodoStore(initialState, notificationStore))
   const [randomStore] = useState(() => new RandomTodoStore(notificationStore))
+  const [tagStore] = useState(() => {
+    const ts = new TagStore(initialState.tags ?? [], notificationStore)
+    store.setTagStore(ts)
+    return ts
+  })
 
   return (
     <TodoStoreProvider store={store}>
       <RandomTodoStoreProvider store={randomStore}>
-        <LoadingIndicator />
-        <NotificationContainer />
-        <ObservedContent user={user} />
+        <TagStoreProvider store={tagStore}>
+          <LoadingIndicator />
+          <NotificationContainer />
+          <ObservedContent user={user} />
+        </TagStoreProvider>
       </RandomTodoStoreProvider>
     </TodoStoreProvider>
   )
@@ -527,6 +535,7 @@ function FilterSelect({ value, onChange }: { value: VisibilityMode; onChange: (v
 
 const SettingsTab = ({ user, onLogout }: { user: SessionUser; onLogout: () => Promise<void> | void }) => {
   const store = useTodoStore()
+  const tagStore = useTagStore()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isExporting, setIsExporting] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
@@ -661,7 +670,7 @@ const SettingsTab = ({ user, onLogout }: { user: SessionUser; onLogout: () => Pr
             e.preventDefault()
             const trimmed = newTag.trim()
             if (!trimmed) return
-            await store.addTag(trimmed)
+            await tagStore.addTag(trimmed)
             setNewTag('')
           }}
           className="mt-3 flex gap-2"
@@ -681,7 +690,7 @@ const SettingsTab = ({ user, onLogout }: { user: SessionUser; onLogout: () => Pr
         </form>
 
         <ul className="mt-4 space-y-2">
-          {store.tags.map((tag) => (
+          {tagStore.tags.map((tag) => (
             <li
               key={tag.id}
               className={`flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 ${draggedTagId === tag.id ? 'opacity-50' : ''}`}
@@ -695,13 +704,13 @@ const SettingsTab = ({ user, onLogout }: { user: SessionUser; onLogout: () => Pr
               onDrop={(e) => {
                 e.preventDefault()
                 if (draggedTagId && draggedTagId !== tag.id) {
-                  const draggedIndex = store.tags.findIndex(t => t.id === draggedTagId)
-                  const targetIndex = store.tags.findIndex(t => t.id === tag.id)
-                  const newOrder = [...store.tags]
+                  const draggedIndex = tagStore.tags.findIndex(t => t.id === draggedTagId)
+                  const targetIndex = tagStore.tags.findIndex(t => t.id === tag.id)
+                  const newOrder = [...tagStore.tags]
                   const [removed] = newOrder.splice(draggedIndex, 1)
                   newOrder.splice(targetIndex, 0, removed)
                   const tagIds = newOrder.map(t => t.id)
-                  void store.reorderTags(tagIds)
+                  void tagStore.reorderTags(tagIds)
                 }
                 setDraggedTagId(null)
               }}
@@ -716,7 +725,7 @@ const SettingsTab = ({ user, onLogout }: { user: SessionUser; onLogout: () => Pr
                   <button
                     type="button"
                     onClick={async () => {
-                      await store.renameTag(tag.id, editingTagName)
+                      await tagStore.renameTag(tag.id, editingTagName)
                       setEditingTagId(null)
                       setEditingTagName('')
                     }}
@@ -753,7 +762,7 @@ const SettingsTab = ({ user, onLogout }: { user: SessionUser; onLogout: () => Pr
                   </button>
                   <button
                     type="button"
-                    onClick={() => store.deleteTag(tag.id)}
+                    onClick={() => tagStore.deleteTag(tag.id)}
                     className="rounded-lg p-2 text-rose-500 hover:bg-rose-50"
                     aria-label="Удалить тег"
                   >
@@ -763,7 +772,7 @@ const SettingsTab = ({ user, onLogout }: { user: SessionUser; onLogout: () => Pr
               )}
             </li>
           ))}
-          {store.tags.length === 0 && (
+          {tagStore.tags.length === 0 && (
             <li className="rounded-xl border border-dashed border-slate-200 bg-white/70 px-3 py-4 text-center text-sm text-slate-500">Тегов пока нет</li>
           )}
         </ul>

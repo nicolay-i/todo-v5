@@ -29,7 +29,6 @@ export interface PinnedListView extends PinnedListState {
 export class TodoStore {
   todos: TodoNode[] = []
   pinnedLists: PinnedListState[] = []
-  tags: Tag[] = []
   draggedId: string | null = null
   // Set со свернутыми узлами дерева (хранит id задач)
   collapsedIds: Set<string> = new Set()
@@ -48,9 +47,12 @@ export class TodoStore {
   highlightFirstAtMaxDepth = true
 
   // Оптимистичные обновления
-  private stateSnapshot: TodoState | null = null
+  private stateSnapshot: Pick<TodoState, 'todos' | 'pinnedLists'> | null = null
   pendingOperations = 0
   notifications: NotificationStore
+
+  // Ссылка на TagStore для синхронизации тегов
+  private tagStore: import('./TagStore').TagStore | null = null
 
   private static readonly COLLAPSE_STORAGE_KEY = 'todoCollapsedIds_v1'
   private static readonly PINNED_COLLAPSE_STORAGE_KEY = 'pinnedCollapsedIds_v1'
@@ -63,10 +65,13 @@ export class TodoStore {
     this.notifications = notifications
     this.todos = initialState.todos
     this.pinnedLists = initialState.pinnedLists
-    this.tags = initialState.tags ?? []
     this.loadCollapsed()
     this.loadPinnedCollapsed()
     this.loadFilters()
+  }
+
+  setTagStore(tagStore: import('./TagStore').TagStore) {
+    this.tagStore = tagStore
   }
 
   get pinnedListsWithTodos(): PinnedListView[] {
@@ -96,12 +101,6 @@ export class TodoStore {
 
   get isSearchActive(): boolean {
     return this.searchQuery.trim().length > 0 || this.searchTagIds.length > 0
-  }
-
-  get selectedSearchTags(): Tag[] {
-    if (this.searchTagIds.length === 0) return []
-    const selected = new Set(this.searchTagIds)
-    return this.tags.filter((tag) => selected.has(tag.id))
   }
 
   getSearchHighlight(id: string): ReadonlyArray<[number, number]> | null {
@@ -168,11 +167,7 @@ export class TodoStore {
           tags: [],
         }
 
-        // Добавляем теги если указаны
-        if (Array.isArray(tagIds) && tagIds.length > 0) {
-          const uniqueTagIds = Array.from(new Set(tagIds))
-          newTodo.tags = this.tags.filter((tag) => uniqueTagIds.includes(tag.id))
-        }
+        // Теги будут добавлены сервером на основе tagIds
 
         if (parentId) {
           const parent = findTodoUtil(parentId, this.todos)
@@ -303,7 +298,10 @@ export class TodoStore {
   setState(state: TodoState) {
     this.todos = state.todos
     this.pinnedLists = state.pinnedLists
-    this.tags = state.tags ?? []
+    // Синхронизируем теги с TagStore
+    if (this.tagStore && state.tags) {
+      this.tagStore.updateTags(state.tags)
+    }
   }
 
   // ---- Filters API ----
@@ -561,81 +559,25 @@ export class TodoStore {
     }
   }
 
-  // ---- Tags CRUD ----
-  async addTag(name: string) {
-    if (!name.trim()) return
-    try {
-      const response = await ApiClient.rpc('tag.add', { name })
-      await this.handleRpcResponse(response)
-    } catch (error) {
-      console.error('Failed to add tag', error)
-      await this.refresh()
-    }
-  }
-
-  async renameTag(id: string, name: string) {
-    if (!name.trim()) return
-    try {
-      const response = await ApiClient.rpc('tag.rename', { id, name })
-      await this.handleRpcResponse(response)
-    } catch (error) {
-      console.error('Failed to rename tag', error)
-      await this.refresh()
-    }
-  }
-
-  async deleteTag(id: string) {
-    try {
-      const response = await ApiClient.rpc('tag.delete', { id })
-      await this.handleRpcResponse(response)
-    } catch (error) {
-      console.error('Failed to delete tag', error)
-      await this.refresh()
-    }
-  }
-
+  // ---- Todo-Tag relation ----
   async attachTag(todoId: string, tagId: string) {
-    await this.optimisticMutate(
-      // Оптимистичное обновление
-      () => {
-        const todoInfo = findTodoUtil(todoId, this.todos)
-        const tag = this.tags.find((t) => t.id === tagId)
-
-        if (todoInfo && tag) {
-          if (!todoInfo.node.tags) {
-            todoInfo.node.tags = []
-          }
-          // Проверяем, что тег еще не добавлен
-          if (!todoInfo.node.tags.some((t) => t.id === tagId)) {
-            todoInfo.node.tags.push(tag)
-          }
-        }
-      },
-      // Запрос на сервер
-      async () => {
-        const response = await ApiClient.rpc('tag.attach', { todoId, tagId })
-        await this.handleRpcResponse(response)
-      },
-      'Не удалось добавить тег'
-    )
+    try {
+      const response = await ApiClient.rpc('tag.attach', { todoId, tagId })
+      await this.handleRpcResponse(response)
+    } catch (error) {
+      console.error('Failed to attach tag', error)
+      await this.refresh()
+    }
   }
 
   async detachTag(todoId: string, tagId: string) {
-    await this.optimisticMutate(
-      // Оптимистичное обновление
-      () => {
-        const todoInfo = findTodoUtil(todoId, this.todos)
-        if (todoInfo && todoInfo.node.tags) {
-          todoInfo.node.tags = todoInfo.node.tags.filter((t) => t.id !== tagId)
-        }
-      },
-      // Запрос на сервер
-      async () => {
-        const response = await ApiClient.rpc('tag.detach', { todoId, tagId })
-        await this.handleRpcResponse(response)
-      },
-      'Не удалось удалить тег'
-    )
+    try {
+      const response = await ApiClient.rpc('tag.detach', { todoId, tagId })
+      await this.handleRpcResponse(response)
+    } catch (error) {
+      console.error('Failed to detach tag', error)
+      await this.refresh()
+    }
   }
 
   getNearestAlias(todoId: string): { todoId: string; alias: string } | null {
@@ -657,16 +599,6 @@ export class TodoStore {
     }
 
     return null
-  }
-
-  async reorderTags(tagIds: string[]) {
-    try {
-      const response = await ApiClient.rpc('tag.reorder', { tagIds })
-      await this.handleRpcResponse(response)
-    } catch (error) {
-      console.error('Failed to reorder tags', error)
-      await this.refresh()
-    }
   }
 
   isPinned(id: string): boolean {
@@ -734,7 +666,6 @@ export class TodoStore {
     this.stateSnapshot = {
       todos: JSON.parse(JSON.stringify(this.todos)),
       pinnedLists: JSON.parse(JSON.stringify(this.pinnedLists)),
-      tags: JSON.parse(JSON.stringify(this.tags)),
     }
   }
 
@@ -746,7 +677,6 @@ export class TodoStore {
       runInAction(() => {
         this.todos = this.stateSnapshot!.todos
         this.pinnedLists = this.stateSnapshot!.pinnedLists
-        this.tags = this.stateSnapshot!.tags ?? []
         this.stateSnapshot = null
       })
     }

@@ -5,11 +5,13 @@ import { FiCheck, FiFilter, FiSearch, FiX } from 'react-icons/fi'
 import { useMemo } from 'react'
 import { useDropdown } from '@/lib/hooks/useDropdown'
 import { useTodoStore } from '@/stores/TodoStoreContext'
+import { useTagStore } from '@/stores/TagStoreContext'
 
 const dropdownGroupKey = 'tag-filter'
 
 export const TodoSearchBar = observer(() => {
   const store = useTodoStore()
+  const tagStore = useTagStore()
   const dropdown = useDropdown({
     hoverOpenDelay: 0,
     closeDelay: 150,
@@ -17,11 +19,15 @@ export const TodoSearchBar = observer(() => {
     groupKey: dropdownGroupKey,
   })
   const tagPickerRef = dropdown.rootRef
-  const tags = store.tags
+  const tags = tagStore.tags
   const selectedTagIds = store.searchTagIds
   const hasQuery = store.searchQuery.trim().length > 0
 
-  const selectedTags = store.selectedSearchTags
+  const selectedTags = useMemo(() => {
+    if (selectedTagIds.length === 0) return []
+    const selected = new Set(selectedTagIds)
+    return tags.filter((tag) => selected.has(tag.id))
+  }, [selectedTagIds, tags])
   const triggerLabel = useMemo(() => {
     if (selectedTagIds.length === 0) return 'Теги'
     if (selectedTagIds.length === 1) return '1 тег'
