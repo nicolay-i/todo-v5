@@ -33,6 +33,11 @@ function FilterSelect({ value, onChange }: { value: VisibilityMode; onChange: (v
 export const AllTasksTab = observer(() => {
   const store = useTodoStore()
 
+  const handleToggleAllProjects = () => {
+    const shouldCollapse = !store.areAllProjectsCollapsed
+    store.collapseAllProjects(shouldCollapse)
+  }
+
   return (
     <>
       <TodoSearchBar />
@@ -46,7 +51,16 @@ export const AllTasksTab = observer(() => {
           />
           <span>Выделение первого todo</span>
         </label>
-        <FilterSelect value={store.listFilterMode} onChange={(v) => store.setListFilterMode(v)} />
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleToggleAllProjects}
+            className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 shadow-sm hover:bg-slate-50 focus:border-slate-400 focus:outline-none active:bg-slate-100"
+            title={store.areAllProjectsCollapsed ? 'Развернуть все проекты' : 'Свернуть все проекты'}
+          >
+            {store.areAllProjectsCollapsed ? '📂 Развернуть проекты' : '📁 Свернуть проекты'}
+          </button>
+          <FilterSelect value={store.listFilterMode} onChange={(v) => store.setListFilterMode(v)} />
+        </div>
       </div>
       <TodoTreeView
         showEmptyPlaceholder={store.todos.length === 0}

@@ -417,6 +417,59 @@ export class TodoStore {
     this.savePinnedCollapsed()
   }
 
+  /**
+   * Сворачивает/разворачивает все проекты (задачи с тегом "Проект")
+   */
+  collapseAllProjects(collapsed: boolean) {
+    const projectIds = new Set<string>()
+    
+    const collectProjects = (nodes: TodoNode[]) => {
+      for (const node of nodes) {
+        const hasProjectTag = (node.tags ?? []).some(tag => tag.name === 'Проект')
+        if (hasProjectTag) {
+          projectIds.add(node.id)
+        }
+        if (node.children.length > 0) {
+          collectProjects(node.children)
+        }
+      }
+    }
+    
+    collectProjects(this.todos)
+    
+    if (collapsed) {
+      projectIds.forEach(id => this.collapsedIds.add(id))
+    } else {
+      projectIds.forEach(id => this.collapsedIds.delete(id))
+    }
+    
+    this.saveCollapsed()
+  }
+
+  /**
+   * Проверяет, все ли проекты свернуты
+   */
+  get areAllProjectsCollapsed(): boolean {
+    const projectIds: string[] = []
+    
+    const collectProjects = (nodes: TodoNode[]) => {
+      for (const node of nodes) {
+        const hasProjectTag = (node.tags ?? []).some(tag => tag.name === 'Проект')
+        if (hasProjectTag) {
+          projectIds.push(node.id)
+        }
+        if (node.children.length > 0) {
+          collectProjects(node.children)
+        }
+      }
+    }
+    
+    collectProjects(this.todos)
+    
+    if (projectIds.length === 0) return false
+    return projectIds.every(id => this.collapsedIds.has(id))
+  }
+
   private loadPinnedCollapsed() {
     if (typeof window === 'undefined') return
     try {
