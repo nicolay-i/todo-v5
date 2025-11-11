@@ -4,8 +4,10 @@ import {
   type RpcMethod,
   type RpcRequest,
   type RpcResponse,
+  type RpcHandlerMap,
   type RpcParamsMap,
   type RpcReturnMap,
+  ALL_RPC_METHODS,
   RPC_ERROR_CODES,
 } from '@/lib/rpcTypes'
 import * as todoService from '@/lib/todoService'
@@ -109,195 +111,161 @@ export async function POST(request: NextRequest): Promise<NextResponse<RpcRespon
 
 /**
  * Проверка, что метод является валидным RPC методом
+ * Использует константу ALL_RPC_METHODS для гарантии полноты
  */
 function isValidRpcMethod(method: string): method is RpcMethod {
-  const validMethods: RpcMethod[] = [
-    'todo.add',
-    'todo.updateDetails',
-    'todo.toggleCompleted',
-    'todo.move',
-    'todo.togglePinned',
-    'todo.delete',
-    'tag.add',
-    'tag.rename',
-    'tag.delete',
-    'tag.reorder',
-    'tag.attach',
-    'tag.detach',
-    'pinnedList.add',
-    'pinnedList.rename',
-    'pinnedList.delete',
-    'pinnedList.setActive',
-    'pinnedTodo.move',
-    'state.get',
-    'state.replace',
-    'random.todo',
-    'random.chain',
-  ]
-  return validMethods.includes(method as RpcMethod)
+  return ALL_RPC_METHODS.includes(method as RpcMethod)
+}
+
+/**
+ * Карта обработчиков RPC методов
+ * ⚠️ TypeScript требует наличия обработчика для КАЖДОГО метода из RpcMethod
+ * При добавлении нового метода обязательно добавить обработчик здесь
+ */
+const rpcHandlers: RpcHandlerMap = {
+  // Todo операции
+  'todo.add': async (userId, params) => {
+    const state = await todoService.addTodo(
+      userId,
+      params.parentId ?? null,
+      params.title,
+      params.tagIds
+    )
+    return { state }
+  },
+
+  'todo.updateDetails': async (userId, params) => {
+    const details: { title?: string; alias?: string | null } = {}
+    if (params.title !== undefined) details.title = params.title
+    if (params.alias !== undefined) details.alias = params.alias
+    const state = await todoService.updateTodoDetails(userId, params.id, details)
+    return { state }
+  },
+
+  'todo.toggleCompleted': async (userId, params) => {
+    const state = await todoService.toggleTodoCompleted(userId, params.id)
+    return { state }
+  },
+
+  'todo.move': async (userId, params) => {
+    const state = await todoService.moveTodo(
+      userId,
+      params.id,
+      params.targetParentId,
+      params.targetPosition
+    )
+    return { state }
+  },
+
+  'todo.togglePinned': async (userId, params) => {
+    const state = await todoService.togglePinned(userId, params.id)
+    return { state }
+  },
+
+  'todo.delete': async (userId, params) => {
+    const state = await todoService.deleteTodo(userId, params.id)
+    return { state }
+  },
+
+  // Tag операции
+  'tag.add': async (userId, params) => {
+    const state = await todoService.addTag(userId, params.name)
+    return { state }
+  },
+
+  'tag.rename': async (userId, params) => {
+    const state = await todoService.renameTag(userId, params.id, params.name)
+    return { state }
+  },
+
+  'tag.delete': async (userId, params) => {
+    const state = await todoService.deleteTag(userId, params.id)
+    return { state }
+  },
+
+  'tag.reorder': async (userId, params) => {
+    const state = await todoService.reorderTags(userId, params.tagIds)
+    return { state }
+  },
+
+  'tag.attach': async (userId, params) => {
+    const state = await todoService.attachTagToTodo(userId, params.todoId, params.tagId)
+    return { state }
+  },
+
+  'tag.detach': async (userId, params) => {
+    const state = await todoService.detachTagFromTodo(userId, params.todoId, params.tagId)
+    return { state }
+  },
+
+  // Pinned List операции
+  'pinnedList.add': async (userId, params) => {
+    const state = await todoService.addPinnedList(userId, params.title)
+    return { state }
+  },
+
+  'pinnedList.rename': async (userId, params) => {
+    const state = await todoService.renamePinnedList(userId, params.id, params.title)
+    return { state }
+  },
+
+  'pinnedList.delete': async (userId, params) => {
+    const state = await todoService.deletePinnedList(userId, params.id)
+    return { state }
+  },
+
+  'pinnedList.setActive': async (userId, params) => {
+    const state = await todoService.setActivePinnedList(userId, params.id)
+    return { state }
+  },
+
+  'pinnedTodo.move': async (userId, params) => {
+    const state = await todoService.movePinnedTodo(
+      userId,
+      params.todoId,
+      params.toListId,
+      params.toPosition
+    )
+    return { state }
+  },
+
+  // State операции
+  'state.get': async (userId, params) => {
+    const state = await todoService.getTodoState(userId)
+    return { state }
+  },
+
+  'state.replace': async (userId, params) => {
+    const state = await todoService.replaceTodoState(userId, params.state)
+    return { state }
+  },
+
+  // Random операции
+  'random.todo': async (userId, params) => {
+    const chain = await todoService.getRandomTodoChain(userId)
+    const state = await todoService.getTodoState(userId)
+    const todo = chain.length > 0 ? chain[chain.length - 1] : null
+    return { todo, state }
+  },
+
+  'random.chain': async (userId, params) => {
+    const chain = params.todoId
+      ? await todoService.getTodoChainById(userId, params.todoId)
+      : await todoService.getRandomTodoChain(userId)
+    const state = await todoService.getTodoState(userId)
+    return { chain, state }
+  },
 }
 
 /**
  * Диспетчер RPC методов
- * Маппит method на соответствующую функцию todoService
+ * Использует строго типизированную карту обработчиков
  */
 async function dispatchRpcMethod<M extends RpcMethod>(
   userId: string,
   method: M,
   params: RpcParamsMap[M]
 ): Promise<RpcReturnMap[M]> {
-  switch (method) {
-    // Todo операции
-    case 'todo.add': {
-      const p = params as RpcParamsMap['todo.add']
-      const state = await todoService.addTodo(
-        userId,
-        p.parentId ?? null,
-        p.title,
-        p.tagIds
-      )
-      return { state } as RpcReturnMap[M]
-    }
-
-    case 'todo.updateDetails': {
-      const p = params as RpcParamsMap['todo.updateDetails']
-      const details: { title?: string; alias?: string | null } = {}
-      if (p.title !== undefined) details.title = p.title
-      if (p.alias !== undefined) details.alias = p.alias
-      const state = await todoService.updateTodoDetails(userId, p.id, details)
-      return { state } as RpcReturnMap[M]
-    }
-
-    case 'todo.toggleCompleted': {
-      const p = params as RpcParamsMap['todo.toggleCompleted']
-      const state = await todoService.toggleTodoCompleted(userId, p.id)
-      return { state } as RpcReturnMap[M]
-    }
-
-    case 'todo.move': {
-      const p = params as RpcParamsMap['todo.move']
-      const state = await todoService.moveTodo(userId, p.id, p.targetParentId, p.targetPosition)
-      return { state } as RpcReturnMap[M]
-    }
-
-    case 'todo.togglePinned': {
-      const p = params as RpcParamsMap['todo.togglePinned']
-      const state = await todoService.togglePinned(userId, p.id)
-      return { state } as RpcReturnMap[M]
-    }
-
-    case 'todo.delete': {
-      const p = params as RpcParamsMap['todo.delete']
-      const state = await todoService.deleteTodo(userId, p.id)
-      return { state } as RpcReturnMap[M]
-    }
-
-    // Tag операции
-    case 'tag.add': {
-      const p = params as RpcParamsMap['tag.add']
-      const state = await todoService.addTag(userId, p.name)
-      return { state } as RpcReturnMap[M]
-    }
-
-    case 'tag.rename': {
-      const p = params as RpcParamsMap['tag.rename']
-      const state = await todoService.renameTag(userId, p.id, p.name)
-      return { state } as RpcReturnMap[M]
-    }
-
-    case 'tag.delete': {
-      const p = params as RpcParamsMap['tag.delete']
-      const state = await todoService.deleteTag(userId, p.id)
-      return { state } as RpcReturnMap[M]
-    }
-
-    case 'tag.reorder': {
-      const p = params as RpcParamsMap['tag.reorder']
-      const state = await todoService.reorderTags(userId, p.tagIds)
-      return { state } as RpcReturnMap[M]
-    }
-
-    case 'tag.attach': {
-      const p = params as RpcParamsMap['tag.attach']
-      const state = await todoService.attachTagToTodo(userId, p.todoId, p.tagId)
-      return { state } as RpcReturnMap[M]
-    }
-
-    case 'tag.detach': {
-      const p = params as RpcParamsMap['tag.detach']
-      const state = await todoService.detachTagFromTodo(userId, p.todoId, p.tagId)
-      return { state } as RpcReturnMap[M]
-    }
-
-    // Pinned List операции
-    case 'pinnedList.add': {
-      const p = params as RpcParamsMap['pinnedList.add']
-      const state = await todoService.addPinnedList(userId, p.title)
-      return { state } as RpcReturnMap[M]
-    }
-
-    case 'pinnedList.rename': {
-      const p = params as RpcParamsMap['pinnedList.rename']
-      const state = await todoService.renamePinnedList(userId, p.id, p.title)
-      return { state } as RpcReturnMap[M]
-    }
-
-    case 'pinnedList.delete': {
-      const p = params as RpcParamsMap['pinnedList.delete']
-      const state = await todoService.deletePinnedList(userId, p.id)
-      return { state } as RpcReturnMap[M]
-    }
-
-    case 'pinnedList.setActive': {
-      const p = params as RpcParamsMap['pinnedList.setActive']
-      const state = await todoService.setActivePinnedList(userId, p.id)
-      return { state } as RpcReturnMap[M]
-    }
-
-    case 'pinnedTodo.move': {
-      const p = params as RpcParamsMap['pinnedTodo.move']
-      const state = await todoService.movePinnedTodo(
-        userId,
-        p.todoId,
-        p.toListId,
-        p.toPosition
-      )
-      return { state } as RpcReturnMap[M]
-    }
-
-    // State операции
-    case 'state.get': {
-      const state = await todoService.getTodoState(userId)
-      return { state } as RpcReturnMap[M]
-    }
-
-    case 'state.replace': {
-      const p = params as RpcParamsMap['state.replace']
-      const state = await todoService.replaceTodoState(userId, p.state)
-      return { state } as RpcReturnMap[M]
-    }
-
-    // Random операции
-    case 'random.todo': {
-      const p = params as RpcParamsMap['random.todo']
-      const chain = await todoService.getRandomTodoChain(userId)
-      const state = await todoService.getTodoState(userId)
-      const todo = chain.length > 0 ? chain[chain.length - 1] : null
-      return { todo, state } as RpcReturnMap[M]
-    }
-
-    case 'random.chain': {
-      const p = params as RpcParamsMap['random.chain']
-      const chain = p.todoId
-        ? await todoService.getTodoChainById(userId, p.todoId)
-        : await todoService.getRandomTodoChain(userId)
-      const state = await todoService.getTodoState(userId)
-      return { chain, state } as RpcReturnMap[M]
-    }
-
-    default:
-      // TypeScript exhaustiveness check
-      const _exhaustive: never = method
-      throw new Error(`Unhandled method: ${_exhaustive}`)
-  }
+  const handler = rpcHandlers[method]
+  return handler(userId, params as any) as Promise<RpcReturnMap[M]>
 }

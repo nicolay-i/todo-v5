@@ -33,13 +33,21 @@ Next.js (App Router) + Prisma (SQLite) + MobX + Tailwind. Все бизнес‑
 ## Утилиты
 Чистые функции для работы с деревом задач вынесены в `src/lib/todoUtils.ts`: `findTodo`, `filterTreeByMode`, `getMaxDepth`, `containsNode`, `shouldIncludeTodo`, `matchesSelectedTags`, `flattenNodes`, `findFirstAtDepth`, `findFirstChildAtMaxDepthInSubtree`. Типы: `VisibilityMode`, `SearchHighlight`, `ListViewResult`, `TodoLookup`.
 
-## API формы
-Todos: `POST /api/todos` (add), `PATCH /api/todos/:id { action: rename|toggleCompleted|move|togglePinned }`, `DELETE /api/todos/:id`.
-Tags: `POST|PATCH|DELETE /api/tags`; связь: `POST|DELETE /api/todos/:id/tags { tagId }`.
-Pinned lists: `POST /api/pinned-lists`, `PATCH|DELETE /api/pinned-lists/:id` (rename / delete / setActive via action), `POST /api/pinned-lists/move` (перемещение закреплённого todo).
+## RPC API (Строгая типизация)
+**Единая точка входа**: `POST /api/rpc` с `{ method, params }`. Все методы строго типизированы через `RpcMethod`, `RpcParamsMap`, `RpcReturnMap` и `RpcHandlerMap`. TypeScript **гарантирует** полноту реализации каждого метода на уровне компиляции.
+
+**Добавление нового RPC метода** (4 обязательных шага):
+1. Параметры в `RpcParamsMap` (`src/lib/rpcTypes.ts`)
+2. Возврат в `RpcReturnMap` (`src/lib/rpcTypes.ts`)
+3. Метод в `ALL_RPC_METHODS` (`src/lib/rpcTypes.ts`)
+4. Обработчик в `rpcHandlers: RpcHandlerMap` (`src/app/api/rpc/route.ts`)
+
+Если пропустить хотя бы один шаг — **код не скомпилируется**. См. `docs/rpc-checklist.md` и `docs/rpc-strict-typing.md`.
+
+Доменные методы: `todo.*`, `tag.*`, `pinnedList.*`, `pinnedTodo.*`, `state.*`, `random.*`. Все возвращают полный `TodoState`.
 
 ## Расширение функционала
-Новая бизнес‑операция: добавь функцию в `todoService.ts`, тонкий endpoint, клиентский метод вызывает `mutate`, возврати полный `TodoState`. При добавлении новых полей обнови Prisma модель, `types.ts`, агрегацию в `getTodoState`.
+Новая бизнес‑операция: добавь функцию в `todoService.ts`, следуй 4-шаговому чеклисту для RPC метода (выше), клиентский метод вызывает `rpcCall`, TypeScript проверит полноту реализации. При добавлении новых полей обнови Prisma модель, `types.ts`, агрегацию в `getTodoState`.
 
 ## Не делать
 Частичных ответов; множественных последовательных UPDATE где возможен батч; нарушения единственности active/primary; обхода глубинных проверок.

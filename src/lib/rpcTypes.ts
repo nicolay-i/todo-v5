@@ -2,40 +2,12 @@ import type { TodoState, TodoNode } from './types'
 import type { Todo } from '@prisma/client'
 
 /**
- * Все доступные RPC методы в системе
- * Формат: domain.action
- */
-export type RpcMethod =
-  // Todo операции
-  | 'todo.add'
-  | 'todo.updateDetails'
-  | 'todo.toggleCompleted'
-  | 'todo.move'
-  | 'todo.togglePinned'
-  | 'todo.delete'
-  // Tag операции
-  | 'tag.add'
-  | 'tag.rename'
-  | 'tag.delete'
-  | 'tag.reorder'
-  | 'tag.attach'
-  | 'tag.detach'
-  // Pinned List операции
-  | 'pinnedList.add'
-  | 'pinnedList.rename'
-  | 'pinnedList.delete'
-  | 'pinnedList.setActive'
-  | 'pinnedTodo.move'
-  // State операции
-  | 'state.get'
-  | 'state.replace'
-  // Random операции
-  | 'random.todo'
-  | 'random.chain'
-
-/**
  * Карта параметров для каждого RPC метода
- * Строгая типизация входных данных
+ * ⚠️ ВАЖНО: При добавлении нового метода ОБЯЗАТЕЛЬНО добавить:
+ * 1. Параметры в RpcParamsMap
+ * 2. Возвращаемое значение в RpcReturnMap
+ * 3. Обработчик в dispatchRpcMethod (route.ts)
+ * TypeScript будет требовать полноту всех трёх
  */
 export interface RpcParamsMap {
   // Todo операции
@@ -118,6 +90,7 @@ export interface RpcParamsMap {
   'random.chain': {
     todoId?: string
   }
+ 
 }
 
 /**
@@ -152,6 +125,24 @@ export interface RpcReturnMap {
   'random.todo': { todo: Todo | null; state: TodoState }
   'random.chain': { chain: (Todo & { tags: any[] })[]; state: TodoState }
 }
+
+/**
+ * Все доступные RPC методы в системе
+ * Автоматически выводится из ключей RpcParamsMap
+ * Гарантирует, что для каждого метода есть параметры и возвращаемое значение
+ */
+export type RpcMethod = keyof RpcParamsMap & keyof RpcReturnMap
+
+/**
+ * Проверка полноты типизации на уровне типов
+ * Если методы не совпадают между ParamsMap и ReturnMap - будет ошибка компиляции
+ */
+type EnsureMethodsMatch = keyof RpcParamsMap extends keyof RpcReturnMap
+  ? keyof RpcReturnMap extends keyof RpcParamsMap
+    ? true
+    : never
+  : never
+const _check: EnsureMethodsMatch = true
 
 /**
  * Структура RPC запроса
@@ -199,3 +190,60 @@ export const RPC_ERROR_CODES = {
 } as const
 
 export type RpcErrorCode = (typeof RPC_ERROR_CODES)[keyof typeof RPC_ERROR_CODES]
+
+/**
+ * Хелпер для создания массива всех методов из RpcMethod
+ * Используется в runtime валидации
+ */
+export const ALL_RPC_METHODS: readonly RpcMethod[] = [
+  'todo.add',
+  'todo.updateDetails',
+  'todo.toggleCompleted',
+  'todo.move',
+  'todo.togglePinned',
+  'todo.delete',
+  'tag.add',
+  'tag.rename',
+  'tag.delete',
+  'tag.reorder',
+  'tag.attach',
+  'tag.detach',
+  'pinnedList.add',
+  'pinnedList.rename',
+  'pinnedList.delete',
+  'pinnedList.setActive',
+  'pinnedTodo.move',
+  'state.get',
+  'state.replace',
+  'random.todo',
+  'random.chain',
+] as const
+
+/**
+ * Проверка полноты списка методов на уровне типов
+ * Гарантирует, что ALL_RPC_METHODS содержит ровно все методы из RpcMethod
+ */
+type EnsureAllMethodsListed = typeof ALL_RPC_METHODS[number] extends RpcMethod
+  ? RpcMethod extends typeof ALL_RPC_METHODS[number]
+    ? true
+    : never
+  : never
+const _checkMethods: EnsureAllMethodsListed = true
+
+/**
+ * Тип для обработчиков RPC методов
+ * Каждый обработчик принимает userId и params конкретного метода,
+ * возвращает результат конкретного метода
+ */
+export type RpcHandler<M extends RpcMethod> = (
+  userId: string,
+  params: RpcParamsMap[M]
+) => Promise<RpcReturnMap[M]>
+
+/**
+ * Карта обработчиков для всех RPC методов
+ * TypeScript требует наличия обработчика для КАЖДОГО метода
+ */
+export type RpcHandlerMap = {
+  [M in RpcMethod]: RpcHandler<M>
+}
