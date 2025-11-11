@@ -111,10 +111,35 @@ export class TodoStore {
 
   async refresh() {
     try {
-      const data = await ApiClient.getState()
-      this.setState(data)
+      const response = await ApiClient.rpc('state.get', {})
+      if (response.ok) {
+        this.setState(response.data.state)
+      } else {
+        if (response.state) {
+          this.setState(response.state)
+        }
+        console.error('Failed to refresh state', response.error)
+      }
     } catch (error) {
       console.error('Failed to refresh state', error)
+    }
+  }
+
+  /**
+   * Обработка RPC ответа с автоматическим обновлением состояния
+   */
+  private async handleRpcResponse<M extends import('@/lib/rpcTypes').RpcMethod>(
+    response: import('@/lib/rpcTypes').RpcResponse<M>
+  ): Promise<boolean> {
+    if (response.ok) {
+      this.setState(response.data.state)
+      return true
+    } else {
+      // Даже при ошибке обновляем состояние, если оно есть
+      if (response.state) {
+        this.setState(response.state)
+      }
+      return false
     }
   }
 
@@ -169,8 +194,12 @@ export class TodoStore {
       },
       // Запрос на сервер
       async () => {
-        const data = await ApiClient.addTodo(parentId, title, tagIds)
-        this.setState(data)
+        const response = await ApiClient.rpc('todo.add', {
+          parentId,
+          title,
+          tagIds,
+        })
+        await this.handleRpcResponse(response)
       },
       'Не удалось создать задачу'
     )
@@ -210,8 +239,12 @@ export class TodoStore {
       },
       // Запрос на сервер
       async () => {
-        const data = await ApiClient.updateTodoDetails(id, details)
-        this.setState(data)
+        const response = await ApiClient.rpc('todo.updateDetails', {
+          id,
+          title: details.title,
+          alias: details.alias,
+        })
+        await this.handleRpcResponse(response)
       },
       'Не удалось обновить задачу'
     )
@@ -233,8 +266,8 @@ export class TodoStore {
       },
       // Запрос на сервер
       async () => {
-        const data = await ApiClient.toggleTodoCompleted(id)
-        this.setState(data)
+        const response = await ApiClient.rpc('todo.toggleCompleted', { id })
+        await this.handleRpcResponse(response)
       },
       'Не удалось изменить статус задачи'
     )
@@ -251,8 +284,8 @@ export class TodoStore {
 
   async deleteTodo(id: string) {
     try {
-      const data = await ApiClient.deleteTodo(id)
-      this.setState(data)
+      const response = await ApiClient.rpc('todo.delete', { id })
+      await this.handleRpcResponse(response)
     } catch (error) {
       console.error('Failed to delete todo', error)
       await this.refresh()
@@ -437,8 +470,12 @@ export class TodoStore {
   async moveTodo(id: string, targetParentId: string | null, targetIndex: number) {
     if (!this.canDrop(id, targetParentId)) return
     try {
-      const data = await ApiClient.moveTodo(id, targetParentId, targetIndex)
-      this.setState(data)
+      const response = await ApiClient.rpc('todo.move', {
+        id,
+        targetParentId,
+        targetPosition: targetIndex,
+      })
+      await this.handleRpcResponse(response)
     } catch (error) {
       console.error('Failed to move todo', error)
       await this.refresh()
@@ -471,8 +508,8 @@ export class TodoStore {
       },
       // Запрос на сервер
       async () => {
-        const data = await ApiClient.toggleTodoPinned(id)
-        this.setState(data)
+        const response = await ApiClient.rpc('todo.togglePinned', { id })
+        await this.handleRpcResponse(response)
       },
       'Не удалось изменить закрепление задачи'
     )
@@ -480,8 +517,12 @@ export class TodoStore {
 
   async movePinnedTodo(id: string, targetListId: string, targetIndex: number) {
     try {
-      const data = await ApiClient.movePinnedTodo(id, targetListId, targetIndex)
-      this.setState(data)
+      const response = await ApiClient.rpc('pinnedTodo.move', {
+        todoId: id,
+        toListId: targetListId,
+        toPosition: targetIndex,
+      })
+      await this.handleRpcResponse(response)
     } catch (error) {
       console.error('Failed to move pinned todo', error)
       await this.refresh()
@@ -491,8 +532,8 @@ export class TodoStore {
   async addPinnedList(title: string) {
     if (!title.trim()) return
     try {
-      const data = await ApiClient.addPinnedList(title)
-      this.setState(data)
+      const response = await ApiClient.rpc('pinnedList.add', { title })
+      await this.handleRpcResponse(response)
     } catch (error) {
       console.error('Failed to add pinned list', error)
       await this.refresh()
@@ -502,8 +543,8 @@ export class TodoStore {
   async renamePinnedList(id: string, title: string) {
     if (!title.trim()) return
     try {
-      const data = await ApiClient.renamePinnedList(id, title)
-      this.setState(data)
+      const response = await ApiClient.rpc('pinnedList.rename', { id, title })
+      await this.handleRpcResponse(response)
     } catch (error) {
       console.error('Failed to rename pinned list', error)
       await this.refresh()
@@ -512,8 +553,8 @@ export class TodoStore {
 
   async deletePinnedList(id: string) {
     try {
-      const data = await ApiClient.deletePinnedList(id)
-      this.setState(data)
+      const response = await ApiClient.rpc('pinnedList.delete', { id })
+      await this.handleRpcResponse(response)
     } catch (error) {
       console.error('Failed to delete pinned list', error)
       await this.refresh()
@@ -524,8 +565,8 @@ export class TodoStore {
   async addTag(name: string) {
     if (!name.trim()) return
     try {
-      const data = await ApiClient.addTag(name)
-      this.setState(data)
+      const response = await ApiClient.rpc('tag.add', { name })
+      await this.handleRpcResponse(response)
     } catch (error) {
       console.error('Failed to add tag', error)
       await this.refresh()
@@ -535,8 +576,8 @@ export class TodoStore {
   async renameTag(id: string, name: string) {
     if (!name.trim()) return
     try {
-      const data = await ApiClient.renameTag(id, name)
-      this.setState(data)
+      const response = await ApiClient.rpc('tag.rename', { id, name })
+      await this.handleRpcResponse(response)
     } catch (error) {
       console.error('Failed to rename tag', error)
       await this.refresh()
@@ -545,8 +586,8 @@ export class TodoStore {
 
   async deleteTag(id: string) {
     try {
-      const data = await ApiClient.deleteTag(id)
-      this.setState(data)
+      const response = await ApiClient.rpc('tag.delete', { id })
+      await this.handleRpcResponse(response)
     } catch (error) {
       console.error('Failed to delete tag', error)
       await this.refresh()
@@ -572,8 +613,8 @@ export class TodoStore {
       },
       // Запрос на сервер
       async () => {
-        const data = await ApiClient.attachTag(todoId, tagId)
-        this.setState(data)
+        const response = await ApiClient.rpc('tag.attach', { todoId, tagId })
+        await this.handleRpcResponse(response)
       },
       'Не удалось добавить тег'
     )
@@ -590,8 +631,8 @@ export class TodoStore {
       },
       // Запрос на сервер
       async () => {
-        const data = await ApiClient.detachTag(todoId, tagId)
-        this.setState(data)
+        const response = await ApiClient.rpc('tag.detach', { todoId, tagId })
+        await this.handleRpcResponse(response)
       },
       'Не удалось удалить тег'
     )
@@ -620,8 +661,8 @@ export class TodoStore {
 
   async reorderTags(tagIds: string[]) {
     try {
-      const data = await ApiClient.reorderTags(tagIds)
-      this.setState(data)
+      const response = await ApiClient.rpc('tag.reorder', { tagIds })
+      await this.handleRpcResponse(response)
     } catch (error) {
       console.error('Failed to reorder tags', error)
       await this.refresh()
@@ -644,8 +685,8 @@ export class TodoStore {
 
   async setActivePinnedList(id: string) {
     try {
-      const data = await ApiClient.setActivePinnedList(id)
-      this.setState(data)
+      const response = await ApiClient.rpc('pinnedList.setActive', { id })
+      await this.handleRpcResponse(response)
     } catch (error) {
       console.error('Failed to set active pinned list', error)
       await this.refresh()

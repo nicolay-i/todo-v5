@@ -1,203 +1,49 @@
-import type { TodoState } from './types'
-
 /**
  * Клиент для работы с API приложения
- * Централизует все запросы к серверу
+ * Все запросы идут через единый RPC endpoint
  */
 export class ApiClient {
   /**
-   * Базовый метод для выполнения запросов к API
+   * Единая точка вызова RPC методов
+   * Все операции проходят через /api/rpc endpoint
+   * 
+   * @example
+   * const response = await ApiClient.rpc('todo.add', {
+   *   parentId: null,
+   *   title: 'Новая задача'
+   * })
+   * 
+   * if (response.ok) {
+   *   console.log('Success:', response.data.state)
+   * } else {
+   *   console.error('Error:', response.error)
+   * }
    */
-  private static async request<T = TodoState>(
-    url: string,
-    init?: RequestInit
-  ): Promise<T> {
-    const response = await fetch(url, {
-      ...init,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(init?.headers ?? {}),
-      },
-    })
+  static async rpc<M extends import('./rpcTypes').RpcMethod>(
+    method: M,
+    params: import('./rpcTypes').RpcParamsMap[M]
+  ): Promise<import('./rpcTypes').RpcResponse<M>> {
+    try {
+      const response = await fetch('/api/rpc', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ method, params }),
+      })
 
-    if (response.status === 401) {
-      window.location.href = '/'
-      throw new Error('Unauthorized')
+      if (response.status === 401) {
+        window.location.href = '/'
+        throw new Error('Unauthorized')
+      }
+
+      return (await response.json()) as import('./rpcTypes').RpcResponse<M>
+    } catch (error) {
+      // В случае сетевой ошибки возвращаем структуру RpcError
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : 'Network error',
+      } as import('./rpcTypes').RpcResponse<M>
     }
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.error || `Request failed: ${response.status}`)
-    }
-
-    return (await response.json()) as T
-  }
-
-  // ===== State =====
-
-  static async getState(): Promise<TodoState> {
-    return this.request('/api/state', { cache: 'no-store' })
-  }
-
-  // ===== Todos =====
-
-  static async addTodo(
-    parentId: string | null,
-    title: string,
-    tagIds?: string[]
-  ): Promise<TodoState> {
-    const payload: any = { parentId, title: title.trim() }
-    if (Array.isArray(tagIds) && tagIds.length > 0) {
-      payload.tagIds = Array.from(new Set(tagIds))
-    }
-
-    return this.request('/api/todos', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    })
-  }
-
-  static async updateTodoDetails(
-    id: string,
-    details: { title?: string; alias?: string | null }
-  ): Promise<TodoState> {
-    const payload: Record<string, unknown> = { action: 'updateDetails' }
-
-    if (typeof details.title === 'string') {
-      payload.title = details.title.trim()
-    }
-
-    if (Object.prototype.hasOwnProperty.call(details, 'alias')) {
-      payload.alias = details.alias
-    }
-
-    return this.request(`/api/todos/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify(payload),
-    })
-  }
-
-  static async toggleTodoCompleted(id: string): Promise<TodoState> {
-    return this.request(`/api/todos/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ action: 'toggleCompleted' }),
-    })
-  }
-
-  static async moveTodo(
-    id: string,
-    targetParentId: string | null,
-    targetIndex: number
-  ): Promise<TodoState> {
-    return this.request(`/api/todos/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ action: 'move', targetParentId, targetIndex }),
-    })
-  }
-
-  static async toggleTodoPinned(id: string): Promise<TodoState> {
-    return this.request(`/api/todos/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ action: 'togglePinned' }),
-    })
-  }
-
-  static async deleteTodo(id: string): Promise<TodoState> {
-    return this.request(`/api/todos/${id}`, {
-      method: 'DELETE',
-    })
-  }
-
-  // ===== Random Todo =====
-
-  static async getRandomChain(todoId?: string): Promise<{ chain: any[] }> {
-    const url = todoId
-      ? `/api/todos/random?id=${encodeURIComponent(todoId)}`
-      : '/api/todos/random'
-    return this.request(url, { cache: 'no-store' })
-  }
-
-  // ===== Pinned Lists =====
-
-  static async addPinnedList(title: string): Promise<TodoState> {
-    return this.request('/api/pinned-lists', {
-      method: 'POST',
-      body: JSON.stringify({ title }),
-    })
-  }
-
-  static async renamePinnedList(id: string, title: string): Promise<TodoState> {
-    return this.request(`/api/pinned-lists/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ title }),
-    })
-  }
-
-  static async deletePinnedList(id: string): Promise<TodoState> {
-    return this.request(`/api/pinned-lists/${id}`, {
-      method: 'DELETE',
-    })
-  }
-
-  static async setActivePinnedList(id: string): Promise<TodoState> {
-    return this.request(`/api/pinned-lists/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ action: 'setActive' }),
-    })
-  }
-
-  static async movePinnedTodo(
-    todoId: string,
-    targetListId: string,
-    targetIndex: number
-  ): Promise<TodoState> {
-    return this.request('/api/pinned-lists/move', {
-      method: 'POST',
-      body: JSON.stringify({ todoId, targetListId, targetIndex }),
-    })
-  }
-
-  // ===== Tags =====
-
-  static async addTag(name: string): Promise<TodoState> {
-    return this.request('/api/tags', {
-      method: 'POST',
-      body: JSON.stringify({ name }),
-    })
-  }
-
-  static async renameTag(id: string, name: string): Promise<TodoState> {
-    return this.request('/api/tags', {
-      method: 'PATCH',
-      body: JSON.stringify({ id, name }),
-    })
-  }
-
-  static async deleteTag(id: string): Promise<TodoState> {
-    return this.request('/api/tags', {
-      method: 'DELETE',
-      body: JSON.stringify({ id }),
-    })
-  }
-
-  static async reorderTags(tagIds: string[]): Promise<TodoState> {
-    return this.request('/api/tags', {
-      method: 'PUT',
-      body: JSON.stringify({ tagIds }),
-    })
-  }
-
-  static async attachTag(todoId: string, tagId: string): Promise<TodoState> {
-    return this.request(`/api/todos/${todoId}/tags`, {
-      method: 'POST',
-      body: JSON.stringify({ tagId }),
-    })
-  }
-
-  static async detachTag(todoId: string, tagId: string): Promise<TodoState> {
-    return this.request(`/api/todos/${todoId}/tags`, {
-      method: 'DELETE',
-      body: JSON.stringify({ tagId }),
-    })
   }
 }

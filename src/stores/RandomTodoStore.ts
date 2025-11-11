@@ -18,10 +18,19 @@ export class RandomTodoStore {
       this.isLoadingRandomChain = true
     })
     try {
-      const data = await ApiClient.getRandomChain(todoId)
+      // Используем RPC для получения случайной цепочки
+      const response = await ApiClient.rpc('random.chain', {
+        todoId,
+      })
+      
+      let chain: any[] = []
+      if (response.ok) {
+        chain = response.data.chain || []
+      }
+      
       runInAction(() => {
         // Преобразуем Todo[] в TodoNode[] с пустыми children и сохраняем теги
-        this.randomChain = (data.chain || []).map((todo: any) => ({
+        this.randomChain = chain.map((todo: any) => ({
           ...todo,
           createdAt: new Date(todo.createdAt),
           updatedAt: new Date(todo.updatedAt),
@@ -46,8 +55,16 @@ export class RandomTodoStore {
     onSuccess: (childId: string) => void
   ) {
     try {
-      // Добавляем задачу через API
-      const data = await ApiClient.addTodo(parentId, childTitle.trim())
+      // Добавляем задачу через RPC
+      const response = await ApiClient.rpc('todo.add', {
+        parentId,
+        title: childTitle.trim(),
+      })
+      
+      if (!response.ok) {
+        this.notifications.show('error', 'Не удалось добавить задачу')
+        return
+      }
       
       // Находим добавленную задачу в ответе
       const findNewChild = (nodes: TodoNode[], parentId: string): TodoNode | null => {
@@ -62,7 +79,7 @@ export class RandomTodoStore {
         return null
       }
 
-      const newChild = findNewChild(data.todos, parentId)
+      const newChild = findNewChild(response.data.state.todos, parentId)
       
       if (newChild) {
         // Добавляем в конец текущей цепочки
@@ -82,8 +99,13 @@ export class RandomTodoStore {
     onSuccess: () => void
   ) {
     try {
-      // Удаляем задачу из базы
-      await ApiClient.deleteTodo(todoId)
+      // Удаляем задачу через RPC
+      const response = await ApiClient.rpc('todo.delete', { id: todoId })
+      
+      if (!response.ok) {
+        this.notifications.show('error', 'Не удалось удалить задачу')
+        return
+      }
       
       // Убираем последний элемент из цепочки
       runInAction(() => {
