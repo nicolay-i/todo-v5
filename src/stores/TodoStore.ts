@@ -172,6 +172,13 @@ export class TodoStore {
         if (parentId) {
           const parent = findTodoUtil(parentId, this.todos)
           if (parent) {
+            // Если родитель был свернут и пуст - разворачиваем его
+            const wasEmpty = parent.node.children.length === 0
+            const wasCollapsed = this.isCollapsed(parentId)
+            if (wasEmpty && wasCollapsed) {
+              this.setCollapsed(parentId, false)
+            }
+            
             // Добавляем в начало списка детей
             parent.node.children = [newTodo, ...parent.node.children]
             // Обновляем позиции остальных

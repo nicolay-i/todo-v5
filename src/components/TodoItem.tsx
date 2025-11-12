@@ -792,7 +792,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
 
         {/* Removed bottom tags row; tags are now inline above */}
 
-        {canAddChild && isAddingChild && !isCollapsed && (
+        {canAddChild && isAddingChild && (!isCollapsed || todo.children.length === 0) && (
           <form onSubmit={handleAddChild} className="flex items-center gap-2 border-t border-slate-100 bg-slate-50 px-4 py-3">
             <input
               ref={childInputRef}
