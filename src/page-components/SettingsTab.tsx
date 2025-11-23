@@ -8,6 +8,7 @@ import type { SessionUser } from '@/lib/auth/session'
 import type { TodoState } from '@/lib/types'
 import { useTodoStore } from '@/stores/TodoStoreContext'
 import { useTagStore } from '@/stores/TagStoreContext'
+import { ApiClient } from '@/lib/apiClient'
 
 interface SettingsTabProps {
   user: SessionUser
@@ -36,15 +37,11 @@ export const SettingsTab = observer(({ user, onLogout }: SettingsTabProps) => {
     setStatus(null)
     setIsExporting(true)
     try {
-      const response = await fetch('/api/state', { cache: 'no-store' })
-      if (response.status === 401) {
-        window.location.href = '/'
-        return
-      }
+      const response = await ApiClient.rpc('state.get', {})
       if (!response.ok) {
-        throw new Error('Failed to export state')
+        throw new Error(response.error || 'Failed to export state')
       }
-      const data = await response.json()
+      const data = response.data.state
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
@@ -74,22 +71,13 @@ export const SettingsTab = observer(({ user, onLogout }: SettingsTabProps) => {
     try {
       const text = await file.text()
       const parsed = JSON.parse(text)
-      const response = await fetch('/api/state', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(parsed),
-      })
-
-      if (response.status === 401) {
-        window.location.href = '/'
-        return
-      }
+      const response = await ApiClient.rpc('state.replace', { state: parsed })
 
       if (!response.ok) {
-        throw new Error('Import failed')
+        throw new Error(response.error || 'Import failed')
       }
 
-      const state = (await response.json()) as TodoState
+      const state = response.data.state
       store.setState(state)
       setStatus({ type: 'success', message: 'Данные успешно импортированы.' })
     } catch (error) {
