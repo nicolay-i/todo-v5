@@ -41,8 +41,6 @@ export function TodoDescriptionEditor({
     modal.open()
   }, [modal])
 
-  // Удалены глобальные шорткаты, теперь обработка внутри TinyMCE setup
-
   const handleSaveClick = () => {
     // Получаем актуальное содержимое из редактора
     const currentContent = editorRef.current?.getContent() || content
@@ -83,11 +81,13 @@ export function TodoDescriptionEditor({
         {/* Редактор */}
         <div className="flex-1 overflow-y-auto p-6">
           <Editor
-            apiKey="agdqo4bdi4mlg2tygtpo7gw7he6lmlo42jjxj89578i3har6" // Используйте свой API ключ или self-hosted TinyMCE
+            tinymceScriptSrc="/tinymce/tinymce.min.js" // локальный путь, отданный твоим веб-сервером
             value={content}
             onEditorChange={setContent}
             onInit={handleEditorInit}
             init={{
+              skin_url: '/tinymce/skins/ui/oxide',
+              content_css: '/tinymce/skins/content/default/content.css',
               height: '100%',
               menubar: false,
               plugins: [
