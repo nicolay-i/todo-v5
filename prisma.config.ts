@@ -7,6 +7,6 @@ import "dotenv/config";
 export default defineConfig({
   schema: path.join("prisma", "schema.prisma"),
   migrations: {
-    path: path.join("prisma", process.env.DATABASE_URL?.startsWith("file:./") ? "migrations-sqlite" : "migrations"),
+    path: path.join("prisma", process.env.DATABASE_MODE == "sqlite" ? "migrations-sqlite" : "migrations"),
   },
 });
