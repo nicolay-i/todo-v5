@@ -44,7 +44,9 @@ export function TodoDescriptionEditor({
   // Удалены глобальные шорткаты, теперь обработка внутри TinyMCE setup
 
   const handleSaveClick = () => {
-    const trimmed = content.trim()
+    // Получаем актуальное содержимое из редактора
+    const currentContent = editorRef.current?.getContent() || content
+    const trimmed = currentContent.trim()
     onSave(trimmed.length > 0 ? trimmed : null)
     onAfterClose?.()
   }
