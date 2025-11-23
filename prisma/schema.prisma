@@ -13,8 +13,9 @@ generator client {
 
 // DATASOURCE_START - Не удаляйте эту строку, используется для автоматической замены
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL_SQLITE")
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 // DATASOURCE_END - Не удаляйте эту строку, используется для автоматической замены
 
