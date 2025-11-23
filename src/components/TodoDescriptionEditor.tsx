@@ -46,8 +46,11 @@ export function TodoDescriptionEditor({
   const handleSaveClick = () => {
     // Получаем актуальное содержимое из редактора
     const currentContent = editorRef.current?.getContent() || content
-    const trimmed = currentContent.trim()
-    onSave(trimmed.length > 0 ? trimmed : null)
+    // Получаем текст без HTML тегов для проверки на пустоту
+    const textContent = editorRef.current?.getContent({ format: 'text' }) || ''
+    const trimmedText = textContent.trim()
+    // Если текст пустой, сохраняем null, иначе сохраняем HTML контент
+    onSave(trimmedText.length > 0 ? currentContent : null)
     onAfterClose?.()
   }
 
