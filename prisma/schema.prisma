@@ -19,22 +19,23 @@ datasource db {
 // DATASOURCE_END - Не удаляйте эту строку, используется для автоматической замены
 
 model Todo {
-  id        String   @id @default(cuid())
-  title     String
-  completed Boolean  @default(false)
+  id          String    @id @default(cuid())
+  title       String
+  completed   Boolean   @default(false)
   completedAt DateTime?
-  pinned    Boolean  @default(false)
-  alias     String?
-  position  Int
-  parentId  String?
-  parent    Todo?    @relation("TodoChildren", fields: [parentId], references: [id], onDelete: Cascade)
-  children  Todo[]   @relation("TodoChildren")
-  pinnedIn  PinnedTodo[]
-  tags      Tag[]
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  pinned      Boolean   @default(false)
+  alias       String?
+  description String?
+  position    Int
+  parentId    String?
+  parent      Todo?     @relation("TodoChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children    Todo[]    @relation("TodoChildren")
+  pinnedIn    PinnedTodo[]
+  tags        Tag[]
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@index([userId])
 }

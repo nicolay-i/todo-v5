@@ -142,6 +142,11 @@ const rpcHandlers: RpcHandlerMap = {
     return { state }
   },
 
+  'todo.updateDescription': async (userId, params) => {
+    const state = await todoService.updateTodoDescription(userId, params.id, params.description)
+    return { state }
+  },
+
   'todo.toggleCompleted': async (userId, params) => {
     const state = await todoService.toggleTodoCompleted(userId, params.id)
     return { state }

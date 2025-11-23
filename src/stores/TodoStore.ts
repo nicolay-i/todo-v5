@@ -158,6 +158,7 @@ export class TodoStore {
           completedAt: null,
           pinned: false,
           alias: null,
+          description: null,
           parentId,
           position: 0,
           userId: '', // Временное значение, будет заменено сервером
@@ -249,6 +250,28 @@ export class TodoStore {
         await this.handleRpcResponse(response)
       },
       'Не удалось обновить задачу'
+    )
+  }
+
+  async updateTodoDescription(id: string, description: string | null) {
+    await this.optimisticMutate(
+      // Оптимистичное обновление
+      () => {
+        const info = findTodoUtil(id, this.todos)
+        if (info) {
+          info.node.description = description
+          info.node.updatedAt = new Date()
+        }
+      },
+      // Запрос на сервер
+      async () => {
+        const response = await ApiClient.rpc('todo.updateDescription', {
+          id,
+          description,
+        })
+        await this.handleRpcResponse(response)
+      },
+      'Не удалось обновить описание задачи'
     )
   }
 
@@ -839,9 +862,23 @@ export class TodoStore {
     const flattened = flattenNodes(nodes)
     for (const node of flattened) {
       if (!matchesSelectedTags(node, this.searchTagIds)) continue
-      const match = fuzzyMatch(query, node.title)
-      if (!match) continue
-      result.set(node.id, { indices: match.indices })
+      
+      // Поиск в заголовке
+      const titleMatch = fuzzyMatch(query, node.title)
+      
+      // Поиск в описании (если есть)
+      let descriptionMatch = null
+      if (node.description) {
+        // Извлекаем текст из HTML описания
+        const textContent = node.description.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+        descriptionMatch = fuzzyMatch(query, textContent)
+      }
+      
+      // Если есть совпадение хотя бы в одном поле
+      if (titleMatch || descriptionMatch) {
+        // Приоритет отдается совпадению в заголовке
+        result.set(node.id, { indices: titleMatch?.indices || [] })
+      }
     }
 
     return result

@@ -17,6 +17,7 @@ interface NormalizedTodoRecord {
   completed: boolean
   pinned: boolean
   alias: string | null
+  description: string | null
   parentId: string | null
   position: number
 }
@@ -322,6 +323,8 @@ function normalizeTodos(
     const pinned = typeof raw.pinned === 'boolean' ? raw.pinned : false
     const aliasValue = typeof raw.alias === 'string' ? raw.alias.trim() : null
     const alias = aliasValue && aliasValue.length > 0 ? aliasValue : null
+    const descriptionValue = typeof raw.description === 'string' ? raw.description.trim() : null
+    const description = descriptionValue && descriptionValue.length > 0 ? descriptionValue : null
 
     result.push({
       id,
@@ -329,6 +332,7 @@ function normalizeTodos(
       completed,
       pinned,
       alias,
+      description,
       parentId,
       position: index,
     })
@@ -509,6 +513,7 @@ export async function replaceTodoState(userId: string, state: unknown): Promise<
           completed: todo.completed,
           pinned: todo.pinned,
           alias: todo.alias,
+          description: todo.description,
           parentId: todo.parentId,
           position: todo.position,
           userId,
@@ -700,6 +705,28 @@ export async function updateTodoDetails(
 
 export async function updateTodoTitle(userId: string, id: string, title: string): Promise<TodoState> {
   return updateTodoDetails(userId, id, { title })
+}
+
+export async function updateTodoDescription(
+  userId: string,
+  id: string,
+  description: string | null,
+): Promise<TodoState> {
+  await ensureSeedData(userId)
+
+  const trimmedDescription = typeof description === 'string' ? description.trim() : null
+  const finalDescription = trimmedDescription && trimmedDescription.length > 0 ? trimmedDescription : null
+
+  const result = await prisma.todo.updateMany({
+    where: { id, userId },
+    data: { description: finalDescription },
+  })
+
+  if (result.count === 0) {
+    return getTodoState(userId)
+  }
+
+  return getTodoState(userId)
 }
 
 export async function toggleTodoCompleted(userId: string, id: string): Promise<TodoState> {

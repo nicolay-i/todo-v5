@@ -9,6 +9,8 @@ import {
   FiChevronDown,
   FiChevronRight,
   FiEdit2,
+  FiFileText,
+  FiMoreHorizontal,
   FiPlus,
   FiTag,
   FiStar,
@@ -21,6 +23,7 @@ import { useDropdown } from '@/lib/hooks/useDropdown'
 import type { TodoNode } from '@/lib/types'
 import { useTodoStore } from '@/stores/TodoStoreContext'
 import { useTagStore } from '@/stores/TagStoreContext'
+import { TodoDescriptionEditor } from './TodoDescriptionEditor'
 // мини-плейсхолдеры для сортировки больше не используются
 
 interface TodoItemProps {
@@ -45,8 +48,12 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
   const [isEditing, setIsEditing] = useState(false)
   const [isAddingChild, setIsAddingChild] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [isEditingDescription, setIsEditingDescription] = useState(false)
+  // Выпадающее меню действий (редактировать/удалить)
+  const actionsDropdown = useDropdown({ groupKey: 'todo-actions', openOnHover: false, animationDuration: 150 })
   const [titleDraft, setTitleDraft] = useState(todo.title)
   const [aliasDraft, setAliasDraft] = useState(todo.alias ?? '')
+  const [descriptionDraft, setDescriptionDraft] = useState(todo.description ?? '')
   const [childTitle, setChildTitle] = useState('')
   const [isOverInside, setIsOverInside] = useState(false)
   const [overPosition, setOverPosition] = useState<null | 'above' | 'below' | 'inside'>(null)
@@ -101,6 +108,10 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
   useEffect(() => {
     setAliasDraft(todo.alias ?? '')
   }, [todo.alias])
+
+  useEffect(() => {
+    setDescriptionDraft(todo.description ?? '')
+  }, [todo.description])
 
   // При входе в режим редактирования определяем число строк на основе ширины поля и текущего текста
   useEffect(() => {
@@ -191,6 +202,21 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
   const handleTogglePinned = () => {
     void store.togglePinned(todo.id)
   }
+
+  const handleSaveDescription = useCallback((description: string | null) => {
+    void store.updateTodoDescription(todo.id, description)
+    setIsEditingDescription(false)
+    focusRef.current?.focus()
+  }, [store, todo.id])
+
+  const handleCancelDescription = useCallback(() => {
+    setDescriptionDraft(todo.description ?? '')
+    setIsEditingDescription(false)
+    focusRef.current?.focus()
+  }, [todo.description])
+
+  // Закрытие меню действий по клику вне
+  // refs теперь из useDropdown
 
   // Фильтруем видимые теги по системным правилам
   const availableTags = tagStore.tags.filter((t) => {
@@ -420,6 +446,12 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
     if (key === 'e') {
       event.preventDefault()
       setIsEditing(true)
+      return
+    }
+    if (key === 'o' || key === 'щ') {
+      event.preventDefault()
+      setDescriptionDraft(todo.description ?? '')
+      setIsEditingDescription(true)
       return
     }
     if (key === 'a') {
@@ -771,20 +803,52 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                 )}
                 <button
                   type="button"
-                  onClick={() => setIsEditing(true)}
-                  className={actionButtonStyles}
-                  aria-label="Редактировать задачу"
+                  onClick={() => {
+                    setDescriptionDraft(todo.description ?? '')
+                    setIsEditingDescription(true)
+                    actionsDropdown.close()
+                  }}
+                  className={`${actionButtonStyles} ${todo.description ? 'text-blue-600 font-semibold' : ''}`}
+                  aria-label="Редактировать описание"
                 >
-                  <FiEdit2 />
+                  <FiFileText />
                 </button>
-                <button
-                  type="button"
-                  onClick={handleDelete}
-                  className={`${actionButtonStyles} text-rose-400 hover:text-rose-600 btn-remove-tags`}
-                  aria-label="Удалить задачу"
-                >
-                  <FiTrash2 />
-                </button>
+                {!isEditingDescription && (
+                  <div ref={actionsDropdown.rootRef} className="relative inline-block">
+                    <button
+                      type="button"
+                      {...actionsDropdown.getTriggerProps()}
+                      className={actionButtonStyles}
+                      aria-label="Действия"
+                    >
+                      <FiMoreHorizontal />
+                    </button>
+                    {actionsDropdown.isMounted && (
+                      <div
+                        ref={actionsDropdown.menuRef}
+                        {...actionsDropdown.getMenuProps()}
+                        className={actionsDropdown.getMenuClassName('absolute right-0 z-40 w-44 rounded-lg border border-slate-200 bg-white shadow-lg py-1')}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => { setIsEditing(true); actionsDropdown.close() }}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100"
+                        >
+                          <FiEdit2 className="text-slate-500" />
+                          <span>Редактировать</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { handleDelete(); actionsDropdown.close() }}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-rose-600 hover:bg-rose-50"
+                        >
+                          <FiTrash2 className="text-rose-500" />
+                          <span>Удалить</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -874,6 +938,17 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
             </div>
           </div>
         </div>
+      )}
+
+      {/* Редактор описания */}
+      {isEditingDescription && (
+        <TodoDescriptionEditor
+          value={descriptionDraft}
+          onSave={handleSaveDescription}
+          onCancel={handleCancelDescription}
+          todoTitle={todo.title}
+          onAfterClose={() => focusRef.current?.focus()}
+        />
       )}
     </div>
   )

@@ -22,6 +22,10 @@ export interface RpcParamsMap {
     title?: string
     alias?: string | null
   }
+  'todo.updateDescription': {
+    id: string
+    description: string | null
+  }
   'todo.toggleCompleted': {
     id: string
   }
@@ -101,6 +105,7 @@ export interface RpcReturnMap {
   // Todo операции
   'todo.add': { state: TodoState }
   'todo.updateDetails': { state: TodoState }
+  'todo.updateDescription': { state: TodoState }
   'todo.toggleCompleted': { state: TodoState }
   'todo.move': { state: TodoState }
   'todo.togglePinned': { state: TodoState }
@@ -198,6 +203,7 @@ export type RpcErrorCode = (typeof RPC_ERROR_CODES)[keyof typeof RPC_ERROR_CODES
 export const ALL_RPC_METHODS: readonly RpcMethod[] = [
   'todo.add',
   'todo.updateDetails',
+  'todo.updateDescription',
   'todo.toggleCompleted',
   'todo.move',
   'todo.togglePinned',
