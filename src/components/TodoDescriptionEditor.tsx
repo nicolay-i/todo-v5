@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Editor } from '@tinymce/tinymce-react'
 import type { Editor as TinyMCEEditor } from 'tinymce'
 import { FiX, FiCheck } from 'react-icons/fi'
+import { useModal } from '@/lib/hooks/useModal'
 
 interface TodoDescriptionEditorProps {
   value: string
@@ -23,6 +24,7 @@ export function TodoDescriptionEditor({
   const [content, setContent] = useState(value)
   const [isMobile, setIsMobile] = useState(false)
   const editorRef = useRef<TinyMCEEditor | null>(null)
+  const modal = useModal({ animationDuration: 200 })
 
   useEffect(() => {
     // Определяем мобильное устройство
@@ -33,6 +35,11 @@ export function TodoDescriptionEditor({
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
+
+  // Анимация входа
+  useEffect(() => {
+    modal.open()
+  }, [modal])
 
   // Удалены глобальные шорткаты, теперь обработка внутри TinyMCE setup
 
@@ -53,7 +60,7 @@ export function TodoDescriptionEditor({
   // Desktop: правый Drawer (fixed panel)
   if (!isMobile) {
     return (
-      <div className="fixed right-0 top-0 bottom-0 w-[600px] bg-white shadow-2xl z-50 flex flex-col">
+      <div ref={modal.modalRef} className="fixed right-0 top-0 bottom-0 w-[600px] bg-white shadow-2xl z-50 flex flex-col animate-panel-slide-in-right">
         {/* Заголовок */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
           <h2 className="text-lg font-semibold text-slate-800 truncate flex-1 mr-4">
@@ -132,7 +139,7 @@ export function TodoDescriptionEditor({
 
   // Mobile: fullscreen modal
   return (
-    <div className="fixed inset-0 bg-white z-50 flex flex-col">
+    <div ref={modal.modalRef} className="fixed inset-0 bg-white z-50 flex flex-col animate-modal-fade-in">
       {/* Заголовок */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
         <h2 className="text-base font-semibold text-slate-800 truncate flex-1 mr-3">

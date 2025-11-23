@@ -91,12 +91,16 @@ export class TodoStore {
   get listView(): ListViewResult {
     const byMode = this.filterTreeByMode(this.todos, this.listFilterMode)
     if (!this.isSearchActive) {
-      return { todos: byMode, highlightMap: new Map() }
+      return { todos: byMode, highlightMap: new Map(), descriptionHighlightMap: new Map() }
     }
 
-    const highlightMap = this.buildSearchHighlightMap(byMode)
+    const { highlightMap, descriptionHighlightMap } = this.calculateSearchHighlights(byMode)
     const filtered = this.applySearchFilters(byMode, highlightMap)
-    return { todos: filtered, highlightMap }
+    return { todos: filtered, highlightMap, descriptionHighlightMap }
+  }
+
+  get descriptionHighlightMap(): Map<string, ReadonlyArray<[number, number]>> {
+    return this.listView.descriptionHighlightMap
   }
 
   get isSearchActive(): boolean {
@@ -106,6 +110,14 @@ export class TodoStore {
   getSearchHighlight(id: string): ReadonlyArray<[number, number]> | null {
     const highlight = this.listView.highlightMap.get(id)
     return highlight ? highlight.indices : null
+  }
+
+  getDescriptionSearchHighlight(id: string): ReadonlyArray<[number, number]> | null {
+    return this.descriptionHighlightMap.get(id) ?? null
+  }
+
+  hasDescriptionMatch(id: string): boolean {
+    return (this.descriptionHighlightMap.get(id)?.length ?? 0) > 0
   }
 
   async refresh() {
@@ -854,10 +866,15 @@ export class TodoStore {
     return result
   }
 
-  private buildSearchHighlightMap(nodes: TodoNode[]): Map<string, SearchHighlight> {
-    const result = new Map<string, SearchHighlight>()
+  private calculateSearchHighlights(nodes: TodoNode[]): {
+    highlightMap: Map<string, SearchHighlight>
+    descriptionHighlightMap: Map<string, ReadonlyArray<[number, number]>>
+  } {
+    const highlightMap = new Map<string, SearchHighlight>()
+    const descriptionHighlightMap = new Map<string, ReadonlyArray<[number, number]>>()
+    
     const query = this.searchQuery.trim()
-    if (query.length === 0) return result
+    if (query.length === 0) return { highlightMap, descriptionHighlightMap }
 
     const flattened = flattenNodes(nodes)
     for (const node of flattened) {
@@ -874,14 +891,19 @@ export class TodoStore {
         descriptionMatch = fuzzyMatch(query, textContent)
       }
       
-      // Если есть совпадение хотя бы в одном поле
+      // Сохраняем диапазоны по описанию отдельно (нужны для выделения иконок и будущей подсветки в редакторе)
+      if (descriptionMatch) {
+        descriptionHighlightMap.set(node.id, descriptionMatch.indices || [])
+      }
+
+      // Если есть совпадение хотя бы в одном поле — добавляем в основную карту.
+      // Для UI заголовка используем только индексы заголовка (title) чтобы не ломать существующую подсветку.
       if (titleMatch || descriptionMatch) {
-        // Приоритет отдается совпадению в заголовке
-        result.set(node.id, { indices: titleMatch?.indices || [] })
+        highlightMap.set(node.id, { indices: titleMatch?.indices || [] })
       }
     }
 
-    return result
+    return { highlightMap, descriptionHighlightMap }
   }
 
   private flattenNodes(nodes: TodoNode[], acc: TodoNode[] = []): TodoNode[] {

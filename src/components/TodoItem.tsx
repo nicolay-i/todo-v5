@@ -24,6 +24,7 @@ import type { TodoNode } from '@/lib/types'
 import { useTodoStore } from '@/stores/TodoStoreContext'
 import { useTagStore } from '@/stores/TagStoreContext'
 import { TodoDescriptionEditor } from './TodoDescriptionEditor'
+import { useDynamicTextareaRows } from '@/lib/hooks/useDynamicTextareaRows'
 // мини-плейсхолдеры для сортировки больше не используются
 
 interface TodoItemProps {
@@ -61,31 +62,9 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
   const focusRef = useRef<HTMLDivElement>(null)
   // Выпадающий список тегов: управляeм через общий хук
   const tagDropdown = useDropdown({ closeDelay: 300, animationDuration: 200, groupKey: 'tag-picker', openOnHover: false })
-  // Многострочное редактирование: вычисляем строки один раз при входе в режим
-  const [editRows, setEditRows] = useState(1)
-  const editWrapRef = useRef<HTMLDivElement>(null)
-  const measureRef = useRef<HTMLDivElement>(null)
+  // Многострочное редактирование вынесено в хук
+  const { rows: editRows, wrapRef: editWrapRef, measureRef, recalcRows } = useDynamicTextareaRows(titleDraft, isEditing, 12)
 
-  // Общая функция измерения требуемого количества строк.
-  const recalcRows = () => {
-    const wrapEl = editWrapRef.current
-    const measureEl = measureRef.current
-    if (!wrapEl || !measureEl) return
-
-    const width = wrapEl.clientWidth
-    if (width <= 0) return
-
-    measureEl.style.width = `${width}px`
-    measureEl.textContent = titleDraft || ''
-
-    const style = window.getComputedStyle(measureEl)
-    const lineHeightPx = parseFloat(style.lineHeight || '20')
-    const totalHeight = measureEl.scrollHeight
-    let rows = lineHeightPx > 0 ? Math.ceil(totalHeight / lineHeightPx) : 1
-    if (!Number.isFinite(rows) || rows <= 0) rows = 1
-    rows = Math.min(rows, 12)
-    setEditRows(rows)
-  }
 
   const navScope: 'list' | 'pinned' = pinnedListId ? 'pinned' : 'list'
   const canAddChild = allowChildren && depth < MAX_DEPTH
@@ -113,18 +92,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
     setDescriptionDraft(todo.description ?? '')
   }, [todo.description])
 
-  // При входе в режим редактирования определяем число строк на основе ширины поля и текущего текста
-  useEffect(() => {
-    if (!isEditing) return
-    // сбрасываем на 1 строку, затем вычисляем фактическое количество
-    setEditRows(1)
-    const raf = requestAnimationFrame(() => {
-  recalcRows()
-    })
-    return () => cancelAnimationFrame(raf)
-    // ВАЖНО: зависит только от входа в режим, а не от текста
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEditing])
+  // Логика пересчета строк теперь внутри хука
 
   useEffect(() => {
     if (isAddingChild && childInputRef.current) {
@@ -260,6 +228,9 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
     if (tags.some(tag => tag.name === 'Раздел')) return 'section'
     return null
   }, [todo.tags])
+
+  // Совпадение по описанию для выделения иконок
+  const hasDescriptionMatch = store.hasDescriptionMatch(todo.id)
 
   // Автосохранение с дебаунсингом при изменении текста
   useEffect(() => {
@@ -808,7 +779,13 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                     setIsEditingDescription(true)
                     actionsDropdown.close()
                   }}
-                  className={`${actionButtonStyles} ${todo.description ? 'text-blue-600 font-semibold' : ''}`}
+                  className={`${actionButtonStyles} ${
+                    hasDescriptionMatch
+                      ? 'text-amber-600 bg-amber-50 ring-2 ring-amber-400'
+                      : todo.description
+                        ? 'text-blue-600 bg-blue-50 ring-2 ring-blue-300'
+                        : ''
+                  }`}
                   aria-label="Редактировать описание"
                 >
                   <FiFileText />
@@ -912,8 +889,8 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
 
       {/* Модальное окно подтверждения удаления */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={cancelDelete}>
-          <div className="rounded-lg bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-fade-in" onClick={cancelDelete}>
+          <div className="rounded-lg bg-white p-6 shadow-xl animate-fade-scale-in" onClick={(e) => e.stopPropagation()}>
             <h3 className="mb-4 text-lg font-semibold text-slate-900">Удалить задачу?</h3>
             <p className="mb-6 text-sm text-slate-600">
               {todo.children.length > 0 

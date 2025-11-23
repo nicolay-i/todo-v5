@@ -9,6 +9,7 @@ export interface SearchHighlight {
 export interface ListViewResult {
   todos: TodoNode[]
   highlightMap: Map<string, SearchHighlight>
+  descriptionHighlightMap: Map<string, ReadonlyArray<[number, number]>>
 }
 
 export interface TodoLookup {
