@@ -16,7 +16,7 @@ const schemaPath = path.join(__dirname, '..', 'prisma', 'schema.prisma');
 const datasources = {
   dev: `datasource db {
   provider = "sqlite"
-  url      = env("DATABASE_URL")
+  url      = env("DATABASE_URL_SQLITE")
 }`,
   prod: `datasource db {
   provider          = "postgresql"
