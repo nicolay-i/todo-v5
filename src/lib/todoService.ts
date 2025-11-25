@@ -1265,9 +1265,15 @@ export async function getRandomTodoChain(userId: string): Promise<(Todo & { tags
     orderBy: { position: 'asc' }
   })
   
-  // Находим листовые элементы (у которых нет детей)
+  // Находим листовые элементы (у которых нет детей) и исключаем системные теги
   const leafTodos = allTodos.filter(todo => {
-    return !allTodos.some(t => t.parentId === todo.id)
+    const isLeaf = !allTodos.some(t => t.parentId === todo.id)
+    if (!isLeaf) return false
+
+    const hasForbiddenTag = todo.tags.some(tag => 
+      ['Проект', 'Раздел', 'Не актуальное'].includes(tag.name)
+    )
+    return !hasForbiddenTag
   })
   
   if (leafTodos.length === 0) {
