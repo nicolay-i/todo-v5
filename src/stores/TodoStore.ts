@@ -688,6 +688,31 @@ export class TodoStore {
     }
   }
 
+  async addExistingTodoToPinnedList(todoId: string, pinnedListId: string) {
+    const info = findTodoUtil(todoId, this.todos)
+    if (!info) return
+
+    const targetList = this.pinnedLists.find((list) => list.id === pinnedListId)
+    if (!targetList) return
+
+    // Проверяем, не находится ли todo уже в этом слоте
+    if (targetList.order.includes(todoId)) {
+      return // Уже в этом слоте
+    }
+
+    // Если todo не закреплен, сначала закрепляем его
+    if (!info.node.pinned) {
+      await this.togglePinned(todoId)
+      // После закрепления todo будет добавлен в активный слот, нужно переместить его в целевой
+      const targetIndex = targetList.order.length
+      await this.movePinnedTodo(todoId, pinnedListId, targetIndex)
+    } else {
+      // Todo уже закреплен, просто перемещаем его в нужный слот
+      const targetIndex = targetList.order.length
+      await this.movePinnedTodo(todoId, pinnedListId, targetIndex)
+    }
+  }
+
   // ---- Todo-Tag relation ----
   async attachTag(todoId: string, tagId: string) {
     try {

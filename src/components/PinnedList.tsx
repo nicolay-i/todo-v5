@@ -2,11 +2,12 @@
 
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { observer } from 'mobx-react-lite'
-import { FiCheck, FiEdit2, FiTrash2, FiX, FiChevronDown, FiChevronRight, FiStar, FiMoreVertical, FiClock } from 'react-icons/fi'
+import { FiCheck, FiEdit2, FiTrash2, FiX, FiChevronDown, FiChevronRight, FiStar, FiMoreVertical, FiClock, FiSearch } from 'react-icons/fi'
 import type { PinnedListView } from '@/stores/TodoStore'
 import { useTodoStore } from '@/stores/TodoStoreContext'
 // мини-плейсхолдеры для сортировки больше не используются
 import { TodoItem } from './TodoItem'
+import { SearchTodoModal } from './SearchTodoModal'
 
 interface PinnedListProps {
   list: PinnedListView
@@ -24,6 +25,8 @@ const PinnedListComponent = ({ list }: PinnedListProps) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isAddingTemporary, setIsAddingTemporary] = useState(false)
   const [temporaryTitle, setTemporaryTitle] = useState('')
+  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false)
+  const [isSearchModalMounted, setIsSearchModalMounted] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -84,6 +87,16 @@ const PinnedListComponent = ({ list }: PinnedListProps) => {
     setTemporaryTitle('')
     setIsAddingTemporary(false)
     setIsMenuOpen(false)
+  }
+
+  const openSearchModal = () => {
+    setIsSearchModalMounted(true)
+    requestAnimationFrame(() => setIsSearchModalOpen(true))
+  }
+
+  const closeSearchModal = () => {
+    setIsSearchModalOpen(false)
+    window.setTimeout(() => setIsSearchModalMounted(false), 200)
   }
 
   return (
@@ -162,6 +175,15 @@ const PinnedListComponent = ({ list }: PinnedListProps) => {
                 title="Добавить временную задачу"
               >
                 <FiClock />
+              </button>
+              <button
+                type="button"
+                onClick={openSearchModal}
+                className={headerButtonStyles}
+                aria-label="Поиск задач"
+                title="Поиск задач"
+              >
+                <FiSearch />
               </button>
               <div className="relative" ref={menuRef}>
                 <button
@@ -269,6 +291,13 @@ const PinnedListComponent = ({ list }: PinnedListProps) => {
           </PinnedListContainer>
         </>
       )}
+
+      <SearchTodoModal
+        pinnedListId={list.id}
+        isOpen={isSearchModalOpen}
+        isMounted={isSearchModalMounted}
+        onClose={closeSearchModal}
+      />
     </div>
   )
 }
