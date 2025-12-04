@@ -89,7 +89,9 @@ export class TodoStore {
   }
 
   get listView(): ListViewResult {
-    const byMode = this.filterTreeByMode(this.todos, this.listFilterMode)
+    // Исключаем временные todo из списка всех задач
+    const todosWithoutTemporary = this.filterOutTemporaryTodos(this.todos)
+    const byMode = this.filterTreeByMode(todosWithoutTemporary, this.listFilterMode)
     if (!this.isSearchActive) {
       return { todos: byMode, highlightMap: new Map(), descriptionHighlightMap: new Map() }
     }
@@ -97,6 +99,24 @@ export class TodoStore {
     const { highlightMap, descriptionHighlightMap } = this.calculateSearchHighlights(byMode)
     const filtered = this.applySearchFilters(byMode, highlightMap)
     return { todos: filtered, highlightMap, descriptionHighlightMap }
+  }
+
+  private filterOutTemporaryTodos(nodes: TodoNode[]): TodoNode[] {
+    const result: TodoNode[] = []
+    for (const node of nodes) {
+      const hasTemporaryTag = (node.tags ?? []).some((tag) => tag.name === 'Временный')
+      if (hasTemporaryTag) {
+        // Пропускаем временные todo, но обрабатываем их детей (если они есть)
+        const filteredChildren = this.filterOutTemporaryTodos(node.children)
+        if (filteredChildren.length > 0) {
+          result.push({ ...node, children: filteredChildren })
+        }
+        continue
+      }
+      const filteredChildren = this.filterOutTemporaryTodos(node.children)
+      result.push({ ...node, children: filteredChildren })
+    }
+    return result
   }
 
   get descriptionHighlightMap(): Map<string, ReadonlyArray<[number, number]>> {
@@ -650,6 +670,20 @@ export class TodoStore {
       await this.handleRpcResponse(response)
     } catch (error) {
       console.error('Failed to delete pinned list', error)
+      await this.refresh()
+    }
+  }
+
+  async addTemporaryTodoToPinnedList(pinnedListId: string, title: string) {
+    if (!title.trim()) return
+    try {
+      const response = await ApiClient.rpc('pinnedTodo.addTemporary', {
+        pinnedListId,
+        title,
+      })
+      await this.handleRpcResponse(response)
+    } catch (error) {
+      console.error('Failed to add temporary todo to pinned list', error)
       await this.refresh()
     }
   }

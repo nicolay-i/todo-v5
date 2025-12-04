@@ -234,6 +234,15 @@ const rpcHandlers: RpcHandlerMap = {
     return { state }
   },
 
+  'pinnedTodo.addTemporary': async (userId, params) => {
+    const state = await todoService.addTemporaryTodoToPinnedList(
+      userId,
+      params.pinnedListId,
+      params.title
+    )
+    return { state }
+  },
+
   // State операции
   'state.get': async (userId, params) => {
     const state = await todoService.getTodoState(userId)

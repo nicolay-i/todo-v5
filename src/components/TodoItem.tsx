@@ -16,6 +16,7 @@ import {
   FiStar,
   FiTrash2,
   FiX,
+  FiClock,
 } from 'react-icons/fi'
 import { MAX_DEPTH } from '@/lib/constants'
 import { focusEdgeTodo, focusTodoByOffset } from '@/lib/dom/todoFocus'
@@ -188,6 +189,10 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
 
   // Фильтруем видимые теги по системным правилам
   const availableTags = tagStore.tags.filter((t) => {
+    // Тег "Временный" не должен быть доступен для выбора вручную
+    if (t.name === 'Временный') {
+      return false
+    }
     if (t.name === 'Проект') {
       // скрыть, если у предков уже есть 'Проект'
       const hasProjectAncestor = (function checkParent(parentId: string | null): boolean {
@@ -226,8 +231,11 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
     const tags = todo.tags ?? []
     if (tags.some(tag => tag.name === 'Проект')) return 'project'
     if (tags.some(tag => tag.name === 'Раздел')) return 'section'
+    if (tags.some(tag => tag.name === 'Временный')) return 'temporary'
     return null
   }, [todo.tags])
+
+  const isTemporary = systemTagType === 'temporary'
 
   // Совпадение по описанию для выделения иконок
   const hasDescriptionMatch = store.hasDescriptionMatch(todo.id)
@@ -519,6 +527,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
           // Базовый фон или фон системных тегов
           systemTagType === 'project' ? 'bg-blue-50/40 ring-2 ring-blue-300' : 
           systemTagType === 'section' ? 'bg-purple-50/40 ring-2 ring-purple-300' : 
+          systemTagType === 'temporary' ? 'bg-amber-50/40 ring-2 ring-amber-100' : 
           'bg-white/95 ring-1 ring-slate-200',
           isDragging ? 'opacity-60 ring-2 ring-slate-300' : '',
           isOverInside && canDropInside ? 'ring-2 ring-emerald-400/80 bg-emerald-50/50' : '',
@@ -655,7 +664,10 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
               </form>
              ) : (
                <div className="flex flex-wrap items-start gap-2 tags-span" onDoubleClick={() => setIsEditing(true)}>
-                 <p className={`${titleStyles} text-sm`}>
+                 <p className={`${titleStyles} text-sm flex items-center gap-1.5`}>
+                  {isTemporary && (
+                    <FiClock className="text-amber-500 flex-shrink-0" title="Временная задача" />
+                  )}
                   {aliasBadge ? (
                     <>
                       <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-700">

@@ -67,28 +67,30 @@ export const AddTodoModal = observer(
             <div className="mt-4">
               <div className="mb-2 text-xs font-medium text-slate-500">Теги</div>
               <div className="flex flex-wrap gap-2">
-                {tagStore.tags.map((t) => {
-                  const selected = selectedTagIds.includes(t.id)
-                  return (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => {
-                        onTagsChange(
-                          selected ? selectedTagIds.filter((id) => id !== t.id) : [...selectedTagIds, t.id],
-                        )
-                      }}
-                      className={[
-                        'rounded-xl border px-2 py-1 text-xs transition',
-                        selected
-                          ? 'border-slate-900 bg-slate-900 text-white'
-                          : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50',
-                      ].join(' ')}
-                    >
-                      {t.name}
-                    </button>
-                  )
-                })}
+                {tagStore.tags
+                  .filter((t) => !t.isSystem || (t.name !== 'Временный'))
+                  .map((t) => {
+                    const selected = selectedTagIds.includes(t.id)
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => {
+                          onTagsChange(
+                            selected ? selectedTagIds.filter((id) => id !== t.id) : [...selectedTagIds, t.id],
+                          )
+                        }}
+                        className={[
+                          'rounded-xl border px-2 py-1 text-xs transition',
+                          selected
+                            ? 'border-slate-900 bg-slate-900 text-white'
+                            : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50',
+                        ].join(' ')}
+                      >
+                        {t.name}
+                      </button>
+                    )
+                  })}
               </div>
               {selectedTagIds.length > 0 && (
                 <button

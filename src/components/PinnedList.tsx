@@ -1,8 +1,8 @@
 'use client'
 
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { observer } from 'mobx-react-lite'
-import { FiCheck, FiEdit2, FiTrash2, FiX, FiChevronDown, FiChevronRight, FiStar } from 'react-icons/fi'
+import { FiCheck, FiEdit2, FiTrash2, FiX, FiChevronDown, FiChevronRight, FiStar, FiMoreVertical, FiClock } from 'react-icons/fi'
 import type { PinnedListView } from '@/stores/TodoStore'
 import { useTodoStore } from '@/stores/TodoStoreContext'
 // мини-плейсхолдеры для сортировки больше не используются
@@ -21,6 +21,11 @@ const PinnedListComponent = ({ list }: PinnedListProps) => {
   const store = useTodoStore()
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState(list.title)
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [isAddingTemporary, setIsAddingTemporary] = useState(false)
+  const [temporaryTitle, setTemporaryTitle] = useState('')
+  const menuRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   const isPrimary = store.isPrimaryPinnedList(list.id)
   const todos = list.todos
@@ -31,6 +36,25 @@ const PinnedListComponent = ({ list }: PinnedListProps) => {
   useEffect(() => {
     setTitleDraft(list.title)
   }, [list.title])
+
+  useEffect(() => {
+    if (isAddingTemporary && inputRef.current) {
+      inputRef.current.focus()
+    }
+  }, [isAddingTemporary])
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsMenuOpen(false)
+      }
+    }
+
+    if (isMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [isMenuOpen])
 
   const emptyStateMessage = useMemo(() => {
     if (isPrimary) {
@@ -45,6 +69,21 @@ const PinnedListComponent = ({ list }: PinnedListProps) => {
     if (!trimmed) return
     await store.renamePinnedList(list.id, trimmed)
     setIsEditingTitle(false)
+  }
+
+  const handleAddTemporary = async () => {
+    const trimmed = temporaryTitle.trim()
+    if (!trimmed) return
+    await store.addTemporaryTodoToPinnedList(list.id, trimmed)
+    setTemporaryTitle('')
+    setIsAddingTemporary(false)
+    setIsMenuOpen(false)
+  }
+
+  const handleCancelTemporary = () => {
+    setTemporaryTitle('')
+    setIsAddingTemporary(false)
+    setIsMenuOpen(false)
   }
 
   return (
@@ -117,41 +156,118 @@ const PinnedListComponent = ({ list }: PinnedListProps) => {
               </button>
               <button
                 type="button"
-                onClick={() => setIsEditingTitle(true)}
+                onClick={() => setIsAddingTemporary(true)}
                 className={headerButtonStyles}
-                aria-label="Переименовать слот"
+                aria-label="Добавить временную задачу"
+                title="Добавить временную задачу"
               >
-                <FiEdit2 />
+                <FiClock />
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  void store.deletePinnedList(list.id)
-                }}
-                className={`${headerButtonStyles} ${isPrimary ? 'cursor-not-allowed opacity-40 hover:bg-transparent hover:text-slate-400' : 'text-rose-400 hover:text-rose-600'
-                  }`}
-                aria-label={isPrimary ? 'Первый слот нельзя удалить' : 'Удалить слот'}
-                disabled={isPrimary}
-              >
-                <FiTrash2 />
-              </button>
+              <div className="relative" ref={menuRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsMenuOpen(!isMenuOpen)}
+                  className={headerButtonStyles}
+                  aria-label="Меню слота"
+                  title="Меню слота"
+                >
+                  <FiMoreVertical />
+                </button>
+                {isMenuOpen && (
+                  <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-slate-200 bg-white shadow-lg">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsEditingTitle(true)
+                        setIsMenuOpen(false)
+                      }}
+                      className="flex w-full items-center gap-2 rounded-t-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                    >
+                      <FiEdit2 className="text-slate-400" />
+                      <span>Переименовать слот</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void store.deletePinnedList(list.id)
+                        setIsMenuOpen(false)
+                      }}
+                      disabled={isPrimary}
+                      className={`flex w-full items-center gap-2 rounded-b-lg px-3 py-2 text-left text-sm ${
+                        isPrimary
+                          ? 'cursor-not-allowed opacity-40 text-slate-400'
+                          : 'text-rose-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <FiTrash2 className="text-slate-400" />
+                      <span>Удалить слот</span>
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </>
         )}
       </div>
 
       {!isCollapsed && (
-        <PinnedListContainer
-          listId={list.id}
-          todosCount={todos.length}
-          emptyMessage={emptyStateMessage}
-        >
-          {todos.map((todo, index) => (
-            <Fragment key={todo.id}>
-              <TodoItem todo={todo} depth={0} parentId={null} index={index} pinnedListId={list.id} allowChildren={false} />
-            </Fragment>
-          ))}
-        </PinnedListContainer>
+        <>
+          {isAddingTemporary && (
+            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  void handleAddTemporary()
+                }}
+                className="flex items-center gap-2"
+              >
+                <input
+                  ref={inputRef}
+                  className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-400 focus:outline-none"
+                  placeholder="Название временной задачи"
+                  value={temporaryTitle}
+                  onChange={(e) => setTemporaryTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                      handleCancelTemporary()
+                    }
+                  }}
+                />
+                <button
+                  type="submit"
+                  disabled={!temporaryTitle.trim()}
+                  className={`rounded-lg p-2 text-sm transition-colors ${
+                    temporaryTitle.trim()
+                      ? 'bg-emerald-500 text-white hover:bg-emerald-600'
+                      : 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                  }`}
+                  aria-label="Добавить временную задачу"
+                >
+                  <FiCheck />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancelTemporary}
+                  className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600"
+                  aria-label="Отменить"
+                >
+                  <FiX />
+                </button>
+              </form>
+            </div>
+          )}
+          <PinnedListContainer
+            listId={list.id}
+            todosCount={todos.length}
+            emptyMessage={emptyStateMessage}
+          >
+            {todos.map((todo, index) => (
+              <Fragment key={todo.id}>
+                <TodoItem todo={todo} depth={0} parentId={null} index={index} pinnedListId={list.id} allowChildren={false} />
+              </Fragment>
+            ))}
+          </PinnedListContainer>
+        </>
       )}
     </div>
   )

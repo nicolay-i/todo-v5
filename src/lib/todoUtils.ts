@@ -122,6 +122,13 @@ export function matchesSelectedTags(node: TodoNode, searchTagIds: string[]): boo
 }
 
 /**
+ * Проверяет, имеет ли задача системный тег "Временный"
+ */
+export function hasTemporaryTag(node: TodoNode): boolean {
+  return (node.tags ?? []).some((tag) => tag.name === 'Временный')
+}
+
+/**
  * Ищет задачу в дереве по ID
  */
 export function findTodo(

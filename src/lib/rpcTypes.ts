@@ -81,6 +81,10 @@ export interface RpcParamsMap {
     toListId: string
     toPosition: number
   }
+  'pinnedTodo.addTemporary': {
+    pinnedListId: string
+    title: string
+  }
   // State операции
   'state.get': Record<string, never> // пустой объект
   'state.replace': {
@@ -123,6 +127,7 @@ export interface RpcReturnMap {
   'pinnedList.delete': { state: TodoState }
   'pinnedList.setActive': { state: TodoState }
   'pinnedTodo.move': { state: TodoState }
+  'pinnedTodo.addTemporary': { state: TodoState }
   // State операции
   'state.get': { state: TodoState }
   'state.replace': { state: TodoState }
@@ -219,6 +224,7 @@ export const ALL_RPC_METHODS: readonly RpcMethod[] = [
   'pinnedList.delete',
   'pinnedList.setActive',
   'pinnedTodo.move',
+  'pinnedTodo.addTemporary',
   'state.get',
   'state.replace',
   'random.todo',

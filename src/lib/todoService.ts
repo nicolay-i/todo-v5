@@ -71,6 +71,26 @@ async function ensureSeedData(userId: string) {
         }
       }
 
+      // Создаем системный тег "Временный" если его еще нет
+      const temporaryTag = await prisma.tag.findFirst({
+        where: { userId, name: 'Временный' },
+      })
+      if (!temporaryTag) {
+        const maxPosition = await prisma.tag.findFirst({
+          where: { userId },
+          orderBy: { position: 'desc' },
+        })
+        const position = (maxPosition?.position ?? -1) + 1
+        await prisma.tag.create({
+          data: {
+            name: 'Временный',
+            position,
+            isSystem: true,
+            userId,
+          },
+        })
+      }
+
       const todoCount = await prisma.todo.count({ where: { userId } })
       if (todoCount === 0) {
         await prisma.$transaction(async (tx) => {
@@ -655,6 +675,63 @@ export async function addTodo(
     })
 
     // If adding as pinned (later via togglePinned), do nothing here.
+  })
+
+  return getTodoState(userId)
+}
+
+export async function addTemporaryTodoToPinnedList(
+  userId: string,
+  pinnedListId: string,
+  title: string,
+): Promise<TodoState> {
+  const trimmed = title.trim()
+  if (!trimmed) {
+    return getTodoState(userId)
+  }
+
+  await ensureSeedData(userId)
+
+  // Проверяем существование pinned list
+  const pinnedList = await prisma.pinnedList.findFirst({
+    where: { id: pinnedListId, userId },
+  })
+  if (!pinnedList) {
+    return getTodoState(userId)
+  }
+
+  // Находим тег "Временный"
+  const temporaryTag = await prisma.tag.findFirst({
+    where: { userId, name: 'Временный' },
+  })
+  if (!temporaryTag) {
+    return getTodoState(userId)
+  }
+
+  // Получаем следующую позицию для todo в pinned list
+  const position = await getNextPinnedTodoPosition(userId, pinnedListId)
+
+  await prisma.$transaction(async (tx) => {
+    // Создаем todo с тегом "Временный" и pinned: true
+    const todo = await tx.todo.create({
+      data: {
+        title: trimmed,
+        parentId: null,
+        position: 0,
+        pinned: true,
+        userId,
+        tags: { connect: { id: temporaryTag.id } },
+      },
+    })
+
+    // Добавляем todo в pinned list
+    await tx.pinnedTodo.create({
+      data: {
+        todoId: todo.id,
+        pinnedListId,
+        position,
+      },
+    })
   })
 
   return getTodoState(userId)
