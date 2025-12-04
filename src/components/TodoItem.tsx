@@ -468,7 +468,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
         tagDropdown.open()
       }
     }
-  }, [availableTags, canAddChild, handleDelete, handleToggle, isCollapsed, navScope, store, tagDropdown, todo.children.length, todo.id, todo.tags, todoTagIds])
+  }, [availableTags, canAddChild, handleDelete, handleToggle, isCollapsed, navScope, store, tagDropdown, todo.children.length, todo.description, todo.id, todo.tags, todoTagIds])
 
   const handleTagMenuKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
     if (!tagDropdown.isOpen) return
