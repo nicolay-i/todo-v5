@@ -22,6 +22,7 @@ import { AllTasksTab } from '@/page-components/AllTasksTab'
 import { PinnedTab } from '@/page-components/PinnedTab'
 import { SettingsTab } from '@/page-components/SettingsTab'
 import { RandomTodoTab } from '@/page-components/RandomTodoTab'
+import { GuideTab } from '@/page-components/GuideTab'
 
 interface TodoAppProps {
   initialState: TodoState
@@ -39,7 +40,7 @@ const TodoAppContent = ({ user }: { user: SessionUser }) => {
 
   // Инициализируем вкладку из URL (?tab=...)
   const tabFromUrl = searchParams?.get('tab')
-  const normalizedTab = (tabFromUrl === 'pinned' || tabFromUrl === 'all' || tabFromUrl === 'settings' || tabFromUrl === 'random')
+  const normalizedTab = (tabFromUrl === 'pinned' || tabFromUrl === 'all' || tabFromUrl === 'settings' || tabFromUrl === 'random' || tabFromUrl === 'guide')
     ? (tabFromUrl as TabKey)
     : 'pinned'
   const [activeTab, setActiveTab] = useState<TabKey>(normalizedTab)
@@ -139,6 +140,7 @@ const TodoAppContent = ({ user }: { user: SessionUser }) => {
       {activeTab === 'all' && <AllTasksTab />}
       {activeTab === 'random' && <RandomTodoTab />}
       {activeTab === 'settings' && <SettingsTab user={user} onLogout={handleLogout} />}
+      {activeTab === 'guide' && <GuideTab />}
 
       <AddTodoModal
         isOpen={isAddModalOpen}

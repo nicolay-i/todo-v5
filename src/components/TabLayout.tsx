@@ -6,7 +6,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { isInputLike } from '@/lib/dom/todoFocus'
 import { focusEdgeTodo } from '@/lib/dom/todoFocus'
 
-export type TabKey = 'pinned' | 'all' | 'settings' | 'random'
+export type TabKey = 'pinned' | 'all' | 'settings' | 'random' | 'guide'
 
 interface Tab {
   key: TabKey
@@ -26,6 +26,7 @@ const tabs: Tab[] = [
   { key: 'all', label: 'Список задач' },
   { key: 'random', label: 'Случайное' },
   { key: 'settings', label: 'Настройки' },
+  { key: 'guide', label: 'Гайд' },
 ]
 
 export function TabLayout({ activeTab, onTabChange, children, headerActions, onPinnedStepList }: TabLayoutProps) {
@@ -63,7 +64,7 @@ export function TabLayout({ activeTab, onTabChange, children, headerActions, onP
       const lowerKey = event.key.toLowerCase()
 
       // n — открыть модал добавления (только на вкладке 'all')
-      if (!event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && lowerKey === 'n' && activeTab === 'all') {
+      if (!event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && (lowerKey === 'n' || lowerKey === 'н') && activeTab === 'all') {
         event.preventDefault()
         // Это событие будет обработано в AllTasksTab
         window.dispatchEvent(new CustomEvent('openAddModal'))
@@ -109,7 +110,7 @@ export function TabLayout({ activeTab, onTabChange, children, headerActions, onP
   // Обратная синхронизация: если URL изменился, обновляем стейт
   useEffect(() => {
     const current = searchParams?.get('tab')
-    const nextTab = (current === 'pinned' || current === 'all' || current === 'settings' || current === 'random')
+    const nextTab = (current === 'pinned' || current === 'all' || current === 'settings' || current === 'random' || current === 'guide')
       ? (current as TabKey)
       : 'pinned'
     if (nextTab !== activeTab) {
@@ -130,7 +131,7 @@ export function TabLayout({ activeTab, onTabChange, children, headerActions, onP
                   type="button"
                   onClick={() => handleSwitchTab(tab.key)}
                   className={[
-                    'rounded-xl px-4 py-2 transition focus-visible:outline-none',
+                    'rounded-xl px-4 py-2 mx-1 transition focus-visible:outline-none',
                     activeTab === tab.key
                       ? 'bg-slate-900 text-white shadow-sm'
                       : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700',

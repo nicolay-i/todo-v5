@@ -422,7 +422,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
     }
 
     const key = event.key.toLowerCase()
-    if (key === 'e') {
+    if (key === 'e' || key === 'у') {
       event.preventDefault()
       setIsEditing(true)
       return
@@ -433,7 +433,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
       setIsEditingDescription(true)
       return
     }
-    if (key === 'a') {
+    if (key === 'a' || key === 'ф') {
       event.preventDefault()
       if (!canAddChild) return
       setIsAddingChild((prev) => {
@@ -449,7 +449,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
       })
       return
     }
-    if (key === 't') {
+    if (key === 't' || key === 'е') {
       event.preventDefault()
       if (event.shiftKey) {
         const availableToAttach = availableTags.filter((tag) => !todoTagIds.has(tag.id))
