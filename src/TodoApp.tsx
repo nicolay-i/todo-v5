@@ -116,7 +116,7 @@ const TodoAppContent = ({ user }: { user: SessionUser }) => {
             <button
               type="button"
               onClick={openAddModal}
-              className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
+              className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 dark:bg-slate-100 px-4 py-2 text-sm font-medium text-white dark:text-slate-900 shadow-sm transition hover:bg-slate-800 dark:hover:bg-slate-200"
               aria-label="Добавить задачу"
             >
               <FiPlus />
@@ -127,7 +127,7 @@ const TodoAppContent = ({ user }: { user: SessionUser }) => {
             <button
               type="button"
               onClick={() => randomStore.loadRandomChain()}
-              className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
+              className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 dark:bg-slate-100 px-4 py-2 text-sm font-medium text-white dark:text-slate-900 shadow-sm transition hover:bg-slate-800 dark:hover:bg-slate-200"
               aria-label="Загрузить другую задачу"
             >
               Другой

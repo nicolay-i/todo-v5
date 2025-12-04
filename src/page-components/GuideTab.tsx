@@ -4,15 +4,15 @@ export const GuideTab = () => {
   return (
     <div className="space-y-6">
       {/* Слоты */}
-      <div className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
-        <h3 className="text-base font-semibold text-slate-700 mb-3">Слоты</h3>
-        <div className="space-y-3 text-sm text-slate-600">
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800/80 p-5 shadow-sm">
+        <h3 className="text-base font-semibold text-slate-700 dark:text-slate-200 mb-3">Слоты</h3>
+        <div className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
           <p>
             Слоты — это закреплённые списки задач, которые помогают организовать работу на день или определённый период.
             Вы можете создать несколько слотов для разных целей или временных интервалов.
           </p>
           <div>
-            <p className="font-medium text-slate-700 mb-2">Основные возможности:</p>
+            <p className="font-medium text-slate-700 dark:text-slate-200 mb-2">Основные возможности:</p>
             <ul className="list-disc list-inside space-y-1 ml-2">
               <li>Создание слотов как промежутки работы (например с 9 до 11 буду делать таску "Проверить баг добавления в список", а после этого с 12 до 14 буду делать таску "Проверить баг удаления из списка")</li>
               <li>Перетаскивание задач между слотами</li>
@@ -21,7 +21,7 @@ export const GuideTab = () => {
               <li>Просмотр слотов в текстовом формате (можно скопировать и отправить кому то выполненые задачи)</li>
             </ul>
           </div>
-          <p className="text-xs text-slate-500 mt-3">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-3">
             Число рядом с названием слота показывает количество задач в нём. Состояние свёрнутости сохраняется локально
             и восстанавливается при перезагрузке страницы.
           </p>
@@ -29,15 +29,15 @@ export const GuideTab = () => {
       </div>
 
       {/* Список задач */}
-      <div className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
-        <h3 className="text-base font-semibold text-slate-700 mb-3">Список задач</h3>
-        <div className="space-y-3 text-sm text-slate-600">
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800/80 p-5 shadow-sm">
+        <h3 className="text-base font-semibold text-slate-700 dark:text-slate-200 mb-3">Список задач</h3>
+        <div className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
           <p>
             Основной раздел для управления всеми задачами. Поддерживает вложенность до трёх уровней глубины, что
             позволяет создавать проекты, подзадачи и подподзадачи.
           </p>
           <div>
-            <p className="font-medium text-slate-700 mb-2">Основные возможности:</p>
+            <p className="font-medium text-slate-700 dark:text-slate-200 mb-2">Основные возможности:</p>
             <ul className="list-disc list-inside space-y-1 ml-2">
               <li>Древовидная структура задач с поддержкой до 3 уровней вложенности</li>
               <li>Drag-and-drop для перетаскивания задач между уровнями и изменения порядка</li>
@@ -50,7 +50,7 @@ export const GuideTab = () => {
               <li>В проект можно добавить alias и он будет отображаться в дочерних задачах как фиксированный тег</li>
             </ul>
           </div>
-          <p className="text-xs text-slate-500 mt-3">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-3">
             Перетаскивание реализовано на чистом HTML5 drag-and-drop. Доступные точки сброса отображаются только во
             время перетаскивания и учитывают ограничения по глубине вложенности.
           </p>
@@ -58,15 +58,15 @@ export const GuideTab = () => {
       </div>
 
       {/* Случайное */}
-      <div className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
-        <h3 className="text-base font-semibold text-slate-700 mb-3">Случайное</h3>
-        <div className="space-y-3 text-sm text-slate-600">
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800/80 p-5 shadow-sm">
+        <h3 className="text-base font-semibold text-slate-700 dark:text-slate-200 mb-3">Случайное</h3>
+        <div className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
           <p>
             Раздел для работы со случайной задачей. Система выбирает случайную незавершённую задачу и показывает всю
             цепочку задач от корня до выбранной задачи, помогая понять контекст и начать работу.
           </p>
           <div>
-            <p className="font-medium text-slate-700 mb-2">Основные возможности:</p>
+            <p className="font-medium text-slate-700 dark:text-slate-200 mb-2">Основные возможности:</p>
             <ul className="list-disc list-inside space-y-1 ml-2">
               <li>Автоматический выбор случайной незавершённой задачи</li>
               <li>Отображение полной цепочки задач от корня до выбранной задачи</li>
@@ -74,7 +74,7 @@ export const GuideTab = () => {
               <li>Возможность загрузить другую случайную задачу</li>
             </ul>
           </div>
-          <p className="text-xs text-slate-500 mt-3">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-3">
             Цепочка задач всегда развёрнута для удобного просмотра. Вы можете работать с задачей прямо из этого
             раздела.
           </p>
@@ -82,9 +82,9 @@ export const GuideTab = () => {
       </div>
 
       {/* Настройки */}
-      <div className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
-        <h3 className="text-base font-semibold text-slate-700 mb-3">Настройки</h3>
-        <div className="space-y-3 text-sm text-slate-600">
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800/80 p-5 shadow-sm">
+        <h3 className="text-base font-semibold text-slate-700 dark:text-slate-200 mb-3">Настройки</h3>
+        <div className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
           <p>Раздел для управления профилем, тегами и данными приложения.</p>
           <div>
             <p className="font-medium text-slate-700 mb-2">Управление профилем:</p>
@@ -110,7 +110,7 @@ export const GuideTab = () => {
               <li>Полная замена текущих данных при импорте</li>
             </ul>
           </div>
-          <p className="text-xs text-rose-600 mt-3">
+          <p className="text-xs text-rose-600 dark:text-rose-400 mt-3">
             ⚠️ Внимание: импорт данных полностью заменяет существующие задачи и списки. Перед импортом рекомендуется
             сохранить резервную копию.
           </p>
@@ -118,30 +118,30 @@ export const GuideTab = () => {
       </div>
 
       {/* Шорткаты */}
-      <div className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
-        <h3 className="text-base font-semibold text-slate-700 mb-3">Клавиатурные сокращения</h3>
-        <div className="space-y-4 text-sm text-slate-600">
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800/80 p-5 shadow-sm">
+        <h3 className="text-base font-semibold text-slate-700 dark:text-slate-200 mb-3">Клавиатурные сокращения</h3>
+        <div className="space-y-4 text-sm text-slate-600 dark:text-slate-300">
           <div>
             <p className="font-medium text-slate-700 mb-2">Глобальные шорткаты (работают, когда фокус не внутри поля ввода):</p>
             <ul className="space-y-1">
               <li>
-                <kbd className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-xs font-mono">N</kbd> /{' '}
-                <kbd className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-xs font-mono">Н</kbd>{' '}
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100">N</kbd> /{' '}
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100">Н</kbd>{' '}
                 — открыть модал добавления новой задачи (вкладка «Список задач»)
               </li>
               <li>
-                <kbd className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-xs font-mono">Alt + ←</kbd> /{' '}
-                <kbd className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-xs font-mono">Alt + →</kbd>{' '}
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100">Alt + ←</kbd> /{' '}
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100">Alt + →</kbd>{' '}
                 — переключить вкладки
               </li>
               <li>
-                <kbd className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-xs font-mono">Alt + ↑</kbd> /{' '}
-                <kbd className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-xs font-mono">Alt + ↓</kbd>{' '}
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100">Alt + ↑</kbd> /{' '}
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100">Alt + ↓</kbd>{' '}
                 — шаг по закреплённым спискам (на вкладке «Слоты»)
               </li>
               <li>
-                <kbd className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-xs font-mono">↑</kbd> /{' '}
-                <kbd className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-xs font-mono">↓</kbd>{' '}
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100">↑</kbd> /{' '}
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100">↓</kbd>{' '}
                 — перейти к предыдущей/следующей задаче (когда фокус на пустой странице)
               </li>
             </ul>
@@ -151,52 +151,52 @@ export const GuideTab = () => {
             <p className="font-medium text-slate-700 mb-2">На карточке задачи (когда карточка в фокусе):</p>
             <ul className="space-y-1">
               <li>
-                <kbd className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-xs font-mono">↑</kbd> /{' '}
-                <kbd className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-xs font-mono">↓</kbd>{' '}
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100">↑</kbd> /{' '}
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100">↓</kbd>{' '}
                 — вверх/вниз по списку задач
               </li>
               <li>
-                <kbd className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-xs font-mono">Home</kbd> /{' '}
-                <kbd className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-xs font-mono">End</kbd>{' '}
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100">Home</kbd> /{' '}
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100">End</kbd>{' '}
                 — к первому/последнему элементу в текущем scope (list или pinned)
               </li>
               <li>
-                <kbd className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-xs font-mono">←</kbd> /{' '}
-                <kbd className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-xs font-mono">→</kbd>{' '}
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100">←</kbd> /{' '}
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100">→</kbd>{' '}
                 — свернуть/развернуть узел (если есть дети)
               </li>
               <li>
-                <kbd className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-xs font-mono">Пробел</kbd>{' '}
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100">Пробел</kbd>{' '}
                 — отметить/снять отметку выполнения
               </li>
               <li>
-                <kbd className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-xs font-mono">Delete</kbd> /{' '}
-                <kbd className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-xs font-mono">Backspace</kbd>{' '}
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100">Delete</kbd> /{' '}
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100">Backspace</kbd>{' '}
                 — удалить задачу
               </li>
               <li>
-                <kbd className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-xs font-mono">E</kbd> /{' '}
-                <kbd className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-xs font-mono">У</kbd>{' '}
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100">E</kbd> /{' '}
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100">У</kbd>{' '}
                 — войти в режим редактирования названия
               </li>
               <li>
-                <kbd className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-xs font-mono">O</kbd> /{' '}
-                <kbd className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-xs font-mono">Щ</kbd>{' '}
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100">O</kbd> /{' '}
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100">Щ</kbd>{' '}
                 — открыть редактор описания
               </li>
               <li>
-                <kbd className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-xs font-mono">A</kbd> /{' '}
-                <kbd className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-xs font-mono">Ф</kbd>{' '}
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100">A</kbd> /{' '}
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100">Ф</kbd>{' '}
                 — открыть/закрыть форму добавления подзадачи
               </li>
               <li>
-                <kbd className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-xs font-mono">T</kbd> /{' '}
-                <kbd className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-xs font-mono">Е</kbd>{' '}
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100">T</kbd> /{' '}
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100">Е</kbd>{' '}
                 — открыть/закрыть меню тегов
               </li>
               <li>
-                <kbd className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-xs font-mono">Shift + T</kbd> /{' '}
-                <kbd className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-xs font-mono">Shift + Е</kbd>{' '}
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100">Shift + T</kbd> /{' '}
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100">Shift + Е</kbd>{' '}
                 — быстро прикрепить/открепить тег
               </li>
             </ul>
@@ -206,18 +206,18 @@ export const GuideTab = () => {
             <p className="font-medium text-slate-700 mb-2">В меню тегов:</p>
             <ul className="space-y-1">
               <li>
-                <kbd className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-xs font-mono">↑</kbd> /{' '}
-                <kbd className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-xs font-mono">↓</kbd>,{' '}
-                <kbd className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-xs font-mono">Home</kbd> /{' '}
-                <kbd className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-xs font-mono">End</kbd>{' '}
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100">↑</kbd> /{' '}
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100">↓</kbd>,{' '}
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100">Home</kbd> /{' '}
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100">End</kbd>{' '}
                 — навигация по элементам
               </li>
               <li>
-                <kbd className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-xs font-mono">1..9</kbd>{' '}
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100">1..9</kbd>{' '}
                 — выбрать тег по позиции
               </li>
               <li>
-                <kbd className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-xs font-mono">Esc</kbd>{' '}
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100">Esc</kbd>{' '}
                 — закрыть меню и вернуть фокус на карточку
               </li>
             </ul>
@@ -227,13 +227,13 @@ export const GuideTab = () => {
             <p className="font-medium text-slate-700 mb-2">Редактирование и формы:</p>
             <ul className="space-y-1">
               <li>
-                <kbd className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-xs font-mono">Esc</kbd>{' '}
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100">Esc</kbd>{' '}
                 — отменить редактирование или закрыть модал/форму
               </li>
               <li>
-                <kbd className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-xs font-mono">Enter</kbd> /{' '}
-                <kbd className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-xs font-mono">Ctrl+Enter</kbd> (или{' '}
-                <kbd className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-xs font-mono">Meta+Enter</kbd>){' '}
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100">Enter</kbd> /{' '}
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100">Ctrl+Enter</kbd> (или{' '}
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-slate-100">Meta+Enter</kbd>){' '}
                 — сохранить изменения (в многострочном вводе использовать Ctrl/Meta+Enter для сохранения)
               </li>
             </ul>

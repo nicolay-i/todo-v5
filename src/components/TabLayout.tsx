@@ -3,8 +3,10 @@
 import type { ReactNode } from 'react'
 import { useCallback, useEffect, useMemo } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { FiMoon, FiSun } from 'react-icons/fi'
 import { isInputLike } from '@/lib/dom/todoFocus'
 import { focusEdgeTodo } from '@/lib/dom/todoFocus'
+import { useTheme } from '@/lib/hooks/useTheme'
 
 export type TabKey = 'pinned' | 'all' | 'settings' | 'random' | 'guide'
 
@@ -33,6 +35,7 @@ export function TabLayout({ activeTab, onTabChange, children, headerActions, onP
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const { theme, toggleTheme, mounted } = useTheme()
 
   const tabKeys = useMemo(() => tabs.map((tab) => tab.key), [])
 
@@ -120,11 +123,11 @@ export function TabLayout({ activeTab, onTabChange, children, headerActions, onP
   }, [searchParams])
 
   return (
-    <div className="min-h-screen bg-canvas-light text-slate-900">
+    <div className="min-h-screen bg-canvas-light dark:bg-canvas-dark text-slate-900 dark:text-slate-100">
       <div className="mx-auto flex min-h-screen max-w-4xl flex-col px-4 py-10 sm:px-6 lg:px-8">
-        <section className="flex-1 rounded-3xl bg-white/60 p-5 shadow-inner ring-1 ring-white/40">
+        <section className="flex-1 rounded-3xl bg-white/60 dark:bg-slate-800/60 p-5 shadow-inner ring-1 ring-white/40 dark:ring-slate-700/40">
           <div className="pb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex rounded-2xl bg-white/70 p-1 text-sm font-medium text-slate-500 shadow-sm ring-1 ring-slate-200/70">
+            <div className="flex rounded-2xl bg-white/70 dark:bg-slate-700/70 p-1 text-sm font-medium text-slate-500 dark:text-slate-400 shadow-sm ring-1 ring-slate-200/70 dark:ring-slate-600/70">
               {tabs.map((tab) => (
                 <button
                   key={tab.key}
@@ -133,15 +136,26 @@ export function TabLayout({ activeTab, onTabChange, children, headerActions, onP
                   className={[
                     'rounded-xl px-4 py-2 mx-1 transition focus-visible:outline-none',
                     activeTab === tab.key
-                      ? 'bg-slate-900 text-white shadow-sm'
-                      : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700',
+                      ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-sm'
+                      : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-600 hover:text-slate-700 dark:hover:text-slate-200',
                   ].join(' ')}
                 >
                   {tab.label}
                 </button>
               ))}
             </div>
-            {headerActions}
+            <div className="flex items-center gap-2">
+              {headerActions}
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="flex items-center justify-center rounded-xl bg-white/70 dark:bg-slate-700/70 px-3 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 shadow-sm ring-1 ring-slate-200/70 dark:ring-slate-600/70 transition hover:bg-slate-100 dark:hover:bg-slate-600"
+                aria-label="Переключить тему"
+                title={mounted ? (theme === 'dark' ? 'Переключить на светлую тему' : 'Переключить на темную тему') : 'Загрузка...'}
+              >
+                {mounted && (theme === 'dark' ? <FiSun className="h-4 w-4" /> : <FiMoon className="h-4 w-4" />)}
+              </button>
+            </div>
           </div>
           {children}
         </section>

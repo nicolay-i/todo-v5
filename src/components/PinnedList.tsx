@@ -14,7 +14,7 @@ interface PinnedListProps {
 }
 
 const headerButtonStyles =
-  'rounded-lg p-1.5 text-slate-400 transition-colors duration-150 hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none'
+  'rounded-lg p-1.5 text-slate-400 dark:text-slate-500 transition-colors duration-150 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200 focus-visible:outline-none'
 
 const actionConfirmButtonStyles = `${headerButtonStyles} bg-emerald-500 text-white hover:bg-emerald-500/90`
 
@@ -100,12 +100,12 @@ const PinnedListComponent = ({ list }: PinnedListProps) => {
   }
 
   return (
-    <div className={["flex flex-col rounded-2xl bg-white/90 p-4 shadow-sm ring-1", isActive ? 'ring-emerald-400' : 'ring-slate-200'].join(' ')}>
+    <div className={["flex flex-col rounded-2xl bg-white/90 dark:bg-slate-800/90 p-4 shadow-sm ring-1", isActive ? 'ring-emerald-400 dark:ring-emerald-500' : 'ring-slate-200 dark:ring-slate-700'].join(' ')}>
       <div className="flex items-start gap-2">
         {isEditingTitle ? (
           <form onSubmit={handleRenameSubmit} className="flex flex-1 items-center gap-2">
             <input
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-400 focus:outline-none"
+              className="w-full rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 shadow-sm focus:border-slate-400 dark:focus:border-slate-500 focus:outline-none"
               autoFocus
               value={titleDraft}
               onChange={(event) => setTitleDraft(event.target.value)}
@@ -147,15 +147,15 @@ const PinnedListComponent = ({ list }: PinnedListProps) => {
             <button
               type="button"
               onClick={() => store.togglePinnedListCollapse(list.id)}
-              className="mr-2 rounded-md p-1 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none"
+              className="mr-2 rounded-md p-1 text-slate-500 dark:text-slate-400 transition-colors hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200 focus-visible:outline-none"
               aria-label={isCollapsed ? 'Развернуть слот' : 'Свернуть слот'}
               title={isCollapsed ? 'Развернуть' : 'Свернуть'}
             >
               {isCollapsed ? <FiChevronRight /> : <FiChevronDown />}
             </button>
-            <h3 className="flex-1 text-sm font-semibold text-slate-700">
+            <h3 className="flex-1 text-sm font-semibold text-slate-700 dark:text-slate-200">
               {list.title}
-              <span className="ml-2 rounded bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">{todos.length}</span>
+              <span className="ml-2 rounded bg-slate-100 dark:bg-slate-700 px-2 py-0.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">{todos.length}</span>
             </h3>
             <div className="flex items-center gap-1">
               <button
@@ -235,7 +235,7 @@ const PinnedListComponent = ({ list }: PinnedListProps) => {
       {!isCollapsed && (
         <>
           {isAddingTemporary && (
-            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div className="mt-4 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/50 p-3">
               <form
                 onSubmit={(e) => {
                   e.preventDefault()
@@ -245,7 +245,7 @@ const PinnedListComponent = ({ list }: PinnedListProps) => {
               >
                 <input
                   ref={inputRef}
-                  className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-400 focus:outline-none"
+                  className="flex-1 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 shadow-sm focus:border-slate-400 dark:focus:border-slate-500 focus:outline-none"
                   placeholder="Название временной задачи"
                   value={temporaryTitle}
                   onChange={(e) => setTemporaryTitle(e.target.value)}
@@ -261,7 +261,7 @@ const PinnedListComponent = ({ list }: PinnedListProps) => {
                   className={`rounded-lg p-2 text-sm transition-colors ${
                     temporaryTitle.trim()
                       ? 'bg-emerald-500 text-white hover:bg-emerald-600'
-                      : 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                      : 'bg-slate-300 dark:bg-slate-600 text-slate-500 dark:text-slate-400 cursor-not-allowed'
                   }`}
                   aria-label="Добавить временную задачу"
                 >
@@ -270,7 +270,7 @@ const PinnedListComponent = ({ list }: PinnedListProps) => {
                 <button
                   type="button"
                   onClick={handleCancelTemporary}
-                  className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600"
+                  className="rounded-lg p-2 text-slate-400 dark:text-slate-500 transition-colors hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-600 dark:hover:text-slate-300"
                   aria-label="Отменить"
                 >
                   <FiX />
@@ -358,8 +358,8 @@ const PinnedListContainer = observer(({ listId, todosCount, emptyMessage, childr
           className={[
             'flex min-h-[96px] items-center justify-center rounded-xl border border-dashed px-4 py-6 text-center text-xs transition-colors',
             isOverEmpty && canAccept
-              ? 'border-emerald-300 bg-emerald-50/70 text-emerald-700'
-              : 'border-amber-200 bg-amber-50/60 text-amber-600',
+              ? 'border-emerald-300 dark:border-emerald-600 bg-emerald-50/70 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-200'
+              : 'border-amber-200 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-900/30 text-amber-600 dark:text-amber-300',
           ].join(' ')}
         >
           {emptyMessage}

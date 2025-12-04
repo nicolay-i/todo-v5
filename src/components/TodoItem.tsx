@@ -42,7 +42,7 @@ interface TodoItemProps {
 }
 
 const actionButtonStyles =
-  'rounded-lg p-1.5 text-slate-400 transition-colors duration-150 hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none'
+  'rounded-lg p-1.5 text-slate-400 dark:text-slate-500 transition-colors duration-150 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200 focus-visible:outline-none'
 
 const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowChildren = true, enableDragDrop = true, forceExpanded = false }: TodoItemProps) => {
   const store = useTodoStore()
@@ -361,7 +361,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
     () =>
       [
         'font-medium leading-snug transition-colors',
-        todo.completed ? 'text-slate-400 line-through' : 'text-slate-700',
+        todo.completed ? 'text-slate-400 dark:text-slate-500 line-through' : 'text-slate-700 dark:text-slate-200',
       ].join(' '),
     [todo.completed],
   )
@@ -525,12 +525,12 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
         className={[
           'group/todo rounded-xl transition-all duration-200 hover:shadow-md',
           // Базовый фон или фон системных тегов
-          systemTagType === 'project' ? 'bg-blue-50/40 ring-2 ring-blue-300' : 
-          systemTagType === 'section' ? 'bg-purple-50/40 ring-2 ring-purple-300' : 
-          systemTagType === 'temporary' ? 'bg-amber-50/40 ring-2 ring-amber-100' : 
-          'bg-white/95 ring-1 ring-slate-200',
-          isDragging ? 'opacity-60 ring-2 ring-slate-300' : '',
-          isOverInside && canDropInside ? 'ring-2 ring-emerald-400/80 bg-emerald-50/50' : '',
+          systemTagType === 'project' ? 'bg-blue-50/40 dark:bg-blue-900/30 ring-2 ring-blue-300 dark:ring-blue-600' : 
+          systemTagType === 'section' ? 'bg-purple-50/40 dark:bg-purple-900/30 ring-2 ring-purple-300 dark:ring-purple-600' : 
+          systemTagType === 'temporary' ? 'bg-amber-50/40 dark:bg-amber-900/30 ring-2 ring-amber-100 dark:ring-amber-700' : 
+          'bg-white/95 dark:bg-slate-800/95 ring-1 ring-slate-200 dark:ring-slate-700',
+          isDragging ? 'opacity-60 ring-2 ring-slate-300 dark:ring-slate-600' : '',
+          isOverInside && canDropInside ? 'ring-2 ring-emerald-400/80 dark:ring-emerald-500/80 bg-emerald-50/50 dark:bg-emerald-900/40' : '',
           overPosition === 'above' ? 'shadow-[inset_0_2px_0_0_rgba(16,185,129,0.7)]' : '',
           overPosition === 'below' ? 'shadow-[inset_0_-2px_0_0_rgba(16,185,129,0.7)]' : '',
           isFirstChildAtMaxDepth ? 'is-first' : '',
@@ -560,8 +560,8 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                 actionButtonStyles,
                 '-ml-1.5 text-lg',
                 todo.children.length > 0 && !searchActive && !forceExpanded
-                  ? 'text-slate-500'
-                  : 'text-slate-300 cursor-default',
+                  ? 'text-slate-500 dark:text-slate-400'
+                  : 'text-slate-300 dark:text-slate-600 cursor-default',
                   'btn-collapse'
               ].join(' ')}
               aria-label={isCollapsed ? 'Развернуть' : 'Свернуть'}
@@ -573,7 +573,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
           <button
             type="button"
             onClick={handleToggle}
-            className={`${actionButtonStyles} text-xl text-slate-500 btn-toggle`}
+            className={`${actionButtonStyles} text-xl text-slate-500 dark:text-slate-400 btn-toggle`}
             aria-label={todo.completed ? 'Отметить как невыполненную' : 'Отметить как выполненную'}
           >
             {todo.completed ? <FiCheckCircle /> : <FiCircle />}
@@ -597,7 +597,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
               <form onSubmit={handleEditSubmit} className="flex flex-col gap-3 sm:flex-row sm:items-start form-title">
                 <div ref={editWrapRef} className="w-full">
                   <textarea
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm leading-snug text-slate-700 shadow-sm focus:border-slate-400 focus:outline-none resize-none"
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm leading-snug text-slate-700 dark:text-slate-200 shadow-sm focus:border-slate-400 dark:focus:border-slate-500 focus:outline-none resize-none"
                     autoFocus
                     value={titleDraft}
                     onChange={(event) => setTitleDraft(event.target.value)}
@@ -624,7 +624,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                     <input
                       id={aliasInputId}
                       type="text"
-                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm leading-snug text-slate-700 shadow-sm focus:border-slate-400 focus:outline-none"
+                      className="w-full rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm leading-snug text-slate-700 dark:text-slate-200 shadow-sm focus:border-slate-400 dark:focus:border-slate-500 focus:outline-none"
                       value={aliasDraft}
                       onChange={(event) => setAliasDraft(event.target.value)}
                       onKeyDown={(event) => {
@@ -647,7 +647,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                   <button
                     type="button"
                     onClick={cancelEditing}
-                    className={`${actionButtonStyles} hover:bg-slate-200`}
+                    className={`${actionButtonStyles} hover:bg-slate-200 dark:hover:bg-slate-600`}
                     aria-label="Отменить редактирование"
                   >
                     <FiX />
@@ -670,7 +670,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                   )}
                   {aliasBadge ? (
                     <>
-                      <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-700">
+                      <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 dark:bg-slate-700 px-2 py-1 text-xs text-slate-700 dark:text-slate-200">
                         {aliasBadge.alias}
                       </span>
                       &nbsp;
@@ -680,13 +680,13 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                   {(todo.tags ?? []).map((tag) => (<>
                     <span
                       key={tag.id}
-                      className="group/tag inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-700"
+                      className="group/tag inline-flex items-center gap-1 rounded-lg bg-slate-100 dark:bg-slate-700 px-2 py-1 text-xs text-slate-700 dark:text-slate-200"
                     >
                       {tag.name}
                       <button
                         type="button"
                         onClick={() => store.detachTag(todo.id, tag.id)}
-                        className="hidden h-4 w-4 shrink-0 items-center justify-center rounded text-slate-400 hover:bg-slate-200 hover:text-slate-700 group-hover/tag:flex focus-visible:flex"
+                        className="hidden h-4 w-4 shrink-0 items-center justify-center rounded text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-600 hover:text-slate-700 dark:hover:text-slate-200 group-hover/tag:flex focus-visible:flex"
                         aria-label="Удалить тег"
                       >
                         <FiX />
@@ -746,12 +746,12 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                     {tagDropdown.isMounted && (
                       <div
                         ref={tagDropdown.menuRef}
-                        className={tagDropdown.getMenuClassName('absolute right-0 z-20 w-48 rounded-lg border border-slate-200 bg-white p-2 shadow-lg')}
+                        className={tagDropdown.getMenuClassName('absolute right-0 z-20 w-48 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 p-2 shadow-lg')}
                         onMouseEnter={menuProps.onMouseEnter}
                         onMouseLeave={menuProps.onMouseLeave}
                         onKeyDown={handleTagMenuKeyDown}
                       >
-                        <div className="mb-2 px-1 text-xs font-medium text-slate-500">Теги</div>
+                        <div className="mb-2 px-1 text-xs font-medium text-slate-500 dark:text-slate-400">Теги</div>
                         <ul className="max-h-56 overflow-auto">
                           {availableTags.map((t) => {
                             const selected = todoTagIds.has(t.id)
@@ -768,13 +768,13 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                                       void store.attachTag(todo.id, t.id)
                                     }
                                   }}
-                                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 focus:bg-slate-100"
+                                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 dark:focus-visible:ring-slate-600 focus:bg-slate-100 dark:focus:bg-slate-700"
                                   data-tag-option="true"
                                 >
                                   <span className={`inline-flex h-4 w-4 items-center justify-center rounded-sm border ${selected ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-slate-300 text-transparent'}`}>
                                     <FiCheck className="h-3 w-3" />
                                   </span>
-                                  <span className={`flex-1 ${selected ? 'font-semibold text-slate-900' : 'text-slate-700'}`}>{t.name}</span>
+                                  <span className={`flex-1 ${selected ? 'font-semibold text-slate-900 dark:text-slate-100' : 'text-slate-700 dark:text-slate-300'}`}>{t.name}</span>
                                 </button>
                               </li>
                             )
@@ -816,12 +816,12 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                       <div
                         ref={actionsDropdown.menuRef}
                         {...actionsDropdown.getMenuProps()}
-                        className={actionsDropdown.getMenuClassName('absolute right-0 z-40 w-44 rounded-lg border border-slate-200 bg-white shadow-lg py-1')}
+                        className={actionsDropdown.getMenuClassName('absolute right-0 z-40 w-44 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 shadow-lg py-1')}
                       >
                         <button
                           type="button"
                           onClick={() => { setIsEditing(true); actionsDropdown.close() }}
-                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100"
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700"
                         >
                           <FiEdit2 className="text-slate-500" />
                           <span>Редактировать</span>
@@ -829,7 +829,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
                         <button
                           type="button"
                           onClick={() => { handleDelete(); actionsDropdown.close() }}
-                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-rose-600 hover:bg-rose-50"
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30"
                         >
                           <FiTrash2 className="text-rose-500" />
                           <span>Удалить</span>
@@ -846,10 +846,10 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
         {/* Removed bottom tags row; tags are now inline above */}
 
         {canAddChild && isAddingChild && (!isCollapsed || todo.children.length === 0) && (
-          <form onSubmit={handleAddChild} className="flex items-center gap-2 border-t border-slate-100 bg-slate-50 px-4 py-3">
+          <form onSubmit={handleAddChild} className="flex items-center gap-2 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 px-4 py-3">
             <input
               ref={childInputRef}
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-inner focus:border-slate-400 focus:outline-none"
+              className="w-full rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 shadow-inner focus:border-slate-400 dark:focus:border-slate-500 focus:outline-none"
               value={childTitle}
               onChange={(event) => setChildTitle(event.target.value)}
               placeholder="Новая подзадача"
@@ -890,7 +890,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
       </div>
 
         {canAddChild && !isCollapsed && (
-          <div className="space-y-2 border-l border-slate-200/70 pl-6">
+          <div className="space-y-2 border-l border-slate-200/70 dark:border-slate-700/70 pl-6">
             {todo.children.map((child, childIndex) => (
               <Fragment key={child.id}>
               <TodoItem todo={child} depth={depth + 1} parentId={todo.id} index={childIndex} enableDragDrop={enableDragDrop} forceExpanded={forceExpanded} />
@@ -901,10 +901,10 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
 
       {/* Модальное окно подтверждения удаления */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-fade-in" onClick={cancelDelete}>
-          <div className="rounded-lg bg-white p-6 shadow-xl animate-fade-scale-in" onClick={(e) => e.stopPropagation()}>
-            <h3 className="mb-4 text-lg font-semibold text-slate-900">Удалить задачу?</h3>
-            <p className="mb-6 text-sm text-slate-600">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 dark:bg-black/70 animate-fade-in" onClick={cancelDelete}>
+          <div className="rounded-lg bg-white dark:bg-slate-800 p-6 shadow-xl animate-fade-scale-in" onClick={(e) => e.stopPropagation()}>
+            <h3 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">Удалить задачу?</h3>
+            <p className="mb-6 text-sm text-slate-600 dark:text-slate-300">
               {todo.children.length > 0 
                 ? `Задача "${todo.title}" и все её подзадачи (${todo.children.length}) будут удалены. Это действие нельзя отменить.`
                 : `Задача "${todo.title}" будет удалена. Это действие нельзя отменить.`}
@@ -913,7 +913,7 @@ const TodoItemComponent = ({ todo, depth, parentId, index, pinnedListId, allowCh
               <button
                 type="button"
                 onClick={cancelDelete}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300"
+                className="rounded-lg border border-slate-300 dark:border-slate-600 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300 dark:focus:ring-slate-600"
               >
                 Отмена
               </button>
@@ -971,7 +971,7 @@ const HighlightedText = ({ text, ranges }: HighlightedTextProps) => {
         parts.push(
           <mark
             key={`match-${index}`}
-            className="rounded bg-amber-200 px-0.5 text-slate-900"
+            className="rounded bg-amber-200 dark:bg-amber-800 px-0.5 text-slate-900 dark:text-slate-100"
           >
             {slice}
           </mark>,

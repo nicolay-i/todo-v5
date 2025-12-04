@@ -67,21 +67,21 @@ export const PinnedTextView = ({ lists }: PinnedTextViewProps) => {
   const displayValue = hasContent ? textRepresentation : 'Нет данных для отображения'
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
+    <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/90 dark:bg-slate-800/90 p-4 shadow-sm">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold text-slate-700">Текстовое представление</h3>
-          <p className="text-xs text-slate-500">Учитывает выбранный фильтр активности.</p>
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Текстовое представление</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Учитывает выбранный фильтр активности.</p>
         </div>
         <button
           type="button"
           onClick={handleCopy}
           disabled={!hasContent}
-          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 shadow-sm transition hover:border-slate-300 dark:hover:border-slate-500 hover:bg-slate-50 dark:hover:bg-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {copied ? (
             <>
-              <FiCheck className="text-emerald-500" />
+              <FiCheck className="text-emerald-500 dark:text-emerald-400" />
               Скопировано
             </>
           ) : (
@@ -97,7 +97,7 @@ export const PinnedTextView = ({ lists }: PinnedTextViewProps) => {
         readOnly
         value={displayValue}
         rows={rows}
-        className="h-auto w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-sm text-slate-700 shadow-inner focus:border-slate-400 focus:outline-none"
+        className="h-auto w-full resize-none rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/50 px-3 py-2 font-mono text-sm text-slate-700 dark:text-slate-200 shadow-inner focus:border-slate-400 dark:focus:border-slate-500 focus:outline-none"
       />
     </div>
   )

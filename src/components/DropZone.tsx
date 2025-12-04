@@ -54,8 +54,8 @@ const DropZoneComponent = ({ parentId, depth, index }: DropZoneProps) => {
           heightClass,
           marginClass,
           showPlaceholder ? 'opacity-100' : 'opacity-0',
-          canAccept ? 'border-slate-300 bg-slate-200/60' : 'border-transparent bg-transparent',
-          isOver && canAccept ? 'border-slate-400 bg-slate-300' : '',
+          canAccept ? 'border-slate-300 dark:border-slate-600 bg-slate-200/60 dark:bg-slate-700/60' : 'border-transparent bg-transparent',
+          isOver && canAccept ? 'border-slate-400 dark:border-slate-500 bg-slate-300 dark:bg-slate-600' : '',
         ].join(' ')}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}

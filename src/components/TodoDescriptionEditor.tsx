@@ -63,15 +63,15 @@ export function TodoDescriptionEditor({
   // Desktop: правый Drawer (fixed panel)
   if (!isMobile) {
     return (
-      <div ref={modal.modalRef} className="fixed right-0 top-0 bottom-0 w-[600px] bg-white shadow-2xl z-50 flex flex-col animate-panel-slide-in-right">
+      <div ref={modal.modalRef} className="fixed right-0 top-0 bottom-0 w-[600px] bg-white dark:bg-slate-800 shadow-2xl z-50 flex flex-col animate-panel-slide-in-right">
         {/* Заголовок */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-800 truncate flex-1 mr-4">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+          <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 truncate flex-1 mr-4">
             {todoTitle}
           </h2>
           <button
             onClick={onCancel}
-            className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+            className="rounded-lg p-2 text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
             aria-label="Закрыть"
           >
             <FiX size={20} />
@@ -123,16 +123,16 @@ export function TodoDescriptionEditor({
         </div>
 
         {/* Кнопки действий */}
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-200 bg-slate-50">
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+            className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
           >
             Отмена (Esc)
           </button>
           <button
             onClick={handleSaveClick}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-500 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors flex items-center gap-2"
           >
             <FiCheck size={16} />
             Сохранить (Ctrl+Enter)
@@ -144,15 +144,15 @@ export function TodoDescriptionEditor({
 
   // Mobile: fullscreen modal
   return (
-    <div ref={modal.modalRef} className="fixed inset-0 bg-white z-50 flex flex-col animate-modal-fade-in">
+    <div ref={modal.modalRef} className="fixed inset-0 bg-white dark:bg-slate-800 z-50 flex flex-col animate-modal-fade-in">
       {/* Заголовок */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
-        <h2 className="text-base font-semibold text-slate-800 truncate flex-1 mr-3">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-700">
+        <h2 className="text-base font-semibold text-slate-800 dark:text-slate-200 truncate flex-1 mr-3">
           {todoTitle}
         </h2>
         <button
             onClick={() => { onCancel(); onAfterClose?.() }}
-          className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+          className="rounded-lg p-2 text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
           aria-label="Закрыть"
         >
           <FiX size={20} />
@@ -192,16 +192,16 @@ export function TodoDescriptionEditor({
       </div>
 
       {/* Кнопки действий */}
-      <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-slate-200 bg-slate-50">
+      <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
         <button
           onClick={() => { onCancel(); onAfterClose?.() }}
-          className="px-3 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+          className="px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
         >
           Отмена
         </button>
         <button
           onClick={handleSaveClick}
-          className="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1"
+          className="px-3 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-500 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors flex items-center gap-1"
         >
           <FiCheck size={16} />
           Сохранить

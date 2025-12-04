@@ -3,11 +3,11 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: only light;
+  color-scheme: light dark;
 }
 
 body {
-  @apply min-h-screen bg-canvas-light text-slate-900 antialiased;
+  @apply min-h-screen bg-canvas-light dark:bg-canvas-dark text-slate-900 dark:text-slate-100 antialiased;
 }
 
 /* Mobile ( <800px ) compact todo item layout: split into 2 rows */
@@ -33,16 +33,16 @@ button {
 
 
 .is-first {
-  @apply bg-emerald-50/60 ring-emerald-300;
+  @apply bg-emerald-50/60 dark:bg-emerald-900/30 ring-emerald-300 dark:ring-emerald-600;
 }
 
 /* Системные теги: Проект и Раздел - усиленное выделение при hover */
 .group\/todo.ring-blue-300:hover {
-  @apply ring-blue-400 bg-blue-50/60;
+  @apply ring-blue-400 dark:ring-blue-500 bg-blue-50/60 dark:bg-blue-900/40;
 }
 
 .group\/todo.ring-purple-300:hover {
-  @apply ring-purple-400 bg-purple-50/60;
+  @apply ring-purple-400 dark:ring-purple-500 bg-purple-50/60 dark:bg-purple-900/40;
 }
 
 /* Анимации для уведомлений */
@@ -140,4 +140,9 @@ button {
   box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1);
   border-radius: 0.75rem;
   outline: none;
+}
+
+.dark .modal-panel-base {
+  background-color: #1e293b;
+  box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3), 0 8px 10px -6px rgba(0,0,0,0.3);
 }

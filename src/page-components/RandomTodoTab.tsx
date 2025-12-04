@@ -70,7 +70,7 @@ function RandomTodoTabComponent() {
       <div className="p-4">
         <div className="flex items-center justify-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-          <span className="ml-2 text-slate-500">Загрузка случайной задачи...</span>
+          <span className="ml-2 text-slate-500 dark:text-slate-400">Загрузка случайной задачи...</span>
         </div>
       </div>
     )
@@ -79,15 +79,15 @@ function RandomTodoTabComponent() {
   if (store.randomChain.length === 0) {
     return (
       <div className="p-4">
-        <p className="text-slate-500 text-center py-8">Нет незавершённых задач</p>
+        <p className="text-slate-500 dark:text-slate-400 text-center py-8">Нет незавершённых задач</p>
       </div>
     )
   }
 
   return (
     <div className="pt-3">
-      <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 flex items-center justify-between p-2">
-        <h3 className="text-sm font-semibold text-amber-900">
+      <div className="mb-4 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/30 flex items-center justify-between p-2">
+        <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-200">
           🎯 Цепочка до случайной задачи
         </h3>
       </div>
@@ -100,13 +100,13 @@ function RandomTodoTabComponent() {
       />
 
       {leafTodo && (
-        <div className="mt-6 p-4 rounded-lg bg-green-50 border border-green-200">
-          <h3 className="font-semibold text-green-800 mb-2 text-sm">
+        <div className="mt-6 p-4 rounded-lg bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800">
+          <h3 className="font-semibold text-green-800 dark:text-green-200 mb-2 text-sm">
             🎯 Текущая задача
           </h3>
-          <p className="text-green-900 font-medium">{leafTodo.title}</p>
+          <p className="text-green-900 dark:text-green-100 font-medium">{leafTodo.title}</p>
           {leafTodo.alias && (
-            <p className="text-sm text-green-700 italic mt-1">
+            <p className="text-sm text-green-700 dark:text-green-300 italic mt-1">
               Алиас: {leafTodo.alias}
             </p>
           )}
