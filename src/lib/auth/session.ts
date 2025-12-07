@@ -96,7 +96,8 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
     console.warn(`DEV_USER_ID=${devUserId} не найден в базе данных`)
   }
 
-  const token = cookies().get(SESSION_COOKIE_NAME)?.value
+  const cookieStore = await cookies()
+  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value
   if (!token) return null
 
   const session = await getSessionFromToken(token)
@@ -123,7 +124,8 @@ export async function getUserId(): Promise<string | null> {
     }
   }
 
-  const token = cookies().get(SESSION_COOKIE_NAME)?.value
+  const cookieStore = await cookies()
+  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value
   if (!token) return null
 
   const session = await getSessionFromToken(token)

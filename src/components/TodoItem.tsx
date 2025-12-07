@@ -957,7 +957,7 @@ const HighlightedText = ({ text, ranges }: HighlightedTextProps) => {
       .map(([start, end]) => [Math.max(0, start), Math.max(start, end)] as [number, number])
       .sort((a, b) => a[0] - b[0])
 
-    const parts: (string | JSX.Element)[] = []
+    const parts: (string | React.ReactElement)[] = []
     let cursor = 0
 
     sorted.forEach(([start, end], index) => {

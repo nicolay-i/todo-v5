@@ -7,13 +7,16 @@ import { getTodoState } from '@/lib/todoService'
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
 
+type SearchParamsShape = Record<string, string | string[] | undefined> | undefined
+
 interface PageProps {
-  searchParams?: Record<string, string | string[] | undefined>
+  searchParams?: SearchParamsShape | Promise<SearchParamsShape>
 }
 
 export default async function Page({ searchParams }: PageProps) {
   const user = await getCurrentUser()
-  const authError = typeof searchParams?.authError === 'string' ? searchParams?.authError : null
+  const resolvedSearchParams = await searchParams
+  const authError = typeof resolvedSearchParams?.authError === 'string' ? resolvedSearchParams.authError : null
 
   if (!user) {
     return (

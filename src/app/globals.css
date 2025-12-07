@@ -1,6 +1,9 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  --color-canvas-light: #f4f7fb;
+  --color-canvas-dark: #0f172a;
+}
 
 :root {
   color-scheme: light dark;
